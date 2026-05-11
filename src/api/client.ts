@@ -1,0 +1,54 @@
+import type { ApiError, ProblemDetail } from './types'
+
+const API_BASE = '/api/v1'
+
+export function normalizeProblemDetail(status: number, problem: ProblemDetail | null): ApiError {
+  return {
+    status,
+    title: problem?.title ? String(problem.title) : undefined,
+    message: (problem?.detail ? String(problem.detail) : problem?.title ? String(problem.title) : 'Request failed'),
+    fieldErrors:
+      problem?.errors && typeof problem.errors === 'object'
+        ? (problem.errors as Record<string, string[]>)
+        : undefined,
+  }
+}
+
+async function parseError(response: Response): Promise<ApiError> {
+  let payload: ProblemDetail | null
+  try {
+    payload = (await response.json()) as ProblemDetail
+  } catch {
+    payload = null
+  }
+  return normalizeProblemDetail(response.status, payload)
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...init?.headers,
+    },
+  })
+
+  if (!response.ok) {
+    throw await parseError(response)
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  if (!text) {
+    return undefined as T
+  }
+  return JSON.parse(text) as T
+}
+
+export function toJsonBody(input: unknown): string {
+  return JSON.stringify(input)
+}

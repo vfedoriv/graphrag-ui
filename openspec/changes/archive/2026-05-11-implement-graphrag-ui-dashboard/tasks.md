@@ -1,0 +1,54 @@
+## 1. Project Foundation
+
+- [x] 1.1 Add and verify required dependencies (Router, Query, RHF, Zod, Tailwind, lucide-react, Vitest, RTL)
+- [x] 1.2 Configure Tailwind via Vite and replace starter global styles with dashboard-ready base styles
+- [x] 1.3 Configure Vitest/jsdom test setup, coverage options, and npm test scripts (`test`, `test:run`, `coverage`)
+- [x] 1.4 Add/verify foundation tests for app bootstrap and test harness configuration
+
+## 2. App Shell and Routing
+
+- [x] 2.1 Implement app providers (`QueryClientProvider`, router root) and route tree under `src/app`
+- [x] 2.2 Build persistent admin shell with sidebar navigation and header status surfaces
+- [x] 2.3 Implement selected knowledge base client state persistence and route-level access helpers
+- [x] 2.4 Add/verify app shell and route navigation tests, including no dedicated health-endpoint dependency
+
+## 3. Shared API and UI Infrastructure
+
+- [x] 3.1 Implement typed DTO modules and shared `apiFetch` helpers for JSON/multipart requests
+- [x] 3.2 Implement `ProblemDetail` -> `ApiError` normalization for field-level and request-level errors
+- [x] 3.3 Build reusable UI primitives (forms, table, empty/loading/error/status components)
+- [x] 3.4 Add/verify tests for API helpers, error normalization, and critical shared UI states
+
+## 4. Knowledge Base Workflows
+
+- [x] 4.1 Implement knowledge base API module and query/mutation hooks with stable query keys
+- [x] 4.2 Build knowledge base list/create/rename/delete/select UI with optimistic UX guards
+- [x] 4.3 Add mutation invalidation/refetch behaviors and tests for selected-knowledge-base synchronization
+- [x] 4.4 Verify KB workflow tests pass before proceeding to schema workflows
+
+## 5. Schema Workflows
+
+- [x] 5.1 Implement schema API operations (list/get/validate/create/activate) and hooks
+- [x] 5.2 Build schema registry/detail views with YAML validation feedback
+- [x] 5.3 Build schema generation flow (example -> YAML -> validate/edit -> create) with stage gating
+- [x] 5.4 Add/verify schema management and generation workflow tests before proceeding
+
+## 6. Document Workflows
+
+- [x] 6.1 Implement document upload/list/process/chunks API calls and hooks
+- [x] 6.2 Build document UI for multipart upload, process actions, and status/error displays
+- [x] 6.3 Build chunk inspection UI and ensure refresh behavior after processing
+- [x] 6.4 Add/verify document workflow tests for upload, process, and chunk inspection
+
+## 7. Query Workflows
+
+- [x] 7.1 Implement query API operations (generate, validate, execute, ask) and hooks
+- [x] 7.2 Build query page for prompt input, Cypher editing, validation, and execution results
+- [x] 7.3 Ensure one-shot ask flow displays answer and related query metadata clearly
+- [x] 7.4 Add/verify query workflow tests for generate/validate/execute/ask behavior
+
+## 8. Deployment and Verification
+
+- [x] 8.1 Add multi-stage Dockerfile and nginx config for SPA fallback plus `/api` proxying
+- [x] 8.2 Add example compose/runtime config documenting `GRAPHRAG_API_URL` and proxy expectations
+- [x] 8.3 Run full verification (`npm run lint`, `npm run test:run`, `npm run build`) and resolve remaining failures

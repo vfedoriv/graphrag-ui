@@ -1,0 +1,7 @@
+services:
+  graphrag-ui:
+    build: .
+    ports:
+      - '8333:8333'
+    environment:
+      GRAPHRAG_API_URL: http://graphrag:8080
