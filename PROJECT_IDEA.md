@@ -12,3 +12,6 @@ Ask additional questions if you need to clarify details about business logic, te
 Out of scope:
 - authentication
 - authorization
+
+UPDATE:
+this idea implementation plan is added into  [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
