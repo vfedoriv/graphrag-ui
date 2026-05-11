@@ -2,31 +2,47 @@
 
 ## Project Structure & Module Organization
 
-This is a Vite React TypeScript frontend for a future GraphRAG admin/dashboard UI. Application code lives in `src/`: `main.tsx` mounts React, `App.tsx` contains the current root component, and `App.css` / `index.css` hold styles. Static public assets live in `public/`; imported UI assets live in `src/assets/`. Build and tool configuration is at the repository root (`vite.config.ts`, `tsconfig*.json`, `eslint.config.js`, `package.json`). `PROJECT_IDEA.md` describes the intended product direction and backend relationship.
+This repository is a React 19 + Vite + TypeScript admin UI for the GraphRAG backend (`/home/vitaliy/workspace/graphrag`). Keep frontend concerns in this repo only; backend API contracts are consumed, not modified here.
+
+Code should be organized by feature, not by file type. Use `src/app` for app shell/router/providers, `src/features/*` for domain modules (`knowledge-bases`, `schemas`, `documents`, `queries`), `src/shared` for reusable UI and utilities, and `src/api` for typed HTTP client code. Static files belong in `public/`; generated build output is `dist/`.
 
 ## Build, Test, and Development Commands
 
-Use npm scripts from the repository root:
+Use npm scripts from the project root:
 
-- `npm run dev` starts the Vite development server with HMR.
-- `npm run build` runs TypeScript project build checks and creates the production Vite bundle in `dist/`.
-- `npm run lint` runs ESLint over the project.
-- `npm run preview` serves the production build locally for verification.
+- `npm run dev`: start Vite with HMR.
+- `npm run build`: type-check and build production assets.
+- `npm run lint`: run ESLint.
+- `npm run preview`: serve built assets locally.
+- `npm test`, `npm run test:run`, `npm run coverage`: Vitest workflows (add/maintain these scripts as test setup lands).
 
-Install dependencies with `npm install` when `package-lock.json` changes.
+Dev API traffic should use `/api` and be proxied to backend (`VITE_API_PROXY_TARGET`, default `http://localhost:8080`).
 
 ## Coding Style & Naming Conventions
 
-Write TypeScript and React components in `.tsx` files. Follow the existing style: two-space indentation, single quotes, no semicolons, and function components. Prefer descriptive component and variable names; use `PascalCase` for React components, `camelCase` for variables/functions, and lowercase or kebab-case for static asset filenames. Keep component-specific styles near the component unless a rule is truly global. Run `npm run lint` before submitting changes.
+Use TypeScript everywhere. Prefer function components, two-space indentation, single quotes, and no semicolons. Use `PascalCase` for components/types, `camelCase` for functions/variables, and kebab-case for asset filenames.
+
+Model server data with explicit DTO types in `src/api/types.ts` (or feature-local equivalents). Centralize fetch logic and `ProblemDetail` error normalization. For forms, use React Hook Form + Zod; for server state, use TanStack Query with stable query keys and mutation invalidation.
 
 ## Testing Guidelines
 
-No test runner is currently wired in `package.json`. When adding tests, prefer Vitest to match the project plan, place tests beside the code as `*.test.ts` or `*.test.tsx`, and add an `npm test` script. Focus tests on user-visible dashboard behavior, API client transformations, and state transitions rather than implementation details.
+Use Vitest with `jsdom` and React Testing Library. Co-locate tests as `*.test.ts(x)` next to source files. Prioritize:
+
+- API client behavior (JSON/multipart payloads, error parsing).
+- Query/mutation cache behavior.
+- Critical user workflows: KB CRUD, schema generation/activation, document upload/process, query ask/execute.
 
 ## Commit & Pull Request Guidelines
 
-The existing history uses short imperative commit messages, for example `add project idea` and `init commit`. Continue that style with focused commits such as `add knowledge base list view`. Pull requests should include a concise summary, testing performed (`npm run build`, `npm run lint`, future `npm test`), linked issues when applicable, and screenshots or screen recordings for UI changes.
+Use short imperative commit messages (`add schema activation panel`). Keep commits focused and reviewable.
+
+PRs should include:
+
+- What changed and why.
+- Validation performed (`npm run lint`, `npm run build`, tests).
+- Screenshots/video for UI changes.
+- Notes on API assumptions or contract dependencies.
 
 ## Security & Configuration Tips
 
-Do not commit secrets, backend tokens, or local environment files. Keep backend URLs and runtime configuration in environment variables when introduced. Authentication and authorization are currently out of scope per `PROJECT_IDEA.md`, so avoid adding placeholder security flows without a product decision.
+Never commit secrets or local env files. Configure runtime endpoints via env vars (for example `VITE_API_PROXY_TARGET`, `GRAPHRAG_API_URL` in container runtime). Authentication/authorization are currently out of scope; do not add placeholder auth flows without explicit product direction.
