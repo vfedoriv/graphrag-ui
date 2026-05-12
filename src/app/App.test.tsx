@@ -16,14 +16,14 @@ describe('app shell', () => {
     vi.unstubAllGlobals()
   })
 
-  it('renders sidebar entries and navigates to queries', async () => {
+  it('renders sidebar entries and navigates to schemas', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     expect(await screen.findByText('GraphRAG UI')).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: /Queries/i }))
+    await user.click(screen.getByRole('link', { name: /Schemas/i }))
 
-    expect(await screen.findByRole('heading', { name: 'Queries' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Schemas' })).toBeInTheDocument()
   })
 
   it('does not call dedicated health endpoint', async () => {

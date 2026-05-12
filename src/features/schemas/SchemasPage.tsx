@@ -3,7 +3,9 @@ import { schemasApi, useActivateSchemaMutation, useCreateSchemaMutation, useSche
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
+import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
 import { Input } from '../../shared/ui/Input'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
@@ -12,23 +14,15 @@ export function SchemasPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const { data = [] } = useSchemasQuery()
   const [yaml, setYaml] = useState('')
+  const [schemaId, setSchemaId] = useState('')
+  const [selectedSchema, setSelectedSchema] = useState<string>('')
+  const [getSchemaError, setGetSchemaError] = useState<string>('')
   const [validation, setValidation] = useState<string[] | null>(null)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
 
-  return (
-    <section className='space-y-4'>
-      <h1 className='text-2xl font-bold text-slate-900'>Schemas</h1>
-      <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
-        <h2 className='text-base font-semibold text-slate-900'>Validate and Create Schema</h2>
-        <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
-        <div className='flex gap-2'>
-          <Button type='button' onClick={async () => setValidation((await schemasApi.validate({ content: yaml })).errors)}>Validate</Button>
-          <Button type='button' className='bg-emerald-700' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'USER_DEFINED' })}>Create</Button>
-        </div>
-        {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
-      </div>
-      <SchemaGenerationPanel onYamlReady={setYaml} />
+  const topSection = (
+    <>
       {data.length === 0 ? (
         <EmptyState title='No Schemas' body='Create or generate one, then activate it for the selected knowledge base.' />
       ) : (
@@ -50,52 +44,231 @@ export function SchemasPage() {
         />
       )}
       {!selectedKnowledgeBaseId && <Alert title='No knowledge base selected' message='Activation requires selecting a knowledge base in the header or KB page.' tone='info' />}
-    </section>
+    </>
+  )
+
+  const tabs: EndpointTab[] = [
+    {
+      id: 'create-schema',
+      label: 'Create schema',
+      content: (
+        <div className='space-y-2'>
+          <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
+          <Button type='button' className='bg-emerald-700' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'USER_DEFINED' })}>Create</Button>
+          {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
+        </div>
+      ),
+    },
+    {
+      id: 'generate-schema-yaml',
+      label: 'Generate schema YAML',
+      content: <SchemaGenerateYamlFromText onYamlReady={setYaml} />,
+    },
+    {
+      id: 'generate-schema-yaml-file',
+      label: 'Generate schema YAML from file',
+      content: <SchemaGenerateYamlFromFile onYamlReady={setYaml} />,
+    },
+    {
+      id: 'generate-schema-example-text',
+      label: 'Generate schema example from text',
+      content: <SchemaGenerateExampleFromText />,
+    },
+    {
+      id: 'generate-schema-example-file',
+      label: 'Generate schema example from file',
+      content: <SchemaGenerateExampleFromFile />,
+    },
+    {
+      id: 'get-schema-by-id',
+      label: 'Get schema by ID',
+      content: (
+        <div className='space-y-2'>
+          <Input value={schemaId} onChange={(e) => setSchemaId(e.target.value)} placeholder='Schema ID' />
+          <Button
+            type='button'
+            onClick={async () => {
+              setGetSchemaError('')
+              try {
+                const schema = await schemasApi.get(schemaId)
+                setSelectedSchema(JSON.stringify(schema, null, 2))
+              } catch (e) {
+                setGetSchemaError((e as Error).message)
+              }
+            }}
+          >
+            Get schema by ID
+          </Button>
+          {getSchemaError && <Alert title='Get schema failed' message={getSchemaError} />}
+          {selectedSchema && <pre className='max-h-72 overflow-auto rounded bg-slate-100 p-2 text-xs'>{selectedSchema}</pre>}
+        </div>
+      ),
+    },
+    {
+      id: 'validate-schema-yaml',
+      label: 'Validate schema YAML',
+      content: (
+        <div className='space-y-2'>
+          <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
+          <Button type='button' onClick={async () => setValidation((await schemasApi.validate({ content: yaml })).errors)}>Validate schema YAML</Button>
+          {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <ControllerPage
+      title='Schemas'
+      topSectionTitle='Schemas list'
+      topSection={topSection}
+      tabs={<EndpointTabs tabs={tabs} testId='schemas-endpoint-tabs' />}
+      testId='schemas-controller-page'
+    />
   )
 }
 
-function SchemaGenerationPanel({ onYamlReady }: { onYamlReady: (yaml: string) => void }) {
-  const [name, setName] = useState('generated-schema')
-  const [version, setVersion] = useState(1)
+function SchemaGenerateExampleFromText() {
   const [text, setText] = useState('')
   const [userPrompt, setUserPrompt] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const generateExample = async () => {
-    setError(null)
-    try {
-      const res = await schemasApi.generateExample({ text, userPrompt })
-      setExample(res.example)
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
+  return (
+    <div className='space-y-2'>
+      <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
+      <Textarea rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
+      <Button
+        type='button'
+        onClick={async () => {
+          setError(null)
+          try {
+            const res = await schemasApi.generateExample({ text, userPrompt })
+            setExample(res.example)
+          } catch (e) {
+            setError((e as Error).message)
+          }
+        }}
+      >
+        Generate schema example
+      </Button>
+      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
+      {error && <Alert title='Generation failed' message={error} />}
+    </div>
+  )
+}
 
-  const generateYaml = async () => {
-    if (!example.trim()) {
-      setError('Generate example first before YAML generation.')
-      return
-    }
-    setError(null)
-    try {
-      const res = await schemasApi.generateYaml({ name, version, text, example })
-      onYamlReady(res.content)
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
+function SchemaGenerateExampleFromFile() {
+  const [fileText, setFileText] = useState('')
+  const [example, setExample] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   return (
-    <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
-      <h2 className='text-base font-semibold text-slate-900'>Schema Generation</h2>
+    <div className='space-y-2'>
+      <label className='block text-sm text-slate-700'>
+        Upload source file
+        <input
+          className='mt-2 block'
+          type='file'
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            setFileText(await file.text())
+          }}
+        />
+      </label>
+      <Button
+        type='button'
+        onClick={async () => {
+          setError(null)
+          try {
+            const res = await schemasApi.generateExample({ text: fileText })
+            setExample(res.example)
+          } catch (e) {
+            setError((e as Error).message)
+          }
+        }}
+      >
+        Generate schema example from file
+      </Button>
+      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
+      {error && <Alert title='Generation failed' message={error} />}
+    </div>
+  )
+}
+
+function SchemaGenerateYamlFromText({ onYamlReady }: { onYamlReady: (yaml: string) => void }) {
+  const [name, setName] = useState('generated-schema')
+  const [version, setVersion] = useState(1)
+  const [text, setText] = useState('')
+  const [example, setExample] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <div className='space-y-2'>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <Input type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
-      <Textarea rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
-      <Button type='button' onClick={generateExample}>Generate Example</Button>
-      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
-      <Button type='button' className='bg-emerald-700' onClick={generateYaml}>Generate YAML</Button>
+      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
+      <Button
+        type='button'
+        className='bg-emerald-700'
+        onClick={async () => {
+          setError(null)
+          try {
+            const res = await schemasApi.generateYaml({ name, version, text, example })
+            onYamlReady(res.content)
+          } catch (e) {
+            setError((e as Error).message)
+          }
+        }}
+      >
+        Generate schema YAML
+      </Button>
+      {error && <Alert title='Generation failed' message={error} />}
+    </div>
+  )
+}
+
+function SchemaGenerateYamlFromFile({ onYamlReady }: { onYamlReady: (yaml: string) => void }) {
+  const [name, setName] = useState('generated-schema')
+  const [version, setVersion] = useState(1)
+  const [text, setText] = useState('')
+  const [example, setExample] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <div className='space-y-2'>
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <Input type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <label className='block text-sm text-slate-700'>
+        Upload source text file
+        <input
+          className='mt-2 block'
+          type='file'
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            setText(await file.text())
+          }}
+        />
+      </label>
+      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
+      <Button
+        type='button'
+        className='bg-emerald-700'
+        onClick={async () => {
+          setError(null)
+          try {
+            const res = await schemasApi.generateYaml({ name, version, text, example })
+            onYamlReady(res.content)
+          } catch (e) {
+            setError((e as Error).message)
+          }
+        }}
+      >
+        Generate schema YAML from file
+      </Button>
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )

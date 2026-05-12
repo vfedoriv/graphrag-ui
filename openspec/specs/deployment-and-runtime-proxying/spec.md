@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the required behavior for deployment and runtime proxying in the GraphRAG admin UI.
+
+## Requirements
 
 ### Requirement: Development runtime proxies API via Vite
 The system SHALL proxy `/api` requests from the Vite development server to a configurable backend target using `VITE_API_PROXY_TARGET` with a local default.

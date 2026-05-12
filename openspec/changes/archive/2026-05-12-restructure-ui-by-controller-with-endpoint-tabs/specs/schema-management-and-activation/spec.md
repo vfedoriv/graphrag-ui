@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for schema management and activation in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Users can inspect and create schemas
 The system SHALL support listing schemas in a top section and expose schema operations as tabs on the Schemas page, including create schema, get schema by ID, and validate schema YAML.
 
@@ -15,4 +13,3 @@ The system SHALL allow activating a selected schema against the currently select
 #### Scenario: Activate schema within tabbed Schemas page
 - **WHEN** a user chooses a schema and confirms activation with an active knowledge base selected
 - **THEN** the system SHALL call schema activation endpoint and refresh active-schema-related views without leaving the Schemas page
-

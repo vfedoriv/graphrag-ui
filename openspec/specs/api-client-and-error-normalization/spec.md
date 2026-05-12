@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the required behavior for api client and error normalization in the GraphRAG admin UI.
+
+## Requirements
 
 ### Requirement: API client enforces typed request and response handling
 The system SHALL provide typed API modules and shared fetch helpers for JSON and multipart requests across all feature domains.

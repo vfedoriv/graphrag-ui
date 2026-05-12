@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for query authoring and execution in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Users can generate, validate, and execute Cypher
 The system SHALL expose Cypher-related endpoint operations as tabs inside a single Queries controller page.
 
@@ -15,4 +13,3 @@ The system SHALL keep one-shot ask as a dedicated tabbed workflow on the Queries
 #### Scenario: Execute ask from tab
 - **WHEN** a user submits an ask request from the Ask tab
 - **THEN** the system SHALL execute the ask endpoint and display results without leaving the Queries page
-
