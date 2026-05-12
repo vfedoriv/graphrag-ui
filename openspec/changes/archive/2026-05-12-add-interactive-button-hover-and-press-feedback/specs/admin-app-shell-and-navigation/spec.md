@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for admin app shell and navigation in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Admin shell provides stable navigation and context
 The system SHALL expose primary navigation entries by controller pages (Schemas, Knowledge Bases, Documents, Queries) and route each entry to its single-page controller workspace, and shell-level action buttons SHALL use the shared interactive visual feedback states.
 
@@ -15,4 +13,3 @@ The system SHALL preserve global knowledge base selection behavior across contro
 #### Scenario: Use global knowledge base in controller tabs
 - **WHEN** a user has an active global knowledge base selected and runs an endpoint workflow from a controller tab
 - **THEN** the workflow SHALL consume the selected knowledge base context consistently
-

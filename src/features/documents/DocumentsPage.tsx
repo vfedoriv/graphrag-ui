@@ -6,6 +6,7 @@ import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
+import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Table } from '../../shared/ui/Table'
 
 export function DocumentsPage() {
@@ -14,6 +15,7 @@ export function DocumentsPage() {
   const uploadMutation = useUploadDocumentMutation()
   const processMutation = useProcessDocumentMutation()
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
+  const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
   const chunksQuery = useDocumentChunksQuery(selectedDocumentId)
 
   if (!selectedKnowledgeBaseId) {
@@ -43,19 +45,15 @@ export function DocumentsPage() {
       label: 'Upload document',
       content: (
         <>
-          <label className='block text-sm text-slate-700'>
-            Upload file
-            <input
-              className='mt-2 block'
-              type='file'
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  uploadMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, file })
-                }
-              }}
-            />
-          </label>
+          <FileSelectButton
+            buttonLabel='Select file to upload'
+            testId='documents-upload-select-file'
+            onFileSelected={(file) => {
+              setSelectedUploadFilename(file.name)
+              uploadMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, file })
+            }}
+          />
+          {selectedUploadFilename && <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p>}
           {uploadMutation.error && <Alert title='Upload failed' message={(uploadMutation.error as Error).message} />}
         </>
       ),

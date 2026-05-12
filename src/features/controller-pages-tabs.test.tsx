@@ -69,6 +69,7 @@ describe('controller pages tabs', () => {
 
     expect(await screen.findByRole('button', { name: 'Upload document' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Inspect document chunks' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select file to upload' })).toBeInTheDocument()
   })
 
   it('renders queries endpoint tabs', async () => {
@@ -76,5 +77,16 @@ describe('controller pages tabs', () => {
 
     expect(screen.getByRole('button', { name: 'Ask query' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Execute Cypher' })).toBeInTheDocument()
+  })
+
+  it('renders schema file-select buttons', async () => {
+    const user = userEvent.setup()
+    render(wrapper(<SchemasPage />))
+
+    await user.click(await screen.findByRole('button', { name: 'Generate schema example from file' }))
+    expect(screen.getByRole('button', { name: 'Select source file' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Generate schema YAML from file' }))
+    expect(screen.getByRole('button', { name: 'Select source text file' })).toBeInTheDocument()
   })
 })

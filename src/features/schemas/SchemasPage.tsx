@@ -6,6 +6,7 @@ import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
+import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
@@ -160,23 +161,21 @@ function SchemaGenerateExampleFromText() {
 
 function SchemaGenerateExampleFromFile() {
   const [fileText, setFileText] = useState('')
+  const [selectedFilename, setSelectedFilename] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   return (
     <div className='space-y-2'>
-      <label className='block text-sm text-slate-700'>
-        Upload source file
-        <input
-          className='mt-2 block'
-          type='file'
-          onChange={async (e) => {
-            const file = e.target.files?.[0]
-            if (!file) return
-            setFileText(await file.text())
-          }}
-        />
-      </label>
+      <FileSelectButton
+        buttonLabel='Select source file'
+        testId='schemas-example-file-select'
+        onFileSelected={async (file) => {
+          setSelectedFilename(file.name)
+          setFileText(await file.text())
+        }}
+      />
+      {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
       <Button
         type='button'
         onClick={async () => {
@@ -234,6 +233,7 @@ function SchemaGenerateYamlFromFile({ onYamlReady }: { onYamlReady: (yaml: strin
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
   const [text, setText] = useState('')
+  const [selectedFilename, setSelectedFilename] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -241,18 +241,15 @@ function SchemaGenerateYamlFromFile({ onYamlReady }: { onYamlReady: (yaml: strin
     <div className='space-y-2'>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <Input type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
-      <label className='block text-sm text-slate-700'>
-        Upload source text file
-        <input
-          className='mt-2 block'
-          type='file'
-          onChange={async (e) => {
-            const file = e.target.files?.[0]
-            if (!file) return
-            setText(await file.text())
-          }}
-        />
-      </label>
+      <FileSelectButton
+        buttonLabel='Select source text file'
+        testId='schemas-yaml-file-select'
+        onFileSelected={async (file) => {
+          setSelectedFilename(file.name)
+          setText(await file.text())
+        }}
+      />
+      {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
       <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
       <Button
         type='button'

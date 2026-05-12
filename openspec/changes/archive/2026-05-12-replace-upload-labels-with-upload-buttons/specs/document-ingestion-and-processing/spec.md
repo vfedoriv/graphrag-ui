@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for document ingestion and processing in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Users can upload and process documents per knowledge base
 The system SHALL support multipart file upload to the selected knowledge base and SHALL expose an explicit upload button that opens file chooser for selecting the document.
 
@@ -15,4 +13,3 @@ The system SHALL allow users to inspect processing outputs within the Documents 
 #### Scenario: View processing outputs after execution
 - **WHEN** a document processing workflow completes
 - **THEN** the system SHALL show resulting outputs/status in the relevant Documents tab panel
-
