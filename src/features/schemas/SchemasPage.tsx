@@ -6,8 +6,10 @@ import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
+import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
+import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
 
@@ -54,7 +56,8 @@ export function SchemasPage() {
       label: 'Create schema',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
+          <FieldLabel htmlFor='create-schema-yaml'>Schema YAML content</FieldLabel>
+          <Textarea id='create-schema-yaml' rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
           <Button type='button' className='bg-emerald-700' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'USER_DEFINED' })}>Create</Button>
           {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
         </div>
@@ -85,7 +88,8 @@ export function SchemasPage() {
       label: 'Get schema by ID',
       content: (
         <div className='space-y-2'>
-          <Input value={schemaId} onChange={(e) => setSchemaId(e.target.value)} placeholder='Schema ID' />
+          <FieldLabel htmlFor='get-schema-id'>Schema ID</FieldLabel>
+          <Input id='get-schema-id' value={schemaId} onChange={(e) => setSchemaId(e.target.value)} placeholder='Schema ID' />
           <Button
             type='button'
             onClick={async () => {
@@ -101,7 +105,7 @@ export function SchemasPage() {
             Get schema by ID
           </Button>
           {getSchemaError && <Alert title='Get schema failed' message={getSchemaError} />}
-          {selectedSchema && <pre className='max-h-72 overflow-auto rounded bg-slate-100 p-2 text-xs'>{selectedSchema}</pre>}
+          {selectedSchema && <OutputPreview label='Schema details JSON'>{selectedSchema}</OutputPreview>}
         </div>
       ),
     },
@@ -110,7 +114,8 @@ export function SchemasPage() {
       label: 'Validate schema YAML',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
+          <FieldLabel htmlFor='validate-schema-yaml-input'>Schema YAML content</FieldLabel>
+          <Textarea id='validate-schema-yaml-input' rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
           <Button type='button' onClick={async () => setValidation((await schemasApi.validate({ content: yaml })).errors)}>Validate schema YAML</Button>
           {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
         </div>
@@ -137,8 +142,10 @@ function SchemaGenerateExampleFromText() {
 
   return (
     <div className='space-y-2'>
-      <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
-      <Textarea rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
+      <FieldLabel htmlFor='generate-example-text-source'>Source text</FieldLabel>
+      <Textarea id='generate-example-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
+      <FieldLabel htmlFor='generate-example-text-guidance'>Generation guidance (optional)</FieldLabel>
+      <Textarea id='generate-example-text-guidance' rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
       <Button
         type='button'
         onClick={async () => {
@@ -153,7 +160,8 @@ function SchemaGenerateExampleFromText() {
       >
         Generate schema example
       </Button>
-      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
+      <FieldLabel htmlFor='generate-example-text-output'>Generated schema example</FieldLabel>
+      <Textarea id='generate-example-text-output' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )
@@ -190,7 +198,8 @@ function SchemaGenerateExampleFromFile() {
       >
         Generate schema example from file
       </Button>
-      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
+      <FieldLabel htmlFor='generate-example-file-output'>Generated schema example</FieldLabel>
+      <Textarea id='generate-example-file-output' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )
@@ -205,10 +214,14 @@ function SchemaGenerateYamlFromText({ onYamlReady }: { onYamlReady: (yaml: strin
 
   return (
     <div className='space-y-2'>
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
-      <Input type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
-      <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
-      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
+      <FieldLabel htmlFor='generate-yaml-text-name'>Schema name</FieldLabel>
+      <Input id='generate-yaml-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <FieldLabel htmlFor='generate-yaml-text-version'>Schema version</FieldLabel>
+      <Input id='generate-yaml-text-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <FieldLabel htmlFor='generate-yaml-text-source'>Source text</FieldLabel>
+      <Textarea id='generate-yaml-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
+      <FieldLabel htmlFor='generate-yaml-text-example'>Schema example JSON</FieldLabel>
+      <Textarea id='generate-yaml-text-example' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
       <Button
         type='button'
         className='bg-emerald-700'
@@ -239,8 +252,10 @@ function SchemaGenerateYamlFromFile({ onYamlReady }: { onYamlReady: (yaml: strin
 
   return (
     <div className='space-y-2'>
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
-      <Input type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <FieldLabel htmlFor='generate-yaml-file-name'>Schema name</FieldLabel>
+      <Input id='generate-yaml-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <FieldLabel htmlFor='generate-yaml-file-version'>Schema version</FieldLabel>
+      <Input id='generate-yaml-file-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FileSelectButton
         buttonLabel='Select source text file'
         testId='schemas-yaml-file-select'
@@ -250,7 +265,8 @@ function SchemaGenerateYamlFromFile({ onYamlReady }: { onYamlReady: (yaml: strin
         }}
       />
       {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
-      <Textarea rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
+      <FieldLabel htmlFor='generate-yaml-file-example'>Schema example JSON</FieldLabel>
+      <Textarea id='generate-yaml-file-example' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Schema example JSON' />
       <Button
         type='button'
         className='bg-emerald-700'

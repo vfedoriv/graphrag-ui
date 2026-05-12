@@ -33,7 +33,7 @@ describe('queries workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.type(screen.getByPlaceholderText('Ask in natural language'), 'who?')
+    await user.type(screen.getByLabelText('Question prompt'), 'who?')
     await user.click(screen.getByRole('button', { name: 'Ask' }))
 
     await user.click(screen.getByRole('button', { name: 'Generate Cypher' }))

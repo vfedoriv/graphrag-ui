@@ -7,6 +7,7 @@ import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
+import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { Table } from '../../shared/ui/Table'
 
 export function DocumentsPage() {
@@ -72,7 +73,7 @@ export function DocumentsPage() {
           {chunksQuery.isLoading ? (
             <p className='text-sm text-slate-600'>Loading chunks...</p>
           ) : (
-            <pre className='max-h-72 overflow-auto rounded bg-slate-100 p-2 text-xs'>{JSON.stringify(chunksQuery.data, null, 2)}</pre>
+            <OutputPreview label='Document chunks JSON'>{JSON.stringify(chunksQuery.data, null, 2)}</OutputPreview>
           )}
         </div>
       ) : (

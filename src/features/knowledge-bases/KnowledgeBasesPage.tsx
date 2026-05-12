@@ -12,6 +12,7 @@ import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
+import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { Input } from '../../shared/ui/Input'
 import { Table } from '../../shared/ui/Table'
 
@@ -41,8 +42,14 @@ export function KnowledgeBasesPage() {
     <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4' data-testid='knowledge-bases-create-section'>
       <h2 className='text-base font-semibold text-slate-900'>Create knowledge base</h2>
       <form onSubmit={onSubmit} className='grid gap-2 md:grid-cols-[1fr_1fr_auto]'>
-        <Input placeholder='id (kb-demo)' {...form.register('id')} />
-        <Input placeholder='name' {...form.register('name')} />
+        <div className='space-y-1'>
+          <FieldLabel htmlFor='knowledge-base-id'>Knowledge base ID</FieldLabel>
+          <Input id='knowledge-base-id' placeholder='id (kb-demo)' {...form.register('id')} />
+        </div>
+        <div className='space-y-1'>
+          <FieldLabel htmlFor='knowledge-base-name'>Knowledge base name</FieldLabel>
+          <Input id='knowledge-base-name' placeholder='name' {...form.register('name')} />
+        </div>
         <Button type='submit' disabled={createMutation.isPending}>Create</Button>
       </form>
       {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}

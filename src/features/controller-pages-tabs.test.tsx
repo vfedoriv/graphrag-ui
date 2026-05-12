@@ -44,6 +44,7 @@ describe('controller pages tabs', () => {
     await user.click(screen.getByRole('button', { name: 'Validate schema YAML' }))
 
     expect(screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')).toBeInTheDocument()
+    expect(screen.getByLabelText('Schema YAML content')).toBeInTheDocument()
   })
 
   it('renders knowledge base inline create section without endpoint tabs', async () => {
@@ -51,6 +52,8 @@ describe('controller pages tabs', () => {
 
     expect(await screen.findByRole('button', { name: 'Create' })).toBeInTheDocument()
     expect(screen.getByTestId('knowledge-bases-create-section')).toBeInTheDocument()
+    expect(screen.getByLabelText('Knowledge base ID')).toBeInTheDocument()
+    expect(screen.getByLabelText('Knowledge base name')).toBeInTheDocument()
     expect(screen.queryByTestId('knowledge-bases-endpoint-tabs')).not.toBeInTheDocument()
   })
 
@@ -67,6 +70,7 @@ describe('controller pages tabs', () => {
 
     expect(screen.getByRole('button', { name: 'Ask query' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Execute Cypher' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Question prompt')).toBeInTheDocument()
   })
 
   it('renders schema file-select buttons', async () => {

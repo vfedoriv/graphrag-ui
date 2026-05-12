@@ -10,6 +10,8 @@ import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
+import { FieldLabel } from '../../shared/ui/FieldLabel'
+import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
 
@@ -46,9 +48,10 @@ export function QueriesPage() {
       label: 'Ask query',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
+          <FieldLabel htmlFor='ask-query-prompt'>Question prompt</FieldLabel>
+          <Textarea id='ask-query-prompt' rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
           <Button type='button' className='bg-slate-700' onClick={() => ask.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })}>Ask</Button>
-          {ask.data && <pre className='max-h-72 overflow-auto rounded-md border border-slate-300 bg-white p-3 text-xs'>{JSON.stringify(ask.data, null, 2)}</pre>}
+          {ask.data && <OutputPreview label='Ask query result JSON'>{JSON.stringify(ask.data, null, 2)}</OutputPreview>}
         </div>
       ),
     },
@@ -57,7 +60,8 @@ export function QueriesPage() {
       label: 'Generate Cypher',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
+          <FieldLabel htmlFor='generate-cypher-prompt'>Question prompt</FieldLabel>
+          <Textarea id='generate-cypher-prompt' rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
           <Button
             type='button'
             onClick={async () => {
@@ -68,8 +72,10 @@ export function QueriesPage() {
           >
             Generate Cypher
           </Button>
-          <Textarea rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
-          <Textarea rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
+          <FieldLabel htmlFor='generate-cypher-text'>Generated Cypher query</FieldLabel>
+          <Textarea id='generate-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
+          <FieldLabel htmlFor='generate-cypher-params'>Generated query parameters JSON</FieldLabel>
+          <Textarea id='generate-cypher-params' rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
         </div>
       ),
     },
@@ -78,10 +84,12 @@ export function QueriesPage() {
       label: 'Validate Cypher',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
-          <Textarea rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
+          <FieldLabel htmlFor='validate-cypher-text'>Cypher query</FieldLabel>
+          <Textarea id='validate-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
+          <FieldLabel htmlFor='validate-cypher-params'>Query parameters JSON</FieldLabel>
+          <Textarea id='validate-cypher-params' rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
           <Button type='button' onClick={() => validate.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Validate</Button>
-          {validate.data && <pre className='max-h-72 overflow-auto rounded-md border border-slate-300 bg-white p-3 text-xs'>{JSON.stringify(validate.data, null, 2)}</pre>}
+          {validate.data && <OutputPreview label='Validation result JSON'>{JSON.stringify(validate.data, null, 2)}</OutputPreview>}
         </div>
       ),
     },
@@ -90,8 +98,10 @@ export function QueriesPage() {
       label: 'Execute Cypher',
       content: (
         <div className='space-y-2'>
-          <Textarea rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
-          <Textarea rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
+          <FieldLabel htmlFor='execute-cypher-text'>Cypher query</FieldLabel>
+          <Textarea id='execute-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
+          <FieldLabel htmlFor='execute-cypher-params'>Query parameters JSON</FieldLabel>
+          <Textarea id='execute-cypher-params' rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
           <Button type='button' className='bg-emerald-700' onClick={() => execute.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Execute</Button>
           {execute.data && (
             <Table

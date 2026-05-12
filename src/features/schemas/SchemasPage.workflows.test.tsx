@@ -22,14 +22,14 @@ describe('schemas workflows', () => {
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
     await user.click(await screen.findByRole('button', { name: 'Validate schema YAML' }))
-    await user.type(screen.getByPlaceholderText('Paste YAML schema content'), 'type: object')
+    await user.type(screen.getByLabelText('Schema YAML content'), 'type: object')
     const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema YAML' }))
 
     expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Get schema by ID' }))
-    await user.type(screen.getByPlaceholderText('Schema ID'), 'schema-1')
+    await user.type(screen.getByLabelText('Schema ID'), 'schema-1')
     const getByIdPanel = screen.getByTestId('schemas-endpoint-tabs-panel-get-schema-by-id')
     await user.click(within(getByIdPanel).getByRole('button', { name: 'Get schema by ID' }))
 
