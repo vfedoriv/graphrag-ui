@@ -5,7 +5,6 @@ import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { Table } from '../../shared/ui/Table'
@@ -40,54 +39,43 @@ export function DocumentsPage() {
     />
   )
 
-  const tabs: EndpointTab[] = [
-    {
-      id: 'upload-document',
-      label: 'Upload document',
-      content: (
-        <>
-          <FileSelectButton
-            buttonLabel='Select file to upload'
-            testId='documents-upload-select-file'
-            onFileSelected={(file) => {
-              setSelectedUploadFilename(file.name)
-              uploadMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, file })
-            }}
-          />
-          {selectedUploadFilename && <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p>}
-          {uploadMutation.error && <Alert title='Upload failed' message={(uploadMutation.error as Error).message} />}
-        </>
-      ),
-    },
-    {
-      id: 'process-document',
-      label: 'Process document',
-      content: <p className='text-sm text-slate-700'>Use the Process action in the documents table above to invoke document processing for a specific upload.</p>,
-    },
-    {
-      id: 'inspect-chunks',
-      label: 'Inspect document chunks',
-      content: selectedDocumentId ? (
-        <div className='space-y-2'>
-          <h2 className='text-base font-semibold text-slate-900'>Chunks for {selectedDocumentId}</h2>
-          {chunksQuery.isLoading ? (
-            <p className='text-sm text-slate-600'>Loading chunks...</p>
-          ) : (
-            <OutputPreview label='Document chunks JSON'>{JSON.stringify(chunksQuery.data, null, 2)}</OutputPreview>
-          )}
-        </div>
-      ) : (
-        <p className='text-sm text-slate-700'>Choose a document in the table above and click View chunks.</p>
-      ),
-    },
-  ]
-
   return (
     <ControllerPage
       title='Documents'
       topSectionTitle='Documents list'
-      topSection={topSection}
-      tabs={<EndpointTabs tabs={tabs} testId='documents-endpoint-tabs' />}
+      topSection={
+        <div className='space-y-4'>
+          <section className='space-y-2'>
+            <h3 className='text-sm font-semibold uppercase tracking-wide text-slate-700'>Upload document</h3>
+            <FileSelectButton
+              buttonLabel='Select file to upload'
+              testId='documents-upload-select-file'
+              onFileSelected={(file) => {
+                setSelectedUploadFilename(file.name)
+                uploadMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, file })
+              }}
+            />
+            {selectedUploadFilename ? <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p> : null}
+            {uploadMutation.error ? <Alert title='Upload failed' message={(uploadMutation.error as Error).message} /> : null}
+          </section>
+          {topSection}
+          <section className='space-y-2'>
+            <h3 className='text-sm font-semibold uppercase tracking-wide text-slate-700'>Inspect document chunks</h3>
+            {selectedDocumentId ? (
+              <>
+                <p className='text-sm text-slate-600'>Selected document: {selectedDocumentId}</p>
+                {chunksQuery.isLoading ? (
+                  <p className='text-sm text-slate-600'>Loading chunks...</p>
+                ) : (
+                  <OutputPreview label='Document chunks JSON'>{JSON.stringify(chunksQuery.data, null, 2)}</OutputPreview>
+                )}
+              </>
+            ) : (
+              <p className='text-sm text-slate-700'>Choose a document in the table above and click View chunks.</p>
+            )}
+          </section>
+        </div>
+      }
       testId='documents-controller-page'
     />
   )

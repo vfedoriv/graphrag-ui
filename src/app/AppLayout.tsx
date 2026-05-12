@@ -44,7 +44,7 @@ export function AppLayout() {
           </nav>
         </aside>
 
-        <main className='space-y-4'>
+        <main className='min-w-0 space-y-4'>
           <header className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white p-4'>
             <div className='space-y-1'>
               <p className='text-sm text-slate-500'>Active knowledge base</p>
@@ -67,7 +67,7 @@ export function AppLayout() {
               <StatusBadge label={knowledgeBases.length > 0 ? 'Backend reachable via API flows' : 'No API data yet'} tone={knowledgeBases.length > 0 ? 'success' : 'neutral'} />
             </div>
           </header>
-          <section className='rounded-xl border border-slate-300 bg-white p-4'>
+          <section className='min-w-0 rounded-xl border border-slate-300 bg-white p-4'>
             <Outlet />
           </section>
         </main>

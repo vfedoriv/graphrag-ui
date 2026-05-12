@@ -29,11 +29,15 @@ describe('documents workflows', () => {
     const hiddenInput = (await screen.findByTestId('documents-upload-select-file-input')) as HTMLInputElement
     fireEvent.change(hiddenInput, { target: { files: [file] } })
 
+    expect(screen.queryByTestId('documents-endpoint-tabs')).not.toBeInTheDocument()
+    expect(screen.getByText('Upload document')).toBeInTheDocument()
+
     await user.click(await screen.findByRole('button', { name: 'Process' }))
     await user.click(await screen.findByRole('button', { name: 'View chunks' }))
 
-    await user.click(screen.getByRole('button', { name: 'Inspect document chunks' }))
-    expect(await screen.findByText(/Chunks for doc-1/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Selected document: doc-1/i)).toBeInTheDocument()
+    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-x-auto')
+    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-y-auto')
 
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map((c) => String(c[0]))
