@@ -1,8 +1,5 @@
-# controller-page-tabbed-endpoint-workflows Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change restructure-ui-by-controller-with-endpoint-tabs. Update Purpose after archive.
-## Requirements
 ### Requirement: Controller pages provide top context plus endpoint tabs
 The system SHALL render controller pages with top context/list sections and MAY omit endpoint tabs when the controller workflow is better represented with direct inline sections.
 
@@ -16,4 +13,3 @@ The system SHALL provide one tab per endpoint workflow only for controller pages
 #### Scenario: Controller page without tabbed workflows
 - **WHEN** a controller page does not enable endpoint tabs
 - **THEN** the system SHALL not render empty or placeholder tabs and SHALL keep workflow actions directly accessible
-

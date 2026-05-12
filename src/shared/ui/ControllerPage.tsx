@@ -4,7 +4,7 @@ type ControllerPageProps = {
   title: string
   topSectionTitle: string
   topSection: ReactNode
-  tabs: ReactNode
+  tabs?: ReactNode
   testId?: string
 }
 
@@ -16,7 +16,7 @@ export function ControllerPage({ title, topSectionTitle, topSection, tabs, testI
         <h2 className='text-base font-semibold text-slate-900'>{topSectionTitle}</h2>
         {topSection}
       </div>
-      <div className='rounded-md border border-slate-300 bg-white p-4'>{tabs}</div>
+      {tabs ? <div className='rounded-md border border-slate-300 bg-white p-4'>{tabs}</div> : null}
     </section>
   )
 }

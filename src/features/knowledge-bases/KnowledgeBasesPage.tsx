@@ -12,7 +12,6 @@ import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
-import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
 import { Input } from '../../shared/ui/Input'
 import { Table } from '../../shared/ui/Table'
 
@@ -38,7 +37,19 @@ export function KnowledgeBasesPage() {
     form.reset()
   })
 
-  const topSection = isLoading ? (
+  const createSection = (
+    <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4' data-testid='knowledge-bases-create-section'>
+      <h2 className='text-base font-semibold text-slate-900'>Create knowledge base</h2>
+      <form onSubmit={onSubmit} className='grid gap-2 md:grid-cols-[1fr_1fr_auto]'>
+        <Input placeholder='id (kb-demo)' {...form.register('id')} />
+        <Input placeholder='name' {...form.register('name')} />
+        <Button type='submit' disabled={createMutation.isPending}>Create</Button>
+      </form>
+      {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
+    </div>
+  )
+
+  const listSection = isLoading ? (
     <p className='text-sm text-slate-600'>Loading knowledge bases...</p>
   ) : data.length === 0 ? (
     <EmptyState title='No Knowledge Bases' body='Create one to begin GraphRAG workflows.' />
@@ -73,42 +84,16 @@ export function KnowledgeBasesPage() {
     />
   )
 
-  const tabs: EndpointTab[] = [
-    {
-      id: 'create-knowledge-base',
-      label: 'Create knowledge base',
-      content: (
-        <form onSubmit={onSubmit} className='grid gap-2 md:grid-cols-[1fr_1fr_auto]'>
-          <Input placeholder='id (kb-demo)' {...form.register('id')} />
-          <Input placeholder='name' {...form.register('name')} />
-          <Button type='submit' disabled={createMutation.isPending}>Create</Button>
-          {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
-        </form>
-      ),
-    },
-    {
-      id: 'update-knowledge-base',
-      label: 'Update knowledge base',
-      content: <p className='text-sm text-slate-700'>Update a knowledge base by editing the name inline in the table above and blurring the input.</p>,
-    },
-    {
-      id: 'delete-knowledge-base',
-      label: 'Delete knowledge base',
-      content: <p className='text-sm text-slate-700'>Delete a knowledge base using the Delete action in the table above.</p>,
-    },
-    {
-      id: 'select-knowledge-base',
-      label: 'Select active knowledge base',
-      content: <p className='text-sm text-slate-700'>Set an active knowledge base using the Use action in the table above or header selector.</p>,
-    },
-  ]
-
   return (
     <ControllerPage
       title='Knowledge Bases'
-      topSectionTitle='Knowledge bases list'
-      topSection={topSection}
-      tabs={<EndpointTabs tabs={tabs} testId='knowledge-bases-endpoint-tabs' />}
+      topSectionTitle='Knowledge bases'
+      topSection={
+        <div className='space-y-4'>
+          {createSection}
+          {listSection}
+        </div>
+      }
       testId='knowledge-bases-controller-page'
     />
   )

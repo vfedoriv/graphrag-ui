@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for knowledge base management in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Users can manage knowledge bases
 The system SHALL provide knowledge base management from a single Knowledge Bases controller page with an inline create section and table-based actions for update/delete/select.
 
@@ -15,4 +13,3 @@ The system SHALL refresh list and detail views in-place after knowledge base mut
 #### Scenario: Mutation updates top list section
 - **WHEN** a user completes a knowledge base mutation from inline form or row actions
 - **THEN** the system SHALL update the visible knowledge base list/context to reflect backend state changes
-

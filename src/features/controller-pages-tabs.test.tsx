@@ -46,11 +46,12 @@ describe('controller pages tabs', () => {
     expect(screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')).toBeInTheDocument()
   })
 
-  it('renders knowledge base endpoint tabs', async () => {
+  it('renders knowledge base inline create section without endpoint tabs', async () => {
     renderWithProviders(<KnowledgeBasesPage />)
 
-    expect(await screen.findByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Update knowledge base' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Create' })).toBeInTheDocument()
+    expect(screen.getByTestId('knowledge-bases-create-section')).toBeInTheDocument()
+    expect(screen.queryByTestId('knowledge-bases-endpoint-tabs')).not.toBeInTheDocument()
   })
 
   it('renders documents endpoint tabs', async () => {
