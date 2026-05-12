@@ -1,18 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
 import { KnowledgeBasesPage } from './KnowledgeBasesPage'
-import { SelectedKnowledgeBaseProvider } from '../../shared/state/selectedKnowledgeBase'
-
-function wrapper(children: ReactNode) {
-  const queryClient = new QueryClient()
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SelectedKnowledgeBaseProvider>{children}</SelectedKnowledgeBaseProvider>
-    </QueryClientProvider>
-  )
-}
+import { renderWithProviders } from '../../test/helpers'
 
 describe('knowledge bases page', () => {
   afterEach(() => {
@@ -36,7 +25,7 @@ describe('knowledge bases page', () => {
       })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(wrapper(<KnowledgeBasesPage />))
+    renderWithProviders(<KnowledgeBasesPage />)
 
     await user.type(screen.getByPlaceholderText('id (kb-demo)'), 'kb-a')
     await user.type(screen.getByPlaceholderText('name'), 'KB A')

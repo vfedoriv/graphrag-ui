@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for api client and error normalization in the GraphRAG admin UI.
-## Requirements
 ### Requirement: API client enforces typed request and response handling
 The system SHALL provide typed API modules and shared fetch helpers for JSON and multipart requests across all feature domains, and these modules SHALL have automated tests for success and failure paths of high-risk request flows.
 
@@ -15,4 +13,3 @@ The system SHALL normalize backend error responses into a shared frontend error 
 #### Scenario: Display field errors from validation response
 - **WHEN** backend returns validation failures with named fields
 - **THEN** the system SHALL map those field errors into form-level displays for corresponding inputs
-

@@ -1,21 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
-import { SelectedKnowledgeBaseProvider } from '../shared/state/selectedKnowledgeBase'
 import { SchemasPage } from './schemas/SchemasPage'
 import { KnowledgeBasesPage } from './knowledge-bases/KnowledgeBasesPage'
 import { DocumentsPage } from './documents/DocumentsPage'
 import { QueriesPage } from './queries/QueriesPage'
-
-function wrapper(children: ReactNode) {
-  const queryClient = new QueryClient()
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SelectedKnowledgeBaseProvider>{children}</SelectedKnowledgeBaseProvider>
-    </QueryClientProvider>
-  )
-}
+import { renderWithProviders } from '../test/helpers'
 
 describe('controller pages tabs', () => {
   beforeEach(() => {
@@ -49,7 +38,7 @@ describe('controller pages tabs', () => {
 
   it('renders schemas endpoint tabs and switches active tab', async () => {
     const user = userEvent.setup()
-    render(wrapper(<SchemasPage />))
+    renderWithProviders(<SchemasPage />)
 
     expect(await screen.findByRole('button', { name: 'Create schema' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Validate schema YAML' }))
@@ -58,14 +47,14 @@ describe('controller pages tabs', () => {
   })
 
   it('renders knowledge base endpoint tabs', async () => {
-    render(wrapper(<KnowledgeBasesPage />))
+    renderWithProviders(<KnowledgeBasesPage />)
 
     expect(await screen.findByRole('button', { name: 'Create knowledge base' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Update knowledge base' })).toBeInTheDocument()
   })
 
   it('renders documents endpoint tabs', async () => {
-    render(wrapper(<DocumentsPage />))
+    renderWithProviders(<DocumentsPage />)
 
     expect(await screen.findByRole('button', { name: 'Upload document' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Inspect document chunks' })).toBeInTheDocument()
@@ -73,7 +62,7 @@ describe('controller pages tabs', () => {
   })
 
   it('renders queries endpoint tabs', async () => {
-    render(wrapper(<QueriesPage />))
+    renderWithProviders(<QueriesPage />)
 
     expect(screen.getByRole('button', { name: 'Ask query' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Execute Cypher' })).toBeInTheDocument()
@@ -81,7 +70,7 @@ describe('controller pages tabs', () => {
 
   it('renders schema file-select buttons', async () => {
     const user = userEvent.setup()
-    render(wrapper(<SchemasPage />))
+    renderWithProviders(<SchemasPage />)
 
     await user.click(await screen.findByRole('button', { name: 'Generate schema example from file' }))
     expect(screen.getByRole('button', { name: 'Select source file' })).toBeInTheDocument()
