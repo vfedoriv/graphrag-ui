@@ -14,7 +14,7 @@ describe('schemas workflows', () => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
       if (url.endsWith('/schemas')) return jsonResponse(200, [])
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
-      if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'USER_DEFINED', format: 'YAML', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
+      if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'YAML', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
       return jsonResponse(200, {})
     })
 
@@ -55,7 +55,7 @@ describe('schemas workflows', () => {
           id: 'schema-1',
           name: getByIdCount === 1 ? 'first' : 'second',
           version: 1,
-          sourceType: 'USER_DEFINED',
+          sourceType: 'PREDEFINED',
           format: 'YAML',
           contentHash: 'h',
           status: 'ACTIVE',

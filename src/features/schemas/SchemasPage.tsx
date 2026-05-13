@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { schemasApi, useActivateSchemaMutation, useCreateSchemaMutation, useSchemasQuery } from '../../api/schemas'
+import { type SchemaSourceType } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -33,17 +34,20 @@ export function SchemasPage() {
   const activateMutation = useActivateSchemaMutation()
   const isAnyPending = createMutation.isPending || activateMutation.isPending || isGetSchemaPending || isValidatePending || isGeneratePending
 
+  const unsupportedSourceTypeSchemas = data.filter((schema) => !isSupportedSchemaSourceType(schema.sourceType))
+
   const topSection = (
     <>
       {data.length === 0 ? (
         <EmptyState title='No Schemas' body='Create or generate one, then activate it for the selected knowledge base.' />
       ) : (
         <Table
-          headers={['ID', 'Name', 'Version', 'Status', 'Activate']}
+          headers={['ID', 'Name', 'Version', 'Source Type', 'Status', 'Activate']}
           rows={data.map((schema) => [
             schema.id,
             schema.name,
             String(schema.version),
+            formatSchemaSourceTypeLabel(schema.sourceType),
             schema.status,
             <Button
               type='button'
@@ -55,6 +59,12 @@ export function SchemasPage() {
               Activate
             </Button>,
           ])}
+        />
+      )}
+      {unsupportedSourceTypeSchemas.length > 0 && (
+        <Alert
+          title='Unsupported schema source type'
+          message={`Some schemas use unsupported source type values: ${unsupportedSourceTypeSchemas.map((schema) => `${schema.id} (${schema.sourceType})`).join(', ')}`}
         />
       )}
       {!selectedKnowledgeBaseId && <Alert title='No knowledge base selected' message='Activation requires selecting a knowledge base in the header or KB page.' tone='info' />}
@@ -153,7 +163,7 @@ export function SchemasPage() {
             onErrorChange={setYamlFormatError}
             placeholder='Paste YAML schema content'
           />
-          <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'USER_DEFINED' })}>Create</Button>
+          <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'PREDEFINED' })}>Create</Button>
           {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
         </div>
       ),
@@ -202,6 +212,14 @@ export function SchemasPage() {
       testId='schemas-controller-page'
     />
   )
+}
+
+function isSupportedSchemaSourceType(sourceType: string): sourceType is SchemaSourceType {
+  return sourceType === 'PREDEFINED' || sourceType === 'GENERATED'
+}
+
+function formatSchemaSourceTypeLabel(sourceType: string) {
+  return isSupportedSchemaSourceType(sourceType) ? sourceType : `UNSUPPORTED (${sourceType})`
 }
 
 function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (isPending: boolean) => void }) {

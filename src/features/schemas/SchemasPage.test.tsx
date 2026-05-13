@@ -17,7 +17,7 @@ describe('schemas page', () => {
             id: 'schema-a',
             name: 'Schema A',
             version: 1,
-            sourceType: 'USER_DEFINED',
+            sourceType: 'PREDEFINED',
             format: 'YAML',
             contentHash: 'hash',
             status: 'ACTIVE',
@@ -60,7 +60,7 @@ describe('schemas page', () => {
             id: 'schema-a',
             name: 'Schema A',
             version: 1,
-            sourceType: 'USER_DEFINED',
+            sourceType: 'PREDEFINED',
             format: 'YAML',
             contentHash: 'hash',
             status: 'ACTIVE',
@@ -143,7 +143,7 @@ describe('schemas page', () => {
             id: 'schema-a',
             name: 'Schema A',
             version: 1,
-            sourceType: 'USER_DEFINED',
+            sourceType: 'PREDEFINED',
             format: 'YAML',
             contentHash: 'hash',
             status: 'ACTIVE',
@@ -176,5 +176,30 @@ describe('schemas page', () => {
 
     resolveActivate?.(jsonResponse(204, {}))
     await waitFor(() => expect(screen.queryByText(/Waiting for schema workflow response\.\.\./i)).not.toBeInTheDocument())
+  })
+
+  it('shows visible fallback when API returns unsupported schema source type', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'LEGACY',
+            format: 'YAML',
+            contentHash: 'hash',
+            status: 'ACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('Unsupported schema source type')).toBeInTheDocument()
+    expect(screen.getByText('UNSUPPORTED (LEGACY)')).toBeInTheDocument()
   })
 })

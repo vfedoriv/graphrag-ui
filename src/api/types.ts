@@ -54,9 +54,11 @@ export type Schema = {
   createdAt: string
 }
 
+export type SchemaSourceType = 'PREDEFINED' | 'GENERATED'
+
 export type CreateSchemaRequest = {
   content: string
-  sourceType?: 'USER_DEFINED' | 'GENERATED'
+  sourceType?: SchemaSourceType
 }
 
 export type ValidateSchemaRequest = {
