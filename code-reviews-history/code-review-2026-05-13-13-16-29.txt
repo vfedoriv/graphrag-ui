@@ -1,0 +1,144 @@
+⏺ PR Review Summary — #1 "add explicit labels for standalone fields and outputs"
+
+  Four specialized agents reviewed code quality, test coverage, error handling, and documentation. Here's the consolidated
+  result.
+
+  ---
+  Critical Issues (must fix before merge)
+
+  Error Handling — No user feedback on most mutation failures
+
+  The most pervasive problem: mutations succeed silently but fail silently too. The createMutation.error pattern exists in the
+  codebase but wasn't applied consistently:
+
+  ┌──────────────────────────────┬─────────────────────────────────────────────────────────────────────┐
+  │           Location           │                        Missing error display                        │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ QueriesPage.tsx:53,91,105    │ ask, validate, execute mutations — zero error UI                    │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ QueriesPage.tsx:67-72        │ generate.mutateAsync — unhandled rejection, no error display        │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ KnowledgeBasesPage.tsx:71    │ updateMutation fires on blur, failure is completely silent          │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ KnowledgeBasesPage.tsx:80-85 │ deleteMutation.mutateAsync — unhandled rejection                    │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ DocumentsPage.tsx:36         │ processMutation — the most failure-prone op, no error display       │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ DocumentsPage.tsx:73-77      │ chunksQuery error renders as literal "undefined" in <OutputPreview> │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ SchemasPage.tsx:41-45        │ activateMutation — user may believe schema activated when it didn't │
+  ├──────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
+  │ SchemasPage.tsx:119          │ Validate YAML async onClick — no try/catch, unhandled rejection     │
+  └──────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+
+  API Client boundary gaps — src/api/client.ts
+
+  1. Network errors not caught (client.ts:27): fetch() can reject before any response (offline, CORS, abort). Callers get a raw
+  TypeError: Failed to fetch instead of a normalized ApiError.
+  2. JSON.parse unguarded on success path (client.ts:49): A malformed 200 body (truncated response, proxy HTML) throws a raw
+  SyntaxError that leaks implementation details to users.
+  3. ApiError is not an Error instance (types.ts, used throughout): The UI casts (err as Error).message everywhere. This works
+  by coincidence today, but mixes undetectably with real TypeError network failures and will break instanceof Error checks in
+  any future logging/monitoring integration.
+
+  ---
+  Important Issues (should fix)
+
+  Table uses array index as key — src/shared/ui/Table.tsx:18
+
+  Row deletion reuses DOM nodes because keys are positional. Combined with the uncontrolled <Input defaultValue={kb.name}> in
+  KnowledgeBasesPage, deleting a row can leave the deleted row's text in the surviving input. Fix: accept a stable rowKey per
+  row.
+
+  KnowledgeBasesPage inline editor fires on every blur — :71
+
+  onBlur fires a PUT even when the value didn't change. Also uses defaultValue (uncontrolled), so server-side rejections won't
+  reset the field. Gate on e.target.value !== kb.name.
+
+  EndpointTabs missing ARIA semantics — src/shared/ui/EndpointTabs.tsx:24
+
+  Tab buttons have no role="tab", no aria-selected, no role="tablist" container. Tests currently disambiguate tabs from action
+  buttons only by call order — fragile. WCAG violation.
+
+  Input/Textarea use :focus not :focus-visible — Input.tsx:8, Textarea.tsx:8
+
+  Button.tsx correctly uses focus-visible:ring-2. These two don't, inconsistently removing the keyboard focus indicator for
+  mouse users and leaving no fallback ring. WCAG 2.4.7 violation.
+
+  Stale localStorage KB ID not reconciled — src/shared/state/selectedKnowledgeBase.tsx
+
+  A saved KB ID that no longer exists in the API response causes every feature page to fire requests against a deleted resource
+  indefinitely. Clear selectedKnowledgeBaseId after useKnowledgeBasesQuery resolves if the ID isn't in the returned list.
+
+  AppLayout and feature pages silently swallow query errors
+
+  useKnowledgeBasesQuery, useSchemasQuery, and others are destructured as { data = [] }. On failure the UI shows "No data" or
+  "Create one", actively misdirecting users. isError should be checked and a visible error state rendered.
+
+  mutateAsync callers produce unhandled rejections
+
+  KnowledgeBasesPage.tsx:35-39 (onSubmit) and QueriesPage.tsx:67 (generate) use mutateAsync without try/catch inside async
+  callbacks. TanStack Query stores the error on the mutation object, but the unhandled rejection still fires and pollutes error
+  monitoring. Add catch { /* surfaced via mutation.error */ }.
+
+  ---
+  Test Coverage Gaps
+
+  ┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────┬────────────┐
+  │                                                     Gap                                                     │  Severity  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ FileSelectButton — zero tests; the event.target.value = '' reset and async onFileSelected behavior are      │ Critical   │
+  │ completely unverified                                                                                       │            │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ apiFetch 204 and empty-body branches untested — delete and activate mutations depend on these               │ Critical   │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ normalizeProblemDetail title-only and null fallbacks untested                                               │ Critical   │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ No test for "No KB selected" guard state (Alert) on Documents/Queries pages                                 │ Important  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ Schema validation failure path (valid: false, errors: [...]) never rendered in tests                        │ Important  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ KB delete mutation and auto-deselect side-effect untested                                                   │ Important  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ Schema activate from table row untested                                                                     │ Important  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ Invalid JSON in QueriesPage parameters field — silent {} fallback untested                                  │ Important  │
+  ├─────────────────────────────────────────────────────────────────────────────────────────────────────────────┼────────────┤
+  │ Button.test.tsx asserts Tailwind class strings — will break on any visual redesign                          │ Suggestion │
+  └─────────────────────────────────────────────────────────────────────────────────────────────────────────────┴────────────┘
+
+  ---
+  Documentation Issues
+
+  1. Personal absolute path in README.md:14 and proposal.md:35: /home/vitaliy/workspace/graphrag is hardcoded. Remove or replace
+   with a generic description.
+  2. README.md:113 project structure uses kb abbreviation; actual directory is knowledge-bases/.
+  3. openspec/specs/admin-app-shell-and-navigation/spec.md:9-10: States all pages SHALL have endpoint tabs — contradicts
+  KnowledgeBasesPage which correctly omits them.
+  4. docs/testing-gap-report.md completion checklist: [x] Feature workflow tests added is misleading when the same doc lists
+  QueriesPage/SchemasPage/SettingsPage as still under-covered.
+
+  ---
+  Strengths
+
+  - Clean layered architecture: api/ → app/ → features/ → shared/ separation is well-executed.
+  - API test strategy is solid: vi.stubGlobal('fetch') at the boundary + shared stubFetch/jsonResponse/renderWithProviders
+  helpers avoid mock brittleness.
+  - Feature workflow tests correctly test behavior through the UI (correct API URLs called from user interactions), not
+  component internals.
+  - FieldLabel htmlFor/id associations are all verified as accurate.
+  - EndpointTabs only renders active tab content, making label-text tests unambiguous.
+
+  ---
+  Recommended Action Plan
+
+  1. Fix client.ts first — wrap fetch() and JSON.parse in try/catch, normalize all errors to ApiError extends Error. This one
+  change fixes C1–C3 and HIGH-6 simultaneously.
+  2. Add missing error displays — wire mutation.error / query.error into <Alert> blocks for the 8 silent-failure locations
+  above.
+  3. Fix Table row keys and the uncontrolled KnowledgeBasesPage input (they interact to cause potential data corruption).
+  4. Add tests for FileSelectButton, apiFetch edge branches, and KB delete/schema activate workflows.
+  5. Fix docs — remove personal path from README, fix the kb abbreviation.
+  component internals.
+  - FieldLabel htmlFor/id associations are all verified as accurate.
+  - EndpointTabs only renders active tab content, making label-text tests unambiguous.
