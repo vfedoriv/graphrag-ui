@@ -9,7 +9,6 @@ import { type EndpointTab, EndpointTabs } from '../../shared/ui/EndpointTabs'
 import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
-import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
@@ -20,7 +19,9 @@ export function SchemasPage() {
   const { data = [] } = useSchemasQuery()
   const [yaml, setYaml] = useState('')
   const [schemaId, setSchemaId] = useState('')
-  const [selectedSchema, setSelectedSchema] = useState<string>('')
+  const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
+  const [generatedYamlOutput, setGeneratedYamlOutput] = useState('')
+  const [generatedYamlFromFileOutput, setGeneratedYamlFromFileOutput] = useState('')
   const [getSchemaError, setGetSchemaError] = useState<string>('')
   const [isGetSchemaPending, setIsGetSchemaPending] = useState(false)
   const [validation, setValidation] = useState<string[] | null>(null)
@@ -76,12 +77,26 @@ export function SchemasPage() {
     {
       id: 'generate-schema-yaml',
       label: 'Generate schema YAML',
-      content: <SchemaGenerateYamlFromText onYamlReady={setYaml} onPendingChange={setIsGeneratePending} />,
+      content: (
+        <SchemaGenerateYamlFromText
+          onYamlReady={setYaml}
+          output={generatedYamlOutput}
+          onOutputReady={setGeneratedYamlOutput}
+          onPendingChange={setIsGeneratePending}
+        />
+      ),
     },
     {
       id: 'generate-schema-yaml-file',
       label: 'Generate schema YAML from file',
-      content: <SchemaGenerateYamlFromFile onYamlReady={setYaml} onPendingChange={setIsGeneratePending} />,
+      content: (
+        <SchemaGenerateYamlFromFile
+          onYamlReady={setYaml}
+          output={generatedYamlFromFileOutput}
+          onOutputReady={setGeneratedYamlFromFileOutput}
+          onPendingChange={setIsGeneratePending}
+        />
+      ),
     },
     {
       id: 'validate-schema-yaml',
@@ -156,10 +171,11 @@ export function SchemasPage() {
             pendingText='Loading...'
             onClick={async () => {
               setGetSchemaError('')
+              setSchemaByIdOutput('')
               setIsGetSchemaPending(true)
               try {
                 const schema = await schemasApi.get(schemaId)
-                setSelectedSchema(JSON.stringify(schema, null, 2))
+                setSchemaByIdOutput(JSON.stringify(schema, null, 2))
               } catch (e) {
                 setGetSchemaError((e as Error).message)
               } finally {
@@ -169,8 +185,9 @@ export function SchemasPage() {
           >
             Get schema by ID
           </Button>
+          <FieldLabel htmlFor='get-schema-by-id-output'>Schema details JSON</FieldLabel>
+          <Textarea id='get-schema-by-id-output' rows={8} value={schemaByIdOutput} onChange={(e) => setSchemaByIdOutput(e.target.value)} placeholder='Schema details response' />
           {getSchemaError && <Alert title='Get schema failed' message={getSchemaError} />}
-          {selectedSchema && <OutputPreview label='Schema details JSON' format='json'>{selectedSchema}</OutputPreview>}
         </div>
       ),
     },
@@ -276,7 +293,11 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
   )
 }
 
-function SchemaGenerateYamlFromText({ onYamlReady, onPendingChange }: { onYamlReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void }) {
+function SchemaGenerateYamlFromText(
+  {
+    onYamlReady, output, onOutputReady, onPendingChange,
+  }: { onYamlReady: (yaml: string) => void, output: string, onOutputReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void },
+) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
   const [text, setText] = useState('')
@@ -312,11 +333,13 @@ function SchemaGenerateYamlFromText({ onYamlReady, onPendingChange }: { onYamlRe
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
+          onOutputReady('')
           setIsPending(true)
           onPendingChange(true)
           try {
             const res = await schemasApi.generateYaml({ name, version, text, example })
             onYamlReady(res.content)
+            onOutputReady(res.content)
           } catch (e) {
             setError((e as Error).message)
           } finally {
@@ -327,12 +350,18 @@ function SchemaGenerateYamlFromText({ onYamlReady, onPendingChange }: { onYamlRe
       >
         Generate schema YAML
       </Button>
+      <FieldLabel htmlFor='generate-yaml-text-output'>Generated schema YAML</FieldLabel>
+      <Textarea id='generate-yaml-text-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated YAML response' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )
 }
 
-function SchemaGenerateYamlFromFile({ onYamlReady, onPendingChange }: { onYamlReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void }) {
+function SchemaGenerateYamlFromFile(
+  {
+    onYamlReady, output, onOutputReady, onPendingChange,
+  }: { onYamlReady: (yaml: string) => void, output: string, onOutputReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void },
+) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
   const [text, setText] = useState('')
@@ -376,11 +405,13 @@ function SchemaGenerateYamlFromFile({ onYamlReady, onPendingChange }: { onYamlRe
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
+          onOutputReady('')
           setIsPending(true)
           onPendingChange(true)
           try {
             const res = await schemasApi.generateYaml({ name, version, text, example })
             onYamlReady(res.content)
+            onOutputReady(res.content)
           } catch (e) {
             setError((e as Error).message)
           } finally {
@@ -391,6 +422,8 @@ function SchemaGenerateYamlFromFile({ onYamlReady, onPendingChange }: { onYamlRe
       >
         Generate schema YAML from file
       </Button>
+      <FieldLabel htmlFor='generate-yaml-file-output'>Generated schema YAML</FieldLabel>
+      <Textarea id='generate-yaml-file-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated YAML response' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )

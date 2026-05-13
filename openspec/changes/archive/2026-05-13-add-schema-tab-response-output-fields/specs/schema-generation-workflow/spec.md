@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for schema generation workflow in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Schema generation follows staged workflow
 The system SHALL expose schema generation actions as dedicated tabs under the Schemas page, file-based generation tabs SHALL use explicit file-select buttons to load source input, and schema generation/retrieval tabs SHALL provide visible output text fields that display corresponding backend response content.
 
@@ -24,11 +22,3 @@ The system SHALL expose schema generation actions as dedicated tabs under the Sc
 #### Scenario: Replace stale output with latest response per tab
 - **WHEN** a user executes the same tab action multiple times
 - **THEN** the system SHALL replace that tab's output text field content with the latest successful backend response
-
-### Requirement: Generated artifacts remain editable before final creation
-The system SHALL keep generated YAML/example outputs editable inside their respective generation tab workflows before creating a schema.
-
-#### Scenario: Edit generated YAML in active generation tab
-- **WHEN** a user receives generated YAML or example output in a generation tab
-- **THEN** the system SHALL allow editing output before submitting create/next-step actions
-
