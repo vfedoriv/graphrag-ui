@@ -14,4 +14,12 @@ describe('Button', () => {
     expect(button.className).toContain('focus-visible:ring-emerald-400')
     expect(button.className).toContain('disabled:pointer-events-none')
   })
+
+  it('shows pending text and disables interaction while pending', () => {
+    render(<Button isPending pendingText='Loading...'>Action</Button>)
+
+    const button = screen.getByRole('button', { name: 'Loading...' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
+  })
 })

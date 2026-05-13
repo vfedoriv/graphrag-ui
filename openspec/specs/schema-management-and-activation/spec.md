@@ -34,3 +34,10 @@ The system SHALL include workflow tests verifying schema activation can be trigg
 - **WHEN** a user clicks Activate for a schema row with a selected knowledge base
 - **THEN** tests SHALL verify the activation endpoint call and related query invalidation effects
 
+### Requirement: Schema YAML authoring areas are format-aware
+The system SHALL treat schema YAML input and output areas as YAML-aware fields with syntax-oriented visual presentation and format guidance.
+
+#### Scenario: Edit schema YAML input
+- **WHEN** a user edits schema YAML content in create/validate/generate workflows
+- **THEN** the field SHALL present YAML-aware syntax formatting cues and explicit YAML format indication
+

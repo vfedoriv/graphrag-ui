@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './SchemasPage'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
@@ -83,5 +83,98 @@ describe('schemas page', () => {
         expect.objectContaining({ method: 'POST' }),
       )
     })
+  })
+
+  it('shows YAML format guidance and reports formatting errors for invalid YAML', async () => {
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Expected format: YAML').length).toBeGreaterThan(0)
+    })
+    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    const yamlInput = within(createPanel).getByLabelText('Schema YAML content')
+    fireEvent.change(yamlInput, { target: { value: '{' } })
+    await user.click(within(createPanel).getByRole('button', { name: 'Format YAML' }))
+
+    expect(within(createPanel).getByText('Cannot format invalid YAML payload.')).toBeInTheDocument()
+  })
+
+  it('renders schema tabs in required workflow order', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const tabsContainer = await screen.findByTestId('schemas-endpoint-tabs')
+    const tabLabels = Array.from(tabsContainer.querySelectorAll('[data-testid^="schemas-endpoint-tabs-tab-"]')).map(
+      (button) => button.textContent?.trim() ?? '',
+    )
+
+    expect(tabLabels).toEqual([
+      'Generate schema example from text',
+      'Generate schema example from file',
+      'Generate schema YAML',
+      'Generate schema YAML from file',
+      'Validate schema YAML',
+      'Create schema',
+      'Get schema by ID',
+    ])
+  })
+
+  it('shows pending indicator and prevents duplicate activate clicks while request is in flight', async () => {
+    const user = userEvent.setup()
+    let resolveActivate: ((value: ReturnType<typeof jsonResponse>) => void) | null = null
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'USER_DEFINED',
+            format: 'YAML',
+            contentHash: 'hash',
+            status: 'ACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas/schema-a/activate' && init?.method === 'POST') {
+        return new Promise((resolve) => {
+          resolveActivate = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Activate' }))
+    expect(await screen.findByText(/Waiting for schema workflow response\.\.\./i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activating...' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Activating...' }))
+    expect(
+      fetchMock.mock.calls.filter(
+        ([u, req]) =>
+          String(u) === '/api/v1/knowledge-bases/kb-a/schemas/schema-a/activate' &&
+          (req as RequestInit | undefined)?.method === 'POST',
+      ).length,
+    ).toBe(1)
+
+    resolveActivate?.(jsonResponse(204, {}))
+    await waitFor(() => expect(screen.queryByText(/Waiting for schema workflow response\.\.\./i)).not.toBeInTheDocument())
   })
 })

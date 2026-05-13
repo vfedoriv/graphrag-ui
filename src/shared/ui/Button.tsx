@@ -1,9 +1,16 @@
 import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '../lib/cn'
 
-export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  isPending?: boolean
+  pendingText?: string
+}
+
+export function Button({ className, isPending = false, pendingText = 'Working...', disabled, children, ...props }: ButtonProps) {
   return (
     <button
+      disabled={disabled || isPending}
+      aria-busy={isPending}
       className={cn(
         'rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-sm font-semibold text-white',
         'transition duration-150 ease-out',
@@ -14,6 +21,8 @@ export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonE
         className,
       )}
       {...props}
-    />
+    >
+      {isPending ? pendingText : children}
+    </button>
   )
 }

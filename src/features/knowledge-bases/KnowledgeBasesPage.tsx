@@ -14,6 +14,7 @@ import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { Input } from '../../shared/ui/Input'
+import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { Table } from '../../shared/ui/Table'
 
 const schema = z.object({
@@ -29,6 +30,7 @@ export function KnowledgeBasesPage() {
   const createMutation = useCreateKnowledgeBaseMutation()
   const updateMutation = useUpdateKnowledgeBaseMutation()
   const deleteMutation = useDeleteKnowledgeBaseMutation()
+  const isAnyPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
 
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { id: '', name: '' } })
 
@@ -54,7 +56,7 @@ export function KnowledgeBasesPage() {
           <FieldLabel htmlFor='knowledge-base-name'>Knowledge base name</FieldLabel>
           <Input id='knowledge-base-name' placeholder='name' {...form.register('name')} />
         </div>
-        <Button type='submit' disabled={createMutation.isPending}>Create</Button>
+        <Button type='submit' isPending={createMutation.isPending} pendingText='Creating...'>Create</Button>
       </form>
       {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
     </div>
@@ -86,6 +88,8 @@ export function KnowledgeBasesPage() {
           <Button
             type='button'
             className='bg-rose-700'
+            isPending={deleteMutation.isPending}
+            pendingText='Deleting...'
             onClick={async () => {
               try {
                 await deleteMutation.mutateAsync(kb.id)
@@ -110,6 +114,7 @@ export function KnowledgeBasesPage() {
       topSectionTitle='Knowledge bases'
       topSection={
         <div className='space-y-4'>
+          {isAnyPending ? <ProgressBanner message='Waiting for knowledge base update...' /> : null}
           {createSection}
           {updateMutation.error && <Alert title='Update failed' message={(updateMutation.error as Error).message} />}
           {deleteMutation.error && <Alert title='Delete failed' message={(deleteMutation.error as Error).message} />}

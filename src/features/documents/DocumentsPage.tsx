@@ -7,6 +7,7 @@ import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
+import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { Table } from '../../shared/ui/Table'
 
 export function DocumentsPage() {
@@ -17,6 +18,7 @@ export function DocumentsPage() {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
   const chunksQuery = useDocumentChunksQuery(selectedDocumentId)
+  const isAnyPending = uploadMutation.isPending || processMutation.isPending || chunksQuery.isLoading
 
   if (!selectedKnowledgeBaseId) {
     return <Alert title='No knowledge base selected' message='Select a knowledge base before uploading documents.' tone='info' />
@@ -32,8 +34,8 @@ export function DocumentsPage() {
         doc.status,
         doc.errorMessage ?? '-',
         <div className='flex gap-2'>
-          <Button type='button' onClick={() => processMutation.mutate(doc.id)} className='bg-slate-700'>Process</Button>
-          <Button type='button' onClick={() => setSelectedDocumentId(doc.id)}>View chunks</Button>
+          <Button type='button' isPending={processMutation.isPending} pendingText='Processing...' onClick={() => processMutation.mutate(doc.id)} className='bg-slate-700'>Process</Button>
+          <Button type='button' isPending={chunksQuery.isLoading && selectedDocumentId === doc.id} pendingText='Loading...' onClick={() => setSelectedDocumentId(doc.id)}>View chunks</Button>
         </div>,
       ])}
     />
@@ -45,6 +47,7 @@ export function DocumentsPage() {
       topSectionTitle='Documents list'
       topSection={
         <div className='space-y-4'>
+          {isAnyPending ? <ProgressBanner message='Waiting for document workflow response...' /> : null}
           <section className='space-y-2'>
             <h3 className='text-sm font-semibold uppercase tracking-wide text-slate-700'>Upload document</h3>
             <FileSelectButton

@@ -16,3 +16,10 @@ The system SHALL preserve global knowledge base selection behavior across contro
 - **WHEN** a user has an active global knowledge base selected and runs an endpoint workflow from a controller tab
 - **THEN** the workflow SHALL consume the selected knowledge base context consistently
 
+### Requirement: Long-running backend activity is globally understandable
+The system SHALL provide a consistent pending-state language across controller pages so users understand that backend work is active and the UI is awaiting results.
+
+#### Scenario: User navigates while request is pending
+- **WHEN** a request-triggering action is pending in the current controller view
+- **THEN** visible pending feedback SHALL remain clear enough that users understand why final results are not yet available
+
