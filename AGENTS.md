@@ -73,7 +73,7 @@ OpenSpec artifacts are the source of historical product decisions. Archived chan
 
 ## Commit & Pull Request Guidelines
 
-Use short imperative commit messages such as `add schema activation panel`. Keep commits focused and reviewable.
+Use short imperative commit messages such as `add schema activation panel`. Keep commits focused and reviewable. Do not mention in commit messages "openspec" unless the user explicitly asks about it.
 
 PRs should include:
 - What changed and why.
