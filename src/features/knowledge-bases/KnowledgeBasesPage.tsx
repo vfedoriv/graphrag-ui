@@ -33,9 +33,13 @@ export function KnowledgeBasesPage() {
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { id: '', name: '' } })
 
   const onSubmit = form.handleSubmit(async (values) => {
-    const created = await createMutation.mutateAsync(values)
-    setSelectedKnowledgeBaseId(created.id)
-    form.reset()
+    try {
+      const created = await createMutation.mutateAsync(values)
+      setSelectedKnowledgeBaseId(created.id)
+      form.reset()
+    } catch {
+      // surfaced via createMutation.error
+    }
   })
 
   const createSection = (
@@ -63,12 +67,17 @@ export function KnowledgeBasesPage() {
   ) : (
     <Table
       headers={['Selected', 'ID', 'Name', 'Active schema', 'Actions']}
+      rowKeys={data.map((kb) => kb.id)}
       rows={data.map((kb) => [
         kb.id === selectedKnowledgeBaseId ? 'Yes' : 'No',
         kb.id,
         <Input
           defaultValue={kb.name}
-          onBlur={(e) => updateMutation.mutate({ id: kb.id, payload: { name: e.target.value } })}
+          onBlur={(e) => {
+            if (e.target.value !== kb.name) {
+              updateMutation.mutate({ id: kb.id, payload: { name: e.target.value } })
+            }
+          }}
           aria-label={`name-${kb.id}`}
         />,
         kb.activeSchemaId ?? '-',
@@ -78,9 +87,13 @@ export function KnowledgeBasesPage() {
             type='button'
             className='bg-rose-700'
             onClick={async () => {
-              await deleteMutation.mutateAsync(kb.id)
-              if (selectedKnowledgeBaseId === kb.id) {
-                setSelectedKnowledgeBaseId(null)
+              try {
+                await deleteMutation.mutateAsync(kb.id)
+                if (selectedKnowledgeBaseId === kb.id) {
+                  setSelectedKnowledgeBaseId(null)
+                }
+              } catch {
+                // surfaced via deleteMutation.error
               }
             }}
           >
@@ -98,6 +111,8 @@ export function KnowledgeBasesPage() {
       topSection={
         <div className='space-y-4'>
           {createSection}
+          {updateMutation.error && <Alert title='Update failed' message={(updateMutation.error as Error).message} />}
+          {deleteMutation.error && <Alert title='Delete failed' message={(deleteMutation.error as Error).message} />}
           {listSection}
         </div>
       }

@@ -16,3 +16,21 @@ The system SHALL allow activating a selected schema against the currently select
 - **WHEN** a user chooses a schema and confirms activation with an active knowledge base selected
 - **THEN** the system SHALL call schema activation endpoint and refresh active-schema-related views without leaving the Schemas page
 
+### Requirement: Schema activation and validation failures are visible
+The system SHALL show explicit error feedback when schema activation requests fail and when schema YAML validation requests fail.
+
+#### Scenario: Activation fails
+- **WHEN** schema activation request fails
+- **THEN** the system SHALL render a visible activation failure alert in the Schemas page context
+
+#### Scenario: Validate YAML request fails
+- **WHEN** schema validation endpoint request fails
+- **THEN** the system SHALL render a visible validation failure alert in the Validate schema tab
+
+### Requirement: Schema activation table action is workflow tested
+The system SHALL include workflow tests verifying schema activation can be triggered from the schemas table row action and calls the expected endpoint.
+
+#### Scenario: Activate schema from list row
+- **WHEN** a user clicks Activate for a schema row with a selected knowledge base
+- **THEN** tests SHALL verify the activation endpoint call and related query invalidation effects
+

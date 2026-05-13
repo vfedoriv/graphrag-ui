@@ -8,11 +8,23 @@ export type ProblemDetail = {
   [key: string]: unknown
 }
 
-export type ApiError = {
+export class ApiError extends Error {
   status: number
-  message: string
   title?: string
   fieldErrors?: Record<string, string[]>
+
+  constructor(params: {
+    status: number
+    message: string
+    title?: string
+    fieldErrors?: Record<string, string[]>
+  }) {
+    super(params.message)
+    this.name = 'ApiError'
+    this.status = params.status
+    this.title = params.title
+    this.fieldErrors = params.fieldErrors
+  }
 }
 
 export type KnowledgeBase = {

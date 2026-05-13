@@ -50,3 +50,10 @@ Coverage artifacts:
 - [x] Shared test helper utilities adopted
 - [x] Lint/test/coverage all passing
 - [x] Baseline metrics captured in this report
+
+## 2026-05-13 Critical Gap Closure
+
+- Added `FileSelectButton` tests for async callback flow and same-file reselection behavior.
+- Added API client edge-branch tests for 204 and empty-body success handling.
+- Added API client normalization fallback tests for title-only and null ProblemDetail payloads.
+- Added workflow tests for selected KB delete auto-deselect behavior and schema row activation action.

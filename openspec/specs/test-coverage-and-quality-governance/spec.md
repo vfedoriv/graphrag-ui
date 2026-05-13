@@ -24,3 +24,17 @@ The system SHALL define project test-quality guardrails including deterministic 
 - **WHEN** contributors add tests for new/changed behavior
 - **THEN** the tests SHALL follow documented mock/setup patterns and align with established quality expectations
 
+### Requirement: Error-state regressions are covered by controller workflow tests
+The system SHALL include regression tests for critical controller error states introduced by mutation/query error handling requirements.
+
+#### Scenario: Validate error-state behavior in controller pages
+- **WHEN** API requests fail in query, knowledge-base, document, or schema workflows
+- **THEN** automated tests SHALL verify visible error alerts are rendered with expected failure messages
+
+### Requirement: Critical coverage-gap closure is tracked by executable tests
+The system SHALL close critical testing gaps with executable tests covering file selection behavior, API client edge branches, and high-impact knowledge base/schema workflows.
+
+#### Scenario: Run focused gap-closure suite
+- **WHEN** maintainers run targeted tests for these critical areas
+- **THEN** the suite SHALL pass and demonstrate coverage of the previously untested critical branches
+

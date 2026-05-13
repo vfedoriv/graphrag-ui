@@ -21,6 +21,7 @@ export function SchemasPage() {
   const [selectedSchema, setSelectedSchema] = useState<string>('')
   const [getSchemaError, setGetSchemaError] = useState<string>('')
   const [validation, setValidation] = useState<string[] | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
 
@@ -47,6 +48,7 @@ export function SchemasPage() {
         />
       )}
       {!selectedKnowledgeBaseId && <Alert title='No knowledge base selected' message='Activation requires selecting a knowledge base in the header or KB page.' tone='info' />}
+      {activateMutation.error && <Alert title='Activate failed' message={(activateMutation.error as Error).message} />}
     </>
   )
 
@@ -116,7 +118,20 @@ export function SchemasPage() {
         <div className='space-y-2'>
           <FieldLabel htmlFor='validate-schema-yaml-input'>Schema YAML content</FieldLabel>
           <Textarea id='validate-schema-yaml-input' rows={8} value={yaml} onChange={(e) => setYaml(e.target.value)} placeholder='Paste YAML schema content' />
-          <Button type='button' onClick={async () => setValidation((await schemasApi.validate({ content: yaml })).errors)}>Validate schema YAML</Button>
+          <Button
+            type='button'
+            onClick={async () => {
+              setValidationError(null)
+              try {
+                setValidation((await schemasApi.validate({ content: yaml })).errors)
+              } catch (error) {
+                setValidationError((error as Error).message)
+              }
+            }}
+          >
+            Validate schema YAML
+          </Button>
+          {validationError && <Alert title='Validate failed' message={validationError} />}
           {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
         </div>
       ),

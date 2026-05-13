@@ -57,6 +57,7 @@ export function DocumentsPage() {
             />
             {selectedUploadFilename ? <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p> : null}
             {uploadMutation.error ? <Alert title='Upload failed' message={(uploadMutation.error as Error).message} /> : null}
+            {processMutation.error ? <Alert title='Process failed' message={(processMutation.error as Error).message} /> : null}
           </section>
           {topSection}
           <section className='space-y-2'>
@@ -66,6 +67,8 @@ export function DocumentsPage() {
                 <p className='text-sm text-slate-600'>Selected document: {selectedDocumentId}</p>
                 {chunksQuery.isLoading ? (
                   <p className='text-sm text-slate-600'>Loading chunks...</p>
+                ) : chunksQuery.error ? (
+                  <Alert title='Load chunks failed' message={(chunksQuery.error as Error).message} />
                 ) : (
                   <OutputPreview label='Document chunks JSON'>{JSON.stringify(chunksQuery.data, null, 2)}</OutputPreview>
                 )}

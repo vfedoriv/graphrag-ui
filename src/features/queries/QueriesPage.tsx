@@ -51,6 +51,7 @@ export function QueriesPage() {
           <FieldLabel htmlFor='ask-query-prompt'>Question prompt</FieldLabel>
           <Textarea id='ask-query-prompt' rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
           <Button type='button' className='bg-slate-700' onClick={() => ask.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })}>Ask</Button>
+          {ask.error && <Alert title='Ask failed' message={(ask.error as Error).message} />}
           {ask.data && <OutputPreview label='Ask query result JSON'>{JSON.stringify(ask.data, null, 2)}</OutputPreview>}
         </div>
       ),
@@ -65,13 +66,18 @@ export function QueriesPage() {
           <Button
             type='button'
             onClick={async () => {
-              const res = await generate.mutateAsync({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })
-              setCypher(res.cypher)
-              setParameters(JSON.stringify(res.parameters ?? {}, null, 2))
+              try {
+                const res = await generate.mutateAsync({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })
+                setCypher(res.cypher)
+                setParameters(JSON.stringify(res.parameters ?? {}, null, 2))
+              } catch {
+                // surfaced via generate.error
+              }
             }}
           >
             Generate Cypher
           </Button>
+          {generate.error && <Alert title='Generate failed' message={(generate.error as Error).message} />}
           <FieldLabel htmlFor='generate-cypher-text'>Generated Cypher query</FieldLabel>
           <Textarea id='generate-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
           <FieldLabel htmlFor='generate-cypher-params'>Generated query parameters JSON</FieldLabel>
@@ -89,6 +95,7 @@ export function QueriesPage() {
           <FieldLabel htmlFor='validate-cypher-params'>Query parameters JSON</FieldLabel>
           <Textarea id='validate-cypher-params' rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
           <Button type='button' onClick={() => validate.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Validate</Button>
+          {validate.error && <Alert title='Validation failed' message={(validate.error as Error).message} />}
           {validate.data && <OutputPreview label='Validation result JSON'>{JSON.stringify(validate.data, null, 2)}</OutputPreview>}
         </div>
       ),
@@ -103,6 +110,7 @@ export function QueriesPage() {
           <FieldLabel htmlFor='execute-cypher-params'>Query parameters JSON</FieldLabel>
           <Textarea id='execute-cypher-params' rows={4} value={parameters} onChange={(e) => setParameters(e.target.value)} placeholder='JSON parameters' />
           <Button type='button' className='bg-emerald-700' onClick={() => execute.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Execute</Button>
+          {execute.error && <Alert title='Execution failed' message={(execute.error as Error).message} />}
           {execute.data && (
             <Table
               headers={execute.data.columns}
