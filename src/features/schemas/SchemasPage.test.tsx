@@ -18,7 +18,7 @@ describe('schemas page', () => {
             name: 'Schema A',
             version: 1,
             sourceType: 'PREDEFINED',
-            format: 'YAML',
+            format: 'JSON',
             contentHash: 'hash',
             status: 'ACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
@@ -42,9 +42,9 @@ describe('schemas page', () => {
       expect(screen.getByText('Activate failed from server')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-yaml'))
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')
-    await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema YAML' }))
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
+    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
     await waitFor(() => {
       expect(screen.getByText('Validate failed')).toBeInTheDocument()
       expect(screen.getByText('Validate failed from server')).toBeInTheDocument()
@@ -61,7 +61,7 @@ describe('schemas page', () => {
             name: 'Schema A',
             version: 1,
             sourceType: 'PREDEFINED',
-            format: 'YAML',
+            format: 'JSON',
             contentHash: 'hash',
             status: 'ACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
@@ -85,7 +85,7 @@ describe('schemas page', () => {
     })
   })
 
-  it('shows YAML format guidance and reports formatting errors for invalid YAML', async () => {
+  it('shows JSON format guidance and reports formatting errors for invalid JSON', async () => {
     const user = userEvent.setup()
     stubFetch((url, init) => {
       if (url === '/api/v1/schemas' && !init?.method) {
@@ -97,14 +97,14 @@ describe('schemas page', () => {
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
     await waitFor(() => {
-      expect(screen.getAllByText('Expected format: YAML').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Expected format: JSON').length).toBeGreaterThan(0)
     })
     const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
-    const yamlInput = within(createPanel).getByLabelText('Schema YAML content')
-    fireEvent.change(yamlInput, { target: { value: '{' } })
-    await user.click(within(createPanel).getByRole('button', { name: 'Format YAML' }))
+    const jsonInput = within(createPanel).getByLabelText('Schema JSON content')
+    fireEvent.change(jsonInput, { target: { value: '{' } })
+    await user.click(within(createPanel).getByRole('button', { name: 'Format JSON' }))
 
-    expect(within(createPanel).getByText('Cannot format invalid YAML payload.')).toBeInTheDocument()
+    expect(within(createPanel).getByText('Cannot format invalid JSON payload.')).toBeInTheDocument()
   })
 
   it('renders schema tabs in required workflow order', async () => {
@@ -125,9 +125,9 @@ describe('schemas page', () => {
     expect(tabLabels).toEqual([
       'Generate schema example from text',
       'Generate schema example from file',
-      'Generate schema YAML',
-      'Generate schema YAML from file',
-      'Validate schema YAML',
+      'Generate schema JSON',
+      'Generate schema JSON from file',
+      'Validate schema JSON',
       'Create schema',
       'Get schema by ID',
     ])
@@ -144,7 +144,7 @@ describe('schemas page', () => {
             name: 'Schema A',
             version: 1,
             sourceType: 'PREDEFINED',
-            format: 'YAML',
+            format: 'JSON',
             contentHash: 'hash',
             status: 'ACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
@@ -187,7 +187,7 @@ describe('schemas page', () => {
             name: 'Schema A',
             version: 1,
             sourceType: 'LEGACY',
-            format: 'YAML',
+            format: 'JSON',
             contentHash: 'hash',
             status: 'ACTIVE',
             createdAt: '2026-01-01T00:00:00Z',

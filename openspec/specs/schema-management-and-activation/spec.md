@@ -3,7 +3,7 @@
 This specification defines the required behavior for schema management and activation in the GraphRAG admin UI.
 ## Requirements
 ### Requirement: Users can inspect and create schemas
-The system SHALL support listing schemas in a top section and expose schema operations as tabs on the Schemas page, including create schema, get schema by ID, and validate schema YAML.
+The system SHALL support listing schemas in a top section and expose schema operations as tabs on the Schemas page, including create schema, get schema by ID, and validate schema JSON.
 
 #### Scenario: Schemas page groups operations as endpoint tabs
 - **WHEN** a user opens the Schemas page
@@ -17,7 +17,7 @@ The system SHALL allow activating a selected schema against the currently select
 - **THEN** the system SHALL call schema activation endpoint and refresh active-schema-related views without leaving the Schemas page
 
 ### Requirement: Schema activation and validation failures are visible
-The system SHALL show explicit error feedback when schema activation requests fail and when schema YAML validation requests fail.
+The system SHALL show explicit error feedback when schema activation requests fail and when schema JSON validation requests fail.
 
 #### Scenario: Activation fails
 - **WHEN** schema activation request fails
@@ -35,11 +35,11 @@ The system SHALL include workflow tests verifying schema activation can be trigg
 - **THEN** tests SHALL verify the activation endpoint call and related query invalidation effects
 
 ### Requirement: Schema YAML authoring areas are format-aware
-The system SHALL treat schema YAML input and output areas as YAML-aware fields with syntax-oriented visual presentation and format guidance.
+The system SHALL treat schema JSON input and output areas as JSON-aware fields with syntax-oriented visual presentation and format guidance.
 
 #### Scenario: Edit schema YAML input
-- **WHEN** a user edits schema YAML content in create/validate/generate workflows
-- **THEN** the field SHALL present YAML-aware syntax formatting cues and explicit YAML format indication
+- **WHEN** a user edits schema JSON content in create/validate/generate workflows
+- **THEN** the field SHALL present JSON-aware syntax formatting cues and explicit JSON format indication
 
 ### Requirement: Schema source types match backend contract
 The system SHALL expose and process only backend-supported schema source types: `PREDEFINED` and `GENERATED`.
@@ -55,3 +55,4 @@ The system SHALL expose and process only backend-supported schema source types: 
 #### Scenario: Unsupported source type from API is visibly handled
 - **WHEN** the backend response contains a source type outside `PREDEFINED` and `GENERATED`
 - **THEN** the system SHALL show a visible unsupported-source-type fallback state without remapping it to a supported value
+

@@ -33,18 +33,19 @@ describe('queries workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.type(screen.getByLabelText('Question prompt'), 'who?')
-    await user.click(screen.getByRole('button', { name: 'Ask' }))
+    const askPanel = screen.getByTestId('queries-endpoint-tabs-panel-ask-query')
+    await user.type(within(askPanel).getByLabelText('Question prompt'), 'who?')
+    await user.click(within(askPanel).getByRole('button', { name: 'Ask' }))
 
-    await user.click(screen.getByRole('button', { name: 'Generate Cypher' }))
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-generate-cypher'))
     const generatePanel = screen.getByTestId('queries-endpoint-tabs-panel-generate-cypher')
     await user.click(within(generatePanel).getByRole('button', { name: 'Generate Cypher' }))
 
-    await user.click(screen.getByRole('button', { name: 'Validate Cypher' }))
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-validate-cypher'))
     const validatePanel = screen.getByTestId('queries-endpoint-tabs-panel-validate-cypher')
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate' }))
 
-    await user.click(screen.getByRole('button', { name: 'Execute Cypher' }))
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher'))
     const executePanel = screen.getByTestId('queries-endpoint-tabs-panel-execute-cypher')
     await user.click(within(executePanel).getByRole('button', { name: 'Execute' }))
 

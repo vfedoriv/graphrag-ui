@@ -39,21 +39,4 @@ describe('StructuredPayloadEditor', () => {
     expect(onErrorChange).toHaveBeenCalledWith('Cannot format invalid JSON payload.')
   })
 
-  it('formats valid YAML payload', async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(
-      <StructuredPayloadEditor
-        id='yaml-editor'
-        format='yaml'
-        value='a: 1'
-        onChange={onChange}
-        onErrorChange={vi.fn()}
-      />,
-    )
-
-    await user.click(screen.getByRole('button', { name: 'Format YAML' }))
-
-    expect(onChange).toHaveBeenCalledWith('a: 1\n')
-  })
 })

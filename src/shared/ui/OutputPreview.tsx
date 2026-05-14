@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 type OutputPreviewProps = {
   label: string
   children: ReactNode
-  format?: 'plain' | 'json' | 'yaml'
+  format?: 'plain' | 'json'
 }
 
 export function OutputPreview({ label, children, format = 'plain' }: OutputPreviewProps) {

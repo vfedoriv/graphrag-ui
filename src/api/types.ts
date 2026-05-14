@@ -48,13 +48,18 @@ export type Schema = {
   name: string
   version: number
   sourceType: string
-  format: string
+  format: SchemaFormat
   contentHash: string
   status: string
   createdAt: string
 }
 
 export type SchemaSourceType = 'PREDEFINED' | 'GENERATED'
+export type SchemaFormat = 'JSON'
+
+export type SchemaDetails = Schema & {
+  content: string
+}
 
 export type CreateSchemaRequest = {
   content: string
@@ -85,6 +90,19 @@ export type GenerateSchemaRequest = {
   description?: string
   text: string
   example: string
+}
+
+export type GenerateSchemaFromFileRequest = {
+  name: string
+  version: number
+  description?: string
+  example: string
+  file: File
+}
+
+export type GenerateSchemaExampleFromFileRequest = {
+  userPrompt?: string
+  file: File
 }
 
 export type GenerateSchemaResponse = {

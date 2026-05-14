@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './schemas/SchemasPage'
 import { KnowledgeBasesPage } from './knowledge-bases/KnowledgeBasesPage'
@@ -41,10 +41,11 @@ describe('controller pages tabs', () => {
     renderWithProviders(<SchemasPage />)
 
     expect(await screen.findByRole('button', { name: 'Create schema' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Validate schema YAML' }))
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
 
-    expect(screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')).toBeInTheDocument()
-    expect(screen.getByLabelText('Schema YAML content')).toBeInTheDocument()
+    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    expect(validatePanel).toBeInTheDocument()
+    expect(within(validatePanel).getByLabelText('Schema JSON content')).toBeInTheDocument()
   })
 
   it('renders knowledge base inline create section without endpoint tabs', async () => {
@@ -60,8 +61,8 @@ describe('controller pages tabs', () => {
   it('renders documents endpoint tabs', async () => {
     renderWithProviders(<DocumentsPage />)
 
-    expect(await screen.findByRole('button', { name: 'Upload document' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Inspect document chunks' })).toBeInTheDocument()
+    expect(await screen.findByText('Upload document')).toBeInTheDocument()
+    expect(screen.getByText('Inspect document chunks')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Select file to upload' })).toBeInTheDocument()
   })
 
@@ -70,17 +71,17 @@ describe('controller pages tabs', () => {
 
     expect(screen.getByRole('button', { name: 'Ask query' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Execute Cypher' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Question prompt')).toBeInTheDocument()
+    expect(screen.getByLabelText('Question prompt', { selector: '#ask-query-prompt' })).toBeInTheDocument()
   })
 
   it('renders schema file-select buttons', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />)
 
-    await user.click(await screen.findByRole('button', { name: 'Generate schema example from file' }))
+    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-generate-schema-example-file'))
     expect(screen.getByRole('button', { name: 'Select source file' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Generate schema YAML from file' }))
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
     expect(screen.getByRole('button', { name: 'Select source text file' })).toBeInTheDocument()
   })
 })

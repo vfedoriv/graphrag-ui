@@ -18,18 +18,18 @@ import { Textarea } from '../../shared/ui/Textarea'
 export function SchemasPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const { data = [] } = useSchemasQuery()
-  const [yaml, setYaml] = useState('')
+  const [schemaJson, setSchemaJson] = useState('')
   const [schemaId, setSchemaId] = useState('')
   const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
-  const [generatedYamlOutput, setGeneratedYamlOutput] = useState('')
-  const [generatedYamlFromFileOutput, setGeneratedYamlFromFileOutput] = useState('')
+  const [generatedJsonOutput, setGeneratedJsonOutput] = useState('')
+  const [generatedJsonFromFileOutput, setGeneratedJsonFromFileOutput] = useState('')
   const [getSchemaError, setGetSchemaError] = useState<string>('')
   const [isGetSchemaPending, setIsGetSchemaPending] = useState(false)
   const [validation, setValidation] = useState<string[] | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [isValidatePending, setIsValidatePending] = useState(false)
   const [isGeneratePending, setIsGeneratePending] = useState(false)
-  const [yamlFormatError, setYamlFormatError] = useState<string | null>(null)
+  const [schemaJsonFormatError, setSchemaJsonFormatError] = useState<string | null>(null)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
   const isAnyPending = createMutation.isPending || activateMutation.isPending || isGetSchemaPending || isValidatePending || isGeneratePending
@@ -85,44 +85,44 @@ export function SchemasPage() {
       content: <SchemaGenerateExampleFromFile onPendingChange={setIsGeneratePending} />,
     },
     {
-      id: 'generate-schema-yaml',
-      label: 'Generate schema YAML',
+      id: 'generate-schema-json',
+      label: 'Generate schema JSON',
       content: (
-        <SchemaGenerateYamlFromText
-          onYamlReady={setYaml}
-          output={generatedYamlOutput}
-          onOutputReady={setGeneratedYamlOutput}
+        <SchemaGenerateJsonFromText
+          onJsonReady={setSchemaJson}
+          output={generatedJsonOutput}
+          onOutputReady={setGeneratedJsonOutput}
           onPendingChange={setIsGeneratePending}
         />
       ),
     },
     {
-      id: 'generate-schema-yaml-file',
-      label: 'Generate schema YAML from file',
+      id: 'generate-schema-json-file',
+      label: 'Generate schema JSON from file',
       content: (
-        <SchemaGenerateYamlFromFile
-          onYamlReady={setYaml}
-          output={generatedYamlFromFileOutput}
-          onOutputReady={setGeneratedYamlFromFileOutput}
+        <SchemaGenerateJsonFromFile
+          onJsonReady={setSchemaJson}
+          output={generatedJsonFromFileOutput}
+          onOutputReady={setGeneratedJsonFromFileOutput}
           onPendingChange={setIsGeneratePending}
         />
       ),
     },
     {
-      id: 'validate-schema-yaml',
-      label: 'Validate schema YAML',
+      id: 'validate-schema-json',
+      label: 'Validate schema JSON',
       content: (
         <div className='space-y-2'>
-          <FieldLabel htmlFor='validate-schema-yaml-input'>Schema YAML content</FieldLabel>
+          <FieldLabel htmlFor='validate-schema-json-input'>Schema JSON content</FieldLabel>
           <StructuredPayloadEditor
-            id='validate-schema-yaml-input'
-            format='yaml'
+            id='validate-schema-json-input'
+            format='json'
             rows={8}
-            value={yaml}
-            onChange={setYaml}
-            error={yamlFormatError}
-            onErrorChange={setYamlFormatError}
-            placeholder='Paste YAML schema content'
+            value={schemaJson}
+            onChange={setSchemaJson}
+            error={schemaJsonFormatError}
+            onErrorChange={setSchemaJsonFormatError}
+            placeholder='Paste JSON schema content'
           />
           <Button
             type='button'
@@ -132,7 +132,7 @@ export function SchemasPage() {
               setValidationError(null)
               setIsValidatePending(true)
               try {
-                setValidation((await schemasApi.validate({ content: yaml })).errors)
+                setValidation((await schemasApi.validate({ content: schemaJson })).errors)
               } catch (error) {
                 setValidationError((error as Error).message)
               } finally {
@@ -140,7 +140,7 @@ export function SchemasPage() {
               }
             }}
           >
-            Validate schema YAML
+            Validate schema JSON
           </Button>
           {validationError && <Alert title='Validate failed' message={validationError} />}
           {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
@@ -152,18 +152,18 @@ export function SchemasPage() {
       label: 'Create schema',
       content: (
         <div className='space-y-2'>
-          <FieldLabel htmlFor='create-schema-yaml'>Schema YAML content</FieldLabel>
+          <FieldLabel htmlFor='create-schema-json'>Schema JSON content</FieldLabel>
           <StructuredPayloadEditor
-            id='create-schema-yaml'
-            format='yaml'
+            id='create-schema-json'
+            format='json'
             rows={8}
-            value={yaml}
-            onChange={setYaml}
-            error={yamlFormatError}
-            onErrorChange={setYamlFormatError}
-            placeholder='Paste YAML schema content'
+            value={schemaJson}
+            onChange={setSchemaJson}
+            error={schemaJsonFormatError}
+            onErrorChange={setSchemaJsonFormatError}
+            placeholder='Paste JSON schema content'
           />
-          <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: yaml, sourceType: 'PREDEFINED' })}>Create</Button>
+          <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: schemaJson, sourceType: 'PREDEFINED' })}>Create</Button>
           {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
         </div>
       ),
@@ -265,7 +265,7 @@ function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (
 }
 
 function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (isPending: boolean) => void }) {
-  const [fileText, setFileText] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedFilename, setSelectedFilename] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -278,8 +278,8 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
         buttonLabel='Select source file'
         testId='schemas-example-file-select'
         onFileSelected={async (file) => {
+          setSelectedFile(file)
           setSelectedFilename(file.name)
-          setFileText(await file.text())
         }}
       />
       {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
@@ -289,10 +289,14 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
+          if (!selectedFile) {
+            setError('Select a source file before generating schema example.')
+            return
+          }
           setIsPending(true)
           onPendingChange(true)
           try {
-            const res = await schemasApi.generateExample({ text: fileText })
+            const res = await schemasApi.generateExampleFromFile({ file: selectedFile })
             setExample(res.example)
           } catch (e) {
             setError((e as Error).message)
@@ -311,10 +315,10 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
   )
 }
 
-function SchemaGenerateYamlFromText(
+function SchemaGenerateJsonFromText(
   {
-    onYamlReady, output, onOutputReady, onPendingChange,
-  }: { onYamlReady: (yaml: string) => void, output: string, onOutputReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void },
+    onJsonReady, output, onOutputReady, onPendingChange,
+  }: { onJsonReady: (json: string) => void, output: string, onOutputReady: (json: string) => void, onPendingChange: (isPending: boolean) => void },
 ) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
@@ -326,16 +330,16 @@ function SchemaGenerateYamlFromText(
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema YAML generation...' /> : null}
-      <FieldLabel htmlFor='generate-yaml-text-name'>Schema name</FieldLabel>
-      <Input id='generate-yaml-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
-      <FieldLabel htmlFor='generate-yaml-text-version'>Schema version</FieldLabel>
-      <Input id='generate-yaml-text-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
-      <FieldLabel htmlFor='generate-yaml-text-source'>Source text</FieldLabel>
-      <Textarea id='generate-yaml-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
-      <FieldLabel htmlFor='generate-yaml-text-example'>Schema example JSON</FieldLabel>
+      {isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
+      <FieldLabel htmlFor='generate-json-text-name'>Schema name</FieldLabel>
+      <Input id='generate-json-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <FieldLabel htmlFor='generate-json-text-version'>Schema version</FieldLabel>
+      <Input id='generate-json-text-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <FieldLabel htmlFor='generate-json-text-source'>Source text</FieldLabel>
+      <Textarea id='generate-json-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
+      <FieldLabel htmlFor='generate-json-text-example'>Schema example JSON</FieldLabel>
       <StructuredPayloadEditor
-        id='generate-yaml-text-example'
+        id='generate-json-text-example'
         format='json'
         rows={5}
         value={example}
@@ -355,8 +359,8 @@ function SchemaGenerateYamlFromText(
           setIsPending(true)
           onPendingChange(true)
           try {
-            const res = await schemasApi.generateYaml({ name, version, text, example })
-            onYamlReady(res.content)
+            const res = await schemasApi.generateJson({ name, version, text, example })
+            onJsonReady(res.content)
             onOutputReady(res.content)
           } catch (e) {
             setError((e as Error).message)
@@ -366,23 +370,23 @@ function SchemaGenerateYamlFromText(
           }
         }}
       >
-        Generate schema YAML
+        Generate schema JSON
       </Button>
-      <FieldLabel htmlFor='generate-yaml-text-output'>Generated schema YAML</FieldLabel>
-      <Textarea id='generate-yaml-text-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated YAML response' />
+      <FieldLabel htmlFor='generate-json-text-output'>Generated schema JSON</FieldLabel>
+      <Textarea id='generate-json-text-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )
 }
 
-function SchemaGenerateYamlFromFile(
+function SchemaGenerateJsonFromFile(
   {
-    onYamlReady, output, onOutputReady, onPendingChange,
-  }: { onYamlReady: (yaml: string) => void, output: string, onOutputReady: (yaml: string) => void, onPendingChange: (isPending: boolean) => void },
+    onJsonReady, output, onOutputReady, onPendingChange,
+  }: { onJsonReady: (json: string) => void, output: string, onOutputReady: (json: string) => void, onPendingChange: (isPending: boolean) => void },
 ) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
-  const [text, setText] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedFilename, setSelectedFilename] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -391,23 +395,23 @@ function SchemaGenerateYamlFromFile(
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema YAML generation...' /> : null}
-      <FieldLabel htmlFor='generate-yaml-file-name'>Schema name</FieldLabel>
-      <Input id='generate-yaml-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
-      <FieldLabel htmlFor='generate-yaml-file-version'>Schema version</FieldLabel>
-      <Input id='generate-yaml-file-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      {isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
+      <FieldLabel htmlFor='generate-json-file-name'>Schema name</FieldLabel>
+      <Input id='generate-json-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <FieldLabel htmlFor='generate-json-file-version'>Schema version</FieldLabel>
+      <Input id='generate-json-file-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FileSelectButton
         buttonLabel='Select source text file'
-        testId='schemas-yaml-file-select'
+        testId='schemas-json-file-select'
         onFileSelected={async (file) => {
+          setSelectedFile(file)
           setSelectedFilename(file.name)
-          setText(await file.text())
         }}
       />
       {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
-      <FieldLabel htmlFor='generate-yaml-file-example'>Schema example JSON</FieldLabel>
+      <FieldLabel htmlFor='generate-json-file-example'>Schema example JSON</FieldLabel>
       <StructuredPayloadEditor
-        id='generate-yaml-file-example'
+        id='generate-json-file-example'
         format='json'
         rows={5}
         value={example}
@@ -423,12 +427,16 @@ function SchemaGenerateYamlFromFile(
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
+          if (!selectedFile) {
+            setError('Select a source file before generating schema JSON.')
+            return
+          }
           onOutputReady('')
           setIsPending(true)
           onPendingChange(true)
           try {
-            const res = await schemasApi.generateYaml({ name, version, text, example })
-            onYamlReady(res.content)
+            const res = await schemasApi.generateJsonFromFile({ name, version, example, file: selectedFile })
+            onJsonReady(res.content)
             onOutputReady(res.content)
           } catch (e) {
             setError((e as Error).message)
@@ -438,10 +446,10 @@ function SchemaGenerateYamlFromFile(
           }
         }}
       >
-        Generate schema YAML from file
+        Generate schema JSON from file
       </Button>
-      <FieldLabel htmlFor='generate-yaml-file-output'>Generated schema YAML</FieldLabel>
-      <Textarea id='generate-yaml-file-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated YAML response' />
+      <FieldLabel htmlFor='generate-json-file-output'>Generated schema JSON</FieldLabel>
+      <Textarea id='generate-json-file-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
       {error && <Alert title='Generation failed' message={error} />}
     </div>
   )

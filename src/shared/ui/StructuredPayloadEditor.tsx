@@ -1,9 +1,8 @@
 import type { TextareaHTMLAttributes } from 'react'
-import YAML from 'yaml'
 import { Button } from './Button'
 import { Textarea } from './Textarea'
 
-type StructuredPayloadFormat = 'json' | 'yaml'
+type StructuredPayloadFormat = 'json'
 
 type StructuredPayloadEditorProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange' | 'value'> & {
   format: StructuredPayloadFormat
@@ -25,10 +24,7 @@ export function StructuredPayloadEditor({
 
   const formatValue = () => {
     try {
-      const formatted =
-        format === 'json'
-          ? JSON.stringify(JSON.parse(value) as unknown, null, 2)
-          : YAML.stringify(YAML.parse(value))
+      const formatted = JSON.stringify(JSON.parse(value) as unknown, null, 2)
       onChange(formatted)
       onErrorChange?.(null)
     } catch {

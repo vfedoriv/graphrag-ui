@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './SchemasPage'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
@@ -14,17 +14,17 @@ describe('schemas workflows', () => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
       if (url.endsWith('/schemas')) return jsonResponse(200, [])
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
-      if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'YAML', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
+      if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
       return jsonResponse(200, {})
     })
 
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-validate-schema-yaml'))
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-yaml')
-    await user.type(within(validatePanel).getByLabelText('Schema YAML content'), 'type: object')
-    await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema YAML' }))
+    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
+    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    fireEvent.change(within(validatePanel).getByLabelText('Schema JSON content'), { target: { value: '{"type":"object"}' } })
+    await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
 
     expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
 
@@ -41,13 +41,16 @@ describe('schemas workflows', () => {
     })
   })
 
-  it('shows response outputs for schema yaml generation tabs and replaces get-by-id output with latest response', async () => {
+  it('shows response outputs for schema JSON generation tabs and replaces get-by-id output with latest response', async () => {
     let getByIdCount = 0
     stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
       if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
-        return jsonResponse(200, { content: 'name: generated-schema\nversion: 1' })
+        return jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
+      }
+      if (url.endsWith('/schemas/generate/from-file') && init?.method === 'POST') {
+        return jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
       }
       if (url.endsWith('/schemas/schema-1')) {
         getByIdCount += 1
@@ -56,7 +59,7 @@ describe('schemas workflows', () => {
           name: getByIdCount === 1 ? 'first' : 'second',
           version: 1,
           sourceType: 'PREDEFINED',
-          format: 'YAML',
+          format: 'JSON',
           contentHash: 'h',
           status: 'ACTIVE',
           createdAt: '',
@@ -68,18 +71,20 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const generateYamlPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-yaml')
-    await user.type(within(generateYamlPanel).getByLabelText('Source text'), 'customer record')
-    await user.click(within(generateYamlPanel).getByRole('button', { name: 'Generate schema YAML' }))
+    const generateJsonPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-json')
+    await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
+    await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
     await waitFor(() => {
-      expect(within(generateYamlPanel).getByLabelText('Generated schema YAML')).toHaveValue('name: generated-schema\nversion: 1')
+      expect(within(generateJsonPanel).getByLabelText('Generated schema JSON')).toHaveValue('{"name":"generated-schema","version":1}')
     })
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-yaml-file'))
-    const generateYamlFilePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-yaml-file')
-    await user.click(within(generateYamlFilePanel).getByRole('button', { name: 'Generate schema YAML from file' }))
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
+    const generateJsonFilePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-json-file')
+    const sourceFileInput = within(generateJsonFilePanel).getByTestId('schemas-json-file-select-input')
+    await user.upload(sourceFileInput, new File(['customer record'], 'customer.txt', { type: 'text/plain' }))
+    await user.click(within(generateJsonFilePanel).getByRole('button', { name: 'Generate schema JSON from file' }))
     await waitFor(() => {
-      expect(within(generateYamlFilePanel).getByLabelText('Generated schema YAML')).toHaveValue('name: generated-schema\nversion: 1')
+      expect(within(generateJsonFilePanel).getByLabelText('Generated schema JSON')).toHaveValue('{"name":"generated-schema","version":1}')
     })
 
     await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-get-schema-by-id'))
