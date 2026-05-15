@@ -14,7 +14,7 @@ describe('documents api', () => {
       if (url.endsWith('/knowledge-bases/kb-a/documents')) {
         return jsonResponse(200, [{ id: 'doc-1', knowledgeBaseId: 'kb-a' }])
       }
-      if (url.endsWith('/documents/doc-1/process')) {
+      if (url.endsWith('/documents/doc-1/process?allowOverwrite=false')) {
         return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
       }
       if (url.endsWith('/documents/doc-1/chunks')) {
@@ -39,7 +39,9 @@ describe('documents api', () => {
 
   it('invalidates document queries after upload/process', async () => {
     stubFetch((url) => {
-      if (url.endsWith('/documents/doc-1/process')) return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
+      if (url.endsWith('/documents/doc-1/process?allowOverwrite=false')) {
+        return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
+      }
       return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
     })
 
@@ -53,8 +55,22 @@ describe('documents api', () => {
     await uploadResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', file: new File(['x'], 'a.txt') })
 
     const { result: processResult } = renderHook(() => useProcessDocumentMutation(), { wrapper })
-    await processResult.current.mutateAsync('doc-1')
+    await processResult.current.mutateAsync({ documentId: 'doc-1' })
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['documents', 'kb-a'] })
+  })
+
+  it('sends allowOverwrite=true when requested', async () => {
+    const fetchMock = stubFetch((url) => {
+      if (url.endsWith('/documents/doc-1/process?allowOverwrite=true')) {
+        return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    await documentsApi.process('doc-1', true)
+
+    const urls = fetchMock.mock.calls.map((call) => String(call[0]))
+    expect(urls.some((url) => url.endsWith('/api/v1/documents/doc-1/process?allowOverwrite=true'))).toBe(true)
   })
 })

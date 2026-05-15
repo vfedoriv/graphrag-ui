@@ -13,7 +13,8 @@ export const documentsApi = {
       body: form,
     })
   },
-  process: (documentId: string) => apiFetch<DocumentUpload>(`/documents/${documentId}/process`, { method: 'POST' }),
+  process: (documentId: string, allowOverwrite = false) =>
+    apiFetch<DocumentUpload>(`/documents/${documentId}/process?allowOverwrite=${allowOverwrite}`, { method: 'POST' }),
   chunks: (documentId: string) => apiFetch<DocumentChunk[]>(`/documents/${documentId}/chunks`),
 }
 
@@ -45,7 +46,8 @@ export function useUploadDocumentMutation() {
 export function useProcessDocumentMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: documentsApi.process,
+    mutationFn: ({ documentId, allowOverwrite = false }: { documentId: string; allowOverwrite?: boolean }) =>
+      documentsApi.process(documentId, allowOverwrite),
     onSuccess: (doc) => queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) }),
   })
 }
