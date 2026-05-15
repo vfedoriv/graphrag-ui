@@ -18,6 +18,7 @@ export function DocumentsPage() {
   const processMutation = useProcessDocumentMutation()
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
+  const [processingDocumentIds, setProcessingDocumentIds] = useState<Set<string>>(new Set())
   const chunksQuery = useDocumentChunksQuery(selectedDocumentId)
   const isAnyPending = uploadMutation.isPending || processMutation.isPending || chunksQuery.isLoading
 
@@ -27,6 +28,23 @@ export function DocumentsPage() {
   }
 
   const handleProcessDocument = async (documentId: string, status: string) => {
+    const runProcess = async (allowOverwrite: boolean) => {
+      setProcessingDocumentIds((prev) => {
+        const next = new Set(prev)
+        next.add(documentId)
+        return next
+      })
+      try {
+        await processMutation.mutateAsync({ documentId, allowOverwrite })
+      } finally {
+        setProcessingDocumentIds((prev) => {
+          const next = new Set(prev)
+          next.delete(documentId)
+          return next
+        })
+      }
+    }
+
     const shouldOverwrite = isCompletedOrSuccessfullyProcessed(status)
       ? window.confirm('This document is already successfully processed. Confirm reprocess and overwrite?')
       : false
@@ -34,13 +52,13 @@ export function DocumentsPage() {
       return
     }
     try {
-      await processMutation.mutateAsync({ documentId, allowOverwrite: shouldOverwrite })
+      await runProcess(shouldOverwrite)
     } catch (error) {
       // Fallback for stale UI status: backend truth is authoritative.
       if (!shouldOverwrite && error instanceof ApiError && error.status === 409) {
         const confirmed = window.confirm('This document is already successfully processed. Confirm reprocess and overwrite?')
         if (!confirmed) return
-        await processMutation.mutateAsync({ documentId, allowOverwrite: true })
+        await runProcess(true)
       }
     }
   }
@@ -69,7 +87,7 @@ export function DocumentsPage() {
         <div className='flex gap-2'>
           <Button
             type='button'
-            isPending={processMutation.isPending}
+            isPending={processingDocumentIds.has(doc.id)}
             pendingText='Processing...'
             onClick={() => {
               void handleProcessDocument(doc.id, doc.status)

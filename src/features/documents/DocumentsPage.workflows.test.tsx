@@ -131,4 +131,133 @@ describe('documents workflows', () => {
       expect(urls.some((u) => u.endsWith('/api/v1/documents/doc-1/process?allowOverwrite=true'))).toBe(true)
     })
   })
+
+  it('shows pending state only for the clicked process row', async () => {
+    let resolveProcess: ((value: Response) => void) | null = null
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents')) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'a.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+          {
+            id: 'doc-2',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'b.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'y',
+            contentUri: 'uri2',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/documents/doc-1/process?allowOverwrite=false')) {
+        return new Promise<Response>((resolve) => {
+          resolveProcess = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const processButtons = await screen.findAllByRole('button', { name: 'Process' })
+    await user.click(processButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Processing...' })).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: 'Process' })).toHaveLength(1)
+    })
+
+    resolveProcess?.(jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' }))
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Process' })).toHaveLength(2)
+    })
+  })
+
+  it('keeps pending state independent across rows when processing concurrently', async () => {
+    let resolveDoc1: ((value: Response) => void) | null = null
+    let resolveDoc2: ((value: Response) => void) | null = null
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents')) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'a.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+          {
+            id: 'doc-2',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'b.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'y',
+            contentUri: 'uri2',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/documents/doc-1/process?allowOverwrite=false')) {
+        return new Promise<Response>((resolve) => {
+          resolveDoc1 = resolve
+        })
+      }
+      if (url.endsWith('/documents/doc-2/process?allowOverwrite=false')) {
+        return new Promise<Response>((resolve) => {
+          resolveDoc2 = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    let processButtons = await screen.findAllByRole('button', { name: 'Process' })
+    await user.click(processButtons[0])
+    processButtons = await screen.findAllByRole('button', { name: 'Process' })
+    await user.click(processButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Processing...' })).toHaveLength(2)
+    })
+
+    resolveDoc1?.(jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' }))
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Processing...' })).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: 'Process' })).toHaveLength(1)
+    })
+
+    resolveDoc2?.(jsonResponse(200, { id: 'doc-2', knowledgeBaseId: 'kb-a' }))
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Process' })).toHaveLength(2)
+    })
+  })
 })
