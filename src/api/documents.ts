@@ -20,16 +20,26 @@ export const documentsApi = {
 
 export function useDocumentsQuery(knowledgeBaseId: string | null) {
   return useQuery({
-    queryKey: knowledgeBaseId ? queryKeys.documents(knowledgeBaseId) : ['documents', 'none'],
-    queryFn: () => documentsApi.list(knowledgeBaseId as string),
+    queryKey: queryKeys.documentsMaybe(knowledgeBaseId),
+    queryFn: () => {
+      if (!knowledgeBaseId) {
+        throw new Error('Cannot load documents without a selected knowledge base')
+      }
+      return documentsApi.list(knowledgeBaseId)
+    },
     enabled: Boolean(knowledgeBaseId),
   })
 }
 
 export function useDocumentChunksQuery(documentId: string | null) {
   return useQuery({
-    queryKey: documentId ? queryKeys.chunks(documentId) : ['documents', 'none', 'chunks'],
-    queryFn: () => documentsApi.chunks(documentId as string),
+    queryKey: queryKeys.chunksMaybe(documentId),
+    queryFn: () => {
+      if (!documentId) {
+        throw new Error('Cannot load chunks without a selected document')
+      }
+      return documentsApi.chunks(documentId)
+    },
     enabled: Boolean(documentId),
   })
 }

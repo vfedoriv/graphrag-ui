@@ -33,4 +33,61 @@ describe('app shell', () => {
     expect(calledUrls.some((url) => url.includes('/health'))).toBe(false)
     expect(calledUrls.some((url) => url.includes('/knowledge-bases'))).toBe(true)
   })
+
+  it('clears stale persisted knowledge base selection after list loads', async () => {
+    localStorage.setItem('graphrag.selectedKnowledgeBase', 'missing-kb')
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify([{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }]),
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('None selected')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(localStorage.getItem('graphrag.selectedKnowledgeBase')).toBeNull()
+    })
+  })
+
+  it('keeps valid persisted knowledge base selection after list loads', async () => {
+    localStorage.setItem('graphrag.selectedKnowledgeBase', 'kb-a')
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify([{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }]),
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('KB A (kb-a)', { selector: 'p' })).toBeInTheDocument()
+    expect(localStorage.getItem('graphrag.selectedKnowledgeBase')).toBe('kb-a')
+  })
+
+  it('does not clear persisted knowledge base selection while list load fails', async () => {
+    localStorage.setItem('graphrag.selectedKnowledgeBase', 'kb-a')
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => JSON.stringify({ detail: 'backend unavailable' }),
+      json: async () => ({ detail: 'backend unavailable' }),
+    })
+
+    render(<App />)
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(localStorage.getItem('graphrag.selectedKnowledgeBase')).toBe('kb-a')
+  })
+
+  it('does not clear persisted knowledge base selection while list is loading', async () => {
+    localStorage.setItem('graphrag.selectedKnowledgeBase', 'kb-a')
+    fetchMock.mockReturnValue(new Promise(() => undefined))
+
+    render(<App />)
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(localStorage.getItem('graphrag.selectedKnowledgeBase')).toBe('kb-a')
+  })
 })

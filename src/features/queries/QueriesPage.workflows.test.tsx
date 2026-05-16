@@ -40,9 +40,11 @@ describe('queries workflows', () => {
     await user.click(screen.getByTestId('queries-endpoint-tabs-tab-generate-cypher'))
     const generatePanel = screen.getByTestId('queries-endpoint-tabs-panel-generate-cypher')
     await user.click(within(generatePanel).getByRole('button', { name: 'Generate Cypher' }))
+    expect(await within(generatePanel).findByDisplayValue('MATCH (n) RETURN n')).toBeInTheDocument()
 
     await user.click(screen.getByTestId('queries-endpoint-tabs-tab-validate-cypher'))
     const validatePanel = screen.getByTestId('queries-endpoint-tabs-panel-validate-cypher')
+    expect(within(validatePanel).getByDisplayValue('MATCH (n) RETURN n')).toBeInTheDocument()
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate' }))
 
     await user.click(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher'))

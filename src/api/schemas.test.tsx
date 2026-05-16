@@ -1,7 +1,17 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { schemasApi, useActivateSchemaMutation, useCreateSchemaMutation } from './schemas'
+import {
+  schemasApi,
+  useActivateSchemaMutation,
+  useCreateSchemaMutation,
+  useGenerateSchemaExampleFromFileMutation,
+  useGenerateSchemaExampleMutation,
+  useGenerateSchemaJsonFromFileMutation,
+  useGenerateSchemaJsonMutation,
+  useGetSchemaMutation,
+  useValidateSchemaMutation,
+} from './schemas'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
 
 describe('schemas api', () => {
@@ -81,5 +91,65 @@ describe('schemas api', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases'] })
+  })
+
+  it('exposes mutation hooks for schema endpoint workflows', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/schemas/schema-1')) {
+        return jsonResponse(200, {
+          id: 'schema-1',
+          name: 'Schema',
+          version: 1,
+          sourceType: 'PREDEFINED',
+          format: 'JSON',
+          contentHash: 'h',
+          status: 'ACTIVE',
+          createdAt: '',
+          content: '{}',
+        })
+      }
+      if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
+      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, { example: '{"from":"file"}' })
+      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, { example: '{"from":"text"}' })
+      if (url.endsWith('/schemas/generate/from-file')) return jsonResponse(200, { content: '{"from":"file"}' })
+      if (url.endsWith('/schemas/generate')) return jsonResponse(200, { content: '{"from":"text"}' })
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const queryClient = createTestQueryClient()
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+
+    const { result: getSchema } = renderHook(() => useGetSchemaMutation(), { wrapper })
+    const { result: validate } = renderHook(() => useValidateSchemaMutation(), { wrapper })
+    const { result: generateExample } = renderHook(() => useGenerateSchemaExampleMutation(), { wrapper })
+    const { result: generateExampleFromFile } = renderHook(() => useGenerateSchemaExampleFromFileMutation(), { wrapper })
+    const { result: generateJson } = renderHook(() => useGenerateSchemaJsonMutation(), { wrapper })
+    const { result: generateJsonFromFile } = renderHook(() => useGenerateSchemaJsonFromFileMutation(), { wrapper })
+
+    await expect(getSchema.current.mutateAsync('schema-1')).resolves.toMatchObject({ id: 'schema-1' })
+    await expect(validate.current.mutateAsync({ content: '{}' })).resolves.toEqual({ valid: true, errors: [] })
+    await expect(generateExample.current.mutateAsync({ text: 'source' })).resolves.toEqual({ example: '{"from":"text"}' })
+    await expect(
+      generateExampleFromFile.current.mutateAsync({ file: new File(['source'], 'source.txt') }),
+    ).resolves.toEqual({ example: '{"from":"file"}' })
+    await expect(generateJson.current.mutateAsync({ name: 'n', version: 1, text: 'source', example: '{}' })).resolves.toEqual({
+      content: '{"from":"text"}',
+    })
+    await expect(
+      generateJsonFromFile.current.mutateAsync({
+        name: 'n',
+        version: 1,
+        example: '{}',
+        file: new File(['source'], 'source.txt'),
+      }),
+    ).resolves.toEqual({ content: '{"from":"file"}' })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/schemas/schema-1', expect.anything())
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/schemas/validate',
+      expect.objectContaining({ method: 'POST' }),
+    )
   })
 })

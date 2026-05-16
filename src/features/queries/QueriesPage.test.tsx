@@ -86,4 +86,29 @@ describe('queries page', () => {
 
     await waitFor(() => expect(screen.queryByText(/Waiting for backend query response\.\.\./i)).not.toBeInTheDocument())
   })
+
+  it('blocks validate and execute requests while parameter JSON is invalid', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch((url) => {
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-validate-cypher'))
+    const validatePanel = screen.getByTestId('queries-endpoint-tabs-panel-validate-cypher')
+    const validateParams = within(validatePanel).getByLabelText('Query parameters JSON')
+    fireEvent.change(validateParams, { target: { value: '{{' } })
+    await user.click(within(validatePanel).getByRole('button', { name: 'Validate' }))
+
+    expect(within(validatePanel).getByText('Cannot submit invalid JSON parameters.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher'))
+    const executePanel = screen.getByTestId('queries-endpoint-tabs-panel-execute-cypher')
+    await user.click(within(executePanel).getByRole('button', { name: 'Execute' }))
+
+    expect(within(executePanel).getByText('Cannot submit invalid JSON parameters.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

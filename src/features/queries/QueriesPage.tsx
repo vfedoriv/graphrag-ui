@@ -30,13 +30,15 @@ export function QueriesPage() {
   const ask = useAskQueryMutation()
   const isAnyPending = ask.isPending || generate.isPending || validate.isPending || execute.isPending
 
-  const parsedParams = (() => {
+  const parseParametersForSubmit = () => {
     try {
+      setParametersFormatError(null)
       return JSON.parse(parameters) as Record<string, unknown>
     } catch {
-      return {}
+      setParametersFormatError('Cannot submit invalid JSON parameters.')
+      return null
     }
-  })()
+  }
 
   if (!selectedKnowledgeBaseId) {
     return <Alert title='No knowledge base selected' message='Select a knowledge base before running query workflows.' tone='info' />
@@ -121,7 +123,18 @@ export function QueriesPage() {
             onErrorChange={setParametersFormatError}
             placeholder='JSON parameters'
           />
-          <Button type='button' isPending={validate.isPending} pendingText='Validating...' onClick={() => validate.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Validate</Button>
+          <Button
+            type='button'
+            isPending={validate.isPending}
+            pendingText='Validating...'
+            onClick={() => {
+              const parsedParams = parseParametersForSubmit()
+              if (!parsedParams) return
+              validate.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })
+            }}
+          >
+            Validate
+          </Button>
           {validate.error && <Alert title='Validation failed' message={(validate.error as Error).message} />}
           {validate.data && <OutputPreview label='Validation result JSON' format='json'>{JSON.stringify(validate.data, null, 2)}</OutputPreview>}
         </div>
@@ -145,7 +158,19 @@ export function QueriesPage() {
             onErrorChange={setParametersFormatError}
             placeholder='JSON parameters'
           />
-          <Button type='button' className='bg-emerald-700' isPending={execute.isPending} pendingText='Executing...' onClick={() => execute.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })}>Execute</Button>
+          <Button
+            type='button'
+            className='bg-emerald-700'
+            isPending={execute.isPending}
+            pendingText='Executing...'
+            onClick={() => {
+              const parsedParams = parseParametersForSubmit()
+              if (!parsedParams) return
+              execute.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { cypher, parameters: parsedParams } })
+            }}
+          >
+            Execute
+          </Button>
           {execute.error && <Alert title='Execution failed' message={(execute.error as Error).message} />}
           {execute.data && (
             <Table

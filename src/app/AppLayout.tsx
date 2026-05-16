@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Database, FileText, House, Settings, Spline, Waypoints } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useKnowledgeBasesQuery } from '../api/knowledgeBases'
@@ -15,9 +16,18 @@ const navItems = [
 ]
 
 export function AppLayout() {
-  const { data: knowledgeBases = [] } = useKnowledgeBasesQuery()
+  const { data: knowledgeBases = [], isSuccess } = useKnowledgeBasesQuery()
   const { selectedKnowledgeBaseId, setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const activeKb = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null
+
+  useEffect(() => {
+    if (!isSuccess || !selectedKnowledgeBaseId) {
+      return
+    }
+    if (!knowledgeBases.some((kb) => kb.id === selectedKnowledgeBaseId)) {
+      setSelectedKnowledgeBaseId(null)
+    }
+  }, [isSuccess, knowledgeBases, selectedKnowledgeBaseId, setSelectedKnowledgeBaseId])
 
   return (
     <div className='min-h-screen bg-[radial-gradient(circle_at_10%_10%,#e8f5e9_0,#f8fafc_40%,#f1f5f9_100%)] text-slate-900'>

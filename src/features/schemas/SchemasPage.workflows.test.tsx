@@ -96,4 +96,33 @@ describe('schemas workflows', () => {
     await user.click(within(getByIdPanel).getByRole('button', { name: 'Get schema by ID' }))
     expect(await within(getByIdPanel).findByDisplayValue(/"name": "second"/)).toBeInTheDocument()
   })
+
+  it('keeps edited generated schema draft when a later generation request fails', async () => {
+    let generateCount = 0
+    stubFetch((url, init) => {
+      if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
+        generateCount += 1
+        return generateCount === 1
+          ? jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
+          : jsonResponse(500, { detail: 'Generation failed from server' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const generateJsonPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-json')
+    await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
+    await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
+
+    const output = await within(generateJsonPanel).findByLabelText('Generated schema JSON')
+    await user.clear(output)
+    fireEvent.change(output, { target: { value: '{"name":"edited"}' } })
+    await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
+
+    expect(await within(generateJsonPanel).findByText('Generation failed from server')).toBeInTheDocument()
+    expect(output).toHaveValue('{"name":"edited"}')
+  })
 })

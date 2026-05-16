@@ -1,7 +1,13 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { documentsApi, useProcessDocumentMutation, useUploadDocumentMutation } from './documents'
+import {
+  documentsApi,
+  useDocumentChunksQuery,
+  useDocumentsQuery,
+  useProcessDocumentMutation,
+  useUploadDocumentMutation,
+} from './documents'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
 
 describe('documents api', () => {
@@ -57,7 +63,29 @@ describe('documents api', () => {
     const { result: processResult } = renderHook(() => useProcessDocumentMutation(), { wrapper })
     await processResult.current.mutateAsync({ documentId: 'doc-1' })
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['documents', 'kb-a'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['documents', 'knowledge-base', 'kb-a'] })
+  })
+
+  it('keeps nullable document queries disabled without calling endpoints', async () => {
+    const fetchMock = stubFetch((url) => {
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const queryClient = createTestQueryClient()
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+
+    const { result: documentsResult } = renderHook(() => useDocumentsQuery(null), { wrapper })
+    const { result: chunksResult } = renderHook(() => useDocumentChunksQuery(null), { wrapper })
+
+    await waitFor(() => {
+      expect(documentsResult.current.fetchStatus).toBe('idle')
+      expect(chunksResult.current.fetchStatus).toBe('idle')
+    })
+    expect(documentsResult.current.data).toBeUndefined()
+    expect(chunksResult.current.data).toBeUndefined()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('sends allowOverwrite=true when requested', async () => {

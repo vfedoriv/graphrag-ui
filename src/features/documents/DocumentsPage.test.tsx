@@ -85,4 +85,15 @@ describe('documents page', () => {
       expect(screen.getByText('Document is already processed. Confirm overwrite to reprocess this file.')).toBeInTheDocument()
     })
   })
+
+  it('does not call document endpoints without selected knowledge base', () => {
+    const fetchMock = stubFetch((url) => {
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: null })
+
+    expect(screen.getByText('No knowledge base selected')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

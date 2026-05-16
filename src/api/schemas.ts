@@ -60,12 +60,49 @@ export function useSchemasQuery() {
   return useQuery({ queryKey: queryKeys.schemas(), queryFn: schemasApi.list })
 }
 
+export function useSchemaQuery(id: string | null) {
+  return useQuery({
+    queryKey: id ? queryKeys.schemaLookup(id) : (['schemas', 'lookup', 'none'] as const),
+    queryFn: () => {
+      if (!id) {
+        throw new Error('Cannot load schema without a schema id')
+      }
+      return schemasApi.get(id)
+    },
+    enabled: Boolean(id),
+  })
+}
+
+export function useGetSchemaMutation() {
+  return useMutation({ mutationFn: schemasApi.get })
+}
+
+export function useValidateSchemaMutation() {
+  return useMutation({ mutationFn: schemasApi.validate })
+}
+
 export function useCreateSchemaMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: schemasApi.create,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schemas() }),
   })
+}
+
+export function useGenerateSchemaExampleMutation() {
+  return useMutation({ mutationFn: schemasApi.generateExample })
+}
+
+export function useGenerateSchemaExampleFromFileMutation() {
+  return useMutation({ mutationFn: schemasApi.generateExampleFromFile })
+}
+
+export function useGenerateSchemaJsonMutation() {
+  return useMutation({ mutationFn: schemasApi.generateJson })
+}
+
+export function useGenerateSchemaJsonFromFileMutation() {
+  return useMutation({ mutationFn: schemasApi.generateJsonFromFile })
 }
 
 export function useActivateSchemaMutation() {

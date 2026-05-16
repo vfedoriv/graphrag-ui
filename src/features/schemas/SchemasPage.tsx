@@ -1,5 +1,15 @@
-import { useState } from 'react'
-import { schemasApi, useActivateSchemaMutation, useCreateSchemaMutation, useSchemasQuery } from '../../api/schemas'
+import { useEffect, useState } from 'react'
+import {
+  useActivateSchemaMutation,
+  useCreateSchemaMutation,
+  useGenerateSchemaExampleFromFileMutation,
+  useGenerateSchemaExampleMutation,
+  useGenerateSchemaJsonFromFileMutation,
+  useGenerateSchemaJsonMutation,
+  useGetSchemaMutation,
+  useSchemasQuery,
+  useValidateSchemaMutation,
+} from '../../api/schemas'
 import { type SchemaSourceType } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
@@ -23,16 +33,13 @@ export function SchemasPage() {
   const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
   const [generatedJsonOutput, setGeneratedJsonOutput] = useState('')
   const [generatedJsonFromFileOutput, setGeneratedJsonFromFileOutput] = useState('')
-  const [getSchemaError, setGetSchemaError] = useState<string>('')
-  const [isGetSchemaPending, setIsGetSchemaPending] = useState(false)
-  const [validation, setValidation] = useState<string[] | null>(null)
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const [isValidatePending, setIsValidatePending] = useState(false)
   const [isGeneratePending, setIsGeneratePending] = useState(false)
   const [schemaJsonFormatError, setSchemaJsonFormatError] = useState<string | null>(null)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
-  const isAnyPending = createMutation.isPending || activateMutation.isPending || isGetSchemaPending || isValidatePending || isGeneratePending
+  const validateMutation = useValidateSchemaMutation()
+  const getSchemaMutation = useGetSchemaMutation()
+  const isAnyPending = createMutation.isPending || activateMutation.isPending || getSchemaMutation.isPending || validateMutation.isPending || isGeneratePending
 
   const unsupportedSourceTypeSchemas = data.filter((schema) => !isSupportedSchemaSourceType(schema.sourceType))
 
@@ -126,24 +133,14 @@ export function SchemasPage() {
           />
           <Button
             type='button'
-            isPending={isValidatePending}
+            isPending={validateMutation.isPending}
             pendingText='Validating...'
-            onClick={async () => {
-              setValidationError(null)
-              setIsValidatePending(true)
-              try {
-                setValidation((await schemasApi.validate({ content: schemaJson })).errors)
-              } catch (error) {
-                setValidationError((error as Error).message)
-              } finally {
-                setIsValidatePending(false)
-              }
-            }}
+            onClick={() => validateMutation.mutate({ content: schemaJson })}
           >
             Validate schema JSON
           </Button>
-          {validationError && <Alert title='Validate failed' message={validationError} />}
-          {validation && (validation.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validation.join('; ')} />)}
+          {validateMutation.error && <Alert title='Validate failed' message={(validateMutation.error as Error).message} />}
+          {validateMutation.data && (validateMutation.data.errors.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validateMutation.data.errors.join('; ')} />)}
         </div>
       ),
     },
@@ -177,19 +174,14 @@ export function SchemasPage() {
           <Input id='get-schema-id' value={schemaId} onChange={(e) => setSchemaId(e.target.value)} placeholder='Schema ID' />
           <Button
             type='button'
-            isPending={isGetSchemaPending}
+            isPending={getSchemaMutation.isPending}
             pendingText='Loading...'
             onClick={async () => {
-              setGetSchemaError('')
-              setSchemaByIdOutput('')
-              setIsGetSchemaPending(true)
               try {
-                const schema = await schemasApi.get(schemaId)
+                const schema = await getSchemaMutation.mutateAsync(schemaId)
                 setSchemaByIdOutput(JSON.stringify(schema, null, 2))
-              } catch (e) {
-                setGetSchemaError((e as Error).message)
-              } finally {
-                setIsGetSchemaPending(false)
+              } catch {
+                // surfaced via getSchemaMutation.error
               }
             }}
           >
@@ -197,7 +189,7 @@ export function SchemasPage() {
           </Button>
           <FieldLabel htmlFor='get-schema-by-id-output'>Schema details JSON</FieldLabel>
           <Textarea id='get-schema-by-id-output' rows={8} value={schemaByIdOutput} onChange={(e) => setSchemaByIdOutput(e.target.value)} placeholder='Schema details response' />
-          {getSchemaError && <Alert title='Get schema failed' message={getSchemaError} />}
+          {getSchemaMutation.error && <Alert title='Get schema failed' message={(getSchemaMutation.error as Error).message} />}
         </div>
       ),
     },
@@ -226,32 +218,29 @@ function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (
   const [text, setText] = useState('')
   const [userPrompt, setUserPrompt] = useState('')
   const [example, setExample] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, setIsPending] = useState(false)
+  const generateExample = useGenerateSchemaExampleMutation()
+
+  useEffect(() => {
+    onPendingChange(generateExample.isPending)
+  }, [generateExample.isPending, onPendingChange])
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
+      {generateExample.isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
       <FieldLabel htmlFor='generate-example-text-source'>Source text</FieldLabel>
       <Textarea id='generate-example-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
       <FieldLabel htmlFor='generate-example-text-guidance'>Generation guidance (optional)</FieldLabel>
       <Textarea id='generate-example-text-guidance' rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
       <Button
         type='button'
-        isPending={isPending}
+        isPending={generateExample.isPending}
         pendingText='Generating...'
         onClick={async () => {
-          setError(null)
-          setIsPending(true)
-          onPendingChange(true)
           try {
-            const res = await schemasApi.generateExample({ text, userPrompt })
+            const res = await generateExample.mutateAsync({ text, userPrompt })
             setExample(res.example)
-          } catch (e) {
-            setError((e as Error).message)
-          } finally {
-            setIsPending(false)
-            onPendingChange(false)
+          } catch {
+            // surfaced via generateExample.error
           }
         }}
       >
@@ -259,7 +248,7 @@ function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (
       </Button>
       <FieldLabel htmlFor='generate-example-text-output'>Generated schema example</FieldLabel>
       <Textarea id='generate-example-text-output' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
-      {error && <Alert title='Generation failed' message={error} />}
+      {generateExample.error && <Alert title='Generation failed' message={(generateExample.error as Error).message} />}
     </div>
   )
 }
@@ -269,11 +258,15 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
   const [selectedFilename, setSelectedFilename] = useState('')
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [isPending, setIsPending] = useState(false)
+  const generateExampleFromFile = useGenerateSchemaExampleFromFileMutation()
+
+  useEffect(() => {
+    onPendingChange(generateExampleFromFile.isPending)
+  }, [generateExampleFromFile.isPending, onPendingChange])
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
+      {generateExampleFromFile.isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
       <FileSelectButton
         buttonLabel='Select source file'
         testId='schemas-example-file-select'
@@ -285,7 +278,7 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
       {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
       <Button
         type='button'
-        isPending={isPending}
+        isPending={generateExampleFromFile.isPending}
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
@@ -293,16 +286,11 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
             setError('Select a source file before generating schema example.')
             return
           }
-          setIsPending(true)
-          onPendingChange(true)
           try {
-            const res = await schemasApi.generateExampleFromFile({ file: selectedFile })
+            const res = await generateExampleFromFile.mutateAsync({ file: selectedFile })
             setExample(res.example)
-          } catch (e) {
-            setError((e as Error).message)
-          } finally {
-            setIsPending(false)
-            onPendingChange(false)
+          } catch {
+            // surfaced via generateExampleFromFile.error
           }
         }}
       >
@@ -310,7 +298,7 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
       </Button>
       <FieldLabel htmlFor='generate-example-file-output'>Generated schema example</FieldLabel>
       <Textarea id='generate-example-file-output' rows={5} value={example} onChange={(e) => setExample(e.target.value)} placeholder='Generated example (editable)' />
-      {error && <Alert title='Generation failed' message={error} />}
+      {(error || generateExampleFromFile.error) && <Alert title='Generation failed' message={error ?? (generateExampleFromFile.error as Error).message} />}
     </div>
   )
 }
@@ -324,13 +312,16 @@ function SchemaGenerateJsonFromText(
   const [version, setVersion] = useState(1)
   const [text, setText] = useState('')
   const [example, setExample] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [exampleFormatError, setExampleFormatError] = useState<string | null>(null)
-  const [isPending, setIsPending] = useState(false)
+  const generateJson = useGenerateSchemaJsonMutation()
+
+  useEffect(() => {
+    onPendingChange(generateJson.isPending)
+  }, [generateJson.isPending, onPendingChange])
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
+      {generateJson.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-text-name'>Schema name</FieldLabel>
       <Input id='generate-json-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-text-version'>Schema version</FieldLabel>
@@ -351,22 +342,15 @@ function SchemaGenerateJsonFromText(
       <Button
         type='button'
         className='bg-emerald-700'
-        isPending={isPending}
+        isPending={generateJson.isPending}
         pendingText='Generating...'
         onClick={async () => {
-          setError(null)
-          onOutputReady('')
-          setIsPending(true)
-          onPendingChange(true)
           try {
-            const res = await schemasApi.generateJson({ name, version, text, example })
+            const res = await generateJson.mutateAsync({ name, version, text, example })
             onJsonReady(res.content)
             onOutputReady(res.content)
-          } catch (e) {
-            setError((e as Error).message)
-          } finally {
-            setIsPending(false)
-            onPendingChange(false)
+          } catch {
+            // surfaced via generateJson.error
           }
         }}
       >
@@ -374,7 +358,7 @@ function SchemaGenerateJsonFromText(
       </Button>
       <FieldLabel htmlFor='generate-json-text-output'>Generated schema JSON</FieldLabel>
       <Textarea id='generate-json-text-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
-      {error && <Alert title='Generation failed' message={error} />}
+      {generateJson.error && <Alert title='Generation failed' message={(generateJson.error as Error).message} />}
     </div>
   )
 }
@@ -391,11 +375,15 @@ function SchemaGenerateJsonFromFile(
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [exampleFormatError, setExampleFormatError] = useState<string | null>(null)
-  const [isPending, setIsPending] = useState(false)
+  const generateJsonFromFile = useGenerateSchemaJsonFromFileMutation()
+
+  useEffect(() => {
+    onPendingChange(generateJsonFromFile.isPending)
+  }, [generateJsonFromFile.isPending, onPendingChange])
 
   return (
     <div className='space-y-2'>
-      {isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
+      {generateJsonFromFile.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-file-name'>Schema name</FieldLabel>
       <Input id='generate-json-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-file-version'>Schema version</FieldLabel>
@@ -423,7 +411,7 @@ function SchemaGenerateJsonFromFile(
       <Button
         type='button'
         className='bg-emerald-700'
-        isPending={isPending}
+        isPending={generateJsonFromFile.isPending}
         pendingText='Generating...'
         onClick={async () => {
           setError(null)
@@ -431,18 +419,12 @@ function SchemaGenerateJsonFromFile(
             setError('Select a source file before generating schema JSON.')
             return
           }
-          onOutputReady('')
-          setIsPending(true)
-          onPendingChange(true)
           try {
-            const res = await schemasApi.generateJsonFromFile({ name, version, example, file: selectedFile })
+            const res = await generateJsonFromFile.mutateAsync({ name, version, example, file: selectedFile })
             onJsonReady(res.content)
             onOutputReady(res.content)
-          } catch (e) {
-            setError((e as Error).message)
-          } finally {
-            setIsPending(false)
-            onPendingChange(false)
+          } catch {
+            // surfaced via generateJsonFromFile.error
           }
         }}
       >
@@ -450,7 +432,7 @@ function SchemaGenerateJsonFromFile(
       </Button>
       <FieldLabel htmlFor='generate-json-file-output'>Generated schema JSON</FieldLabel>
       <Textarea id='generate-json-file-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
-      {error && <Alert title='Generation failed' message={error} />}
+      {(error || generateJsonFromFile.error) && <Alert title='Generation failed' message={error ?? (generateJsonFromFile.error as Error).message} />}
     </div>
   )
 }
