@@ -260,4 +260,81 @@ describe('documents workflows', () => {
       expect(screen.getAllByRole('button', { name: 'Process' })).toHaveLength(2)
     })
   })
+
+  it('shows processing state for backend in-progress document status', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents')) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'processing.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'EXTRACTING_GRAPH',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+          {
+            id: 'doc-2',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'uploaded.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'y',
+            contentUri: 'uri2',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('processing.txt')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Processing...' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Process' })).toBeEnabled()
+    expect(screen.getByText('Waiting for document workflow response...')).toBeInTheDocument()
+  })
+
+  it('restores processing state from backend status after Documents page remounts', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents')) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'processing.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'EXTRACTING_GRAPH',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const { rerender } = renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByRole('button', { name: 'Processing...' })).toBeDisabled()
+
+    rerender(<section>Other page</section>)
+    expect(screen.queryByText('processing.txt')).not.toBeInTheDocument()
+
+    rerender(<DocumentsPage />)
+    expect(await screen.findByText('processing.txt')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Processing...' })).toBeDisabled()
+  })
 })

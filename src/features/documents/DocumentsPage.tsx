@@ -10,6 +10,7 @@ import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { Table } from '../../shared/ui/Table'
+import { isCompletedOrSuccessfullyProcessed, isDocumentProcessingStatus } from './documentStatus'
 
 export function DocumentsPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
@@ -20,12 +21,8 @@ export function DocumentsPage() {
   const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
   const [processingDocumentIds, setProcessingDocumentIds] = useState<Set<string>>(new Set())
   const chunksQuery = useDocumentChunksQuery(selectedDocumentId)
-  const isAnyPending = uploadMutation.isPending || processMutation.isPending || chunksQuery.isLoading
-
-  const isCompletedOrSuccessfullyProcessed = (status: string) => {
-    const normalized = status.trim().toUpperCase()
-    return normalized.includes('PROCESSED') || normalized.includes('COMPLETED') || normalized.includes('SUCCESS')
-  }
+  const hasBackendProcessingDocument = documents.some((doc) => isDocumentProcessingStatus(doc.status))
+  const isAnyPending = uploadMutation.isPending || processMutation.isPending || chunksQuery.isLoading || hasBackendProcessingDocument
 
   const handleProcessDocument = async (documentId: string, status: string) => {
     const runProcess = async (allowOverwrite: boolean) => {
@@ -87,7 +84,7 @@ export function DocumentsPage() {
         <div className='flex gap-2'>
           <Button
             type='button'
-            isPending={processingDocumentIds.has(doc.id)}
+            isPending={processingDocumentIds.has(doc.id) || isDocumentProcessingStatus(doc.status)}
             pendingText='Processing...'
             onClick={() => {
               void handleProcessDocument(doc.id, doc.status)
