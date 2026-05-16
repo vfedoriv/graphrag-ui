@@ -78,6 +78,9 @@ VITE_API_PROXY_TARGET=http://localhost:8080 npm run dev
 - `npm test`: run Vitest in watch mode.
 - `npm run test:run`: run Vitest once.
 - `npm run coverage`: run Vitest coverage with thresholds.
+- `npm run test:e2e`: run Playwright browser tests against a local Vite server with mocked `/api/v1` responses.
+- `npm run test:e2e:ui`: run Playwright in interactive UI mode.
+- `npm run test:e2e:headed`: run Playwright with a visible browser.
 
 ## Project Structure
 
@@ -134,6 +137,7 @@ Recommended validation for substantial changes:
 ```bash
 npm run lint
 npm run test:run
+npm run test:e2e
 npm run coverage
 npm run build
 ```
@@ -141,7 +145,9 @@ npm run build
 The current coverage baseline and priority gaps are tracked in:
 - `docs/testing-gap-report.md`
 
-Test coverage includes API client behavior, query keys, shared UI, app routing, and feature workflow tests for knowledge bases, schemas, documents, and queries.
+Playwright tests start or reuse the Vite app on `127.0.0.1:8333` and do not require a running GraphRAG backend because they mock same-origin `/api/v1` traffic.
+
+Test coverage includes API client behavior, query keys, shared UI, app routing, Playwright browser navigation, and feature workflow tests for knowledge bases, schemas, documents, and queries.
 
 ## Notes
 
