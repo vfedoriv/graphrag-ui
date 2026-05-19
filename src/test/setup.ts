@@ -1,40 +1,32 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-vi.mock('json-edit-react', () => ({
+vi.mock('@visual-json/react', () => ({
   JsonEditor: ({
-    id,
-    data,
-    setData,
-    restrictEdit,
-    restrictAdd,
-    restrictDelete,
-    restrictDrag,
+    value,
+    onChange,
+    readOnly,
   }: {
-    id?: string
-    data: unknown
-    setData?: (data: unknown) => void
-    restrictEdit?: boolean
-    restrictAdd?: boolean
-    restrictDelete?: boolean
-    restrictDrag?: boolean
+    value: unknown
+    onChange?: (data: unknown) => void
+    readOnly?: boolean
   }) => React.createElement(
     'div',
-    { 'data-testid': `${id ?? 'json'}-json-edit-react` },
+    { 'data-testid': 'visual-json-editor' },
     React.createElement('textarea', {
       'aria-label': 'Mock structured JSON data',
-      value: JSON.stringify(data, null, 2),
-      disabled: restrictEdit,
+      value: JSON.stringify(value, null, 2),
+      disabled: readOnly,
       onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setData?.(JSON.parse(event.target.value) as unknown)
+        onChange?.(JSON.parse(event.target.value) as unknown)
       },
     }),
     React.createElement(
       'button',
       {
         type: 'button',
-        disabled: restrictEdit,
-        onClick: () => setData?.({ ...(isObjectRecord(data) ? data : {}), type: 'string' }),
+        disabled: readOnly,
+        onClick: () => onChange?.({ ...(isObjectRecord(value) ? value : {}), type: 'string' }),
       },
       'Mock edit primitive',
     ),
@@ -42,8 +34,8 @@ vi.mock('json-edit-react', () => ({
       'button',
       {
         type: 'button',
-        disabled: restrictAdd,
-        onClick: () => setData?.({ ...(isObjectRecord(data) ? data : {}), addedNode: { type: 'number' } }),
+        disabled: readOnly,
+        onClick: () => onChange?.({ ...(isObjectRecord(value) ? value : {}), addedNode: { type: 'number' } }),
       },
       'Mock add node',
     ),
@@ -51,11 +43,11 @@ vi.mock('json-edit-react', () => ({
       'button',
       {
         type: 'button',
-        disabled: restrictDelete,
+        disabled: readOnly,
         onClick: () => {
-          const next = { ...(isObjectRecord(data) ? data : {}) }
+          const next = { ...(isObjectRecord(value) ? value : {}) }
           delete next.addedNode
-          setData?.(next)
+          onChange?.(next)
         },
       },
       'Mock remove node',
@@ -64,13 +56,12 @@ vi.mock('json-edit-react', () => ({
       'button',
       {
         type: 'button',
-        disabled: restrictDrag,
-        onClick: () => setData?.({ moved: true, ...(isObjectRecord(data) ? data : {}) }),
+        disabled: readOnly,
+        onClick: () => onChange?.({ moved: true, ...(isObjectRecord(value) ? value : {}) }),
       },
       'Mock move node',
     ),
   ),
-  githubLightTheme: {},
 }))
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

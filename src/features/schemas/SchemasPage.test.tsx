@@ -100,8 +100,9 @@ describe('schemas page', () => {
     })
     const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
 
-    expect(within(createPanel).getByText('Structured editor')).toBeInTheDocument()
-    expect(within(createPanel).getByTestId('create-schema-json-json-edit-react')).toBeInTheDocument()
+    expect(within(createPanel).getByRole('button', { name: 'Tree View' })).toBeInTheDocument()
+    expect(within(createPanel).getByRole('button', { name: 'Raw View' })).toBeInTheDocument()
+    expect(within(createPanel).getByTestId('visual-json-editor')).toBeInTheDocument()
   })
 
   it('renders schema tabs in required workflow order', async () => {
