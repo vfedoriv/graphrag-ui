@@ -10,8 +10,9 @@ describe('schemas workflows', () => {
   })
 
   it('runs validate and get-by-id flows from tabs', async () => {
-    const fetchMock = stubFetch((url) => {
+    const fetchMock = stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
+      if (url.endsWith('/schemas') && init?.method === 'POST') return jsonResponse(200, { id: 'created-schema' })
       if (url.endsWith('/schemas')) return jsonResponse(200, [])
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
       if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
@@ -23,7 +24,7 @@ describe('schemas workflows', () => {
 
     await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
     const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
-    fireEvent.change(within(validatePanel).getByLabelText('Schema JSON content'), { target: { value: '{"type":"object"}' } })
+    fireEvent.change(within(validatePanel).getByLabelText('Mock structured JSON data'), { target: { value: '{"type":"object"}' } })
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
 
     expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
@@ -38,6 +39,20 @@ describe('schemas workflows', () => {
       const urls = fetchMock.mock.calls.map((c) => String(c[0]))
       expect(urls.some((u) => u.endsWith('/api/v1/schemas/validate'))).toBe(true)
       expect(urls.some((u) => u.endsWith('/api/v1/schemas/schema-1'))).toBe(true)
+    })
+
+    const validateCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/api/v1/schemas/validate'))
+    const validatePayload = JSON.parse(String((validateCall?.[1] as RequestInit | undefined)?.body)) as { content: string }
+    expect(JSON.parse(validatePayload.content)).toEqual({ type: 'object' })
+
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-create-schema'))
+    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/api/v1/schemas') && (init as RequestInit | undefined)?.method === 'POST')
+      const createPayload = JSON.parse(String((createCall?.[1] as RequestInit | undefined)?.body)) as { content: string, sourceType: string }
+      expect(JSON.parse(createPayload.content)).toEqual({ type: 'object' })
+      expect(createPayload.sourceType).toBe('PREDEFINED')
     })
   })
 
@@ -75,7 +90,7 @@ describe('schemas workflows', () => {
     await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
     await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
     await waitFor(() => {
-      expect(within(generateJsonPanel).getByLabelText('Generated schema JSON')).toHaveValue('{"name":"generated-schema","version":1}')
+      expect(within(generateJsonPanel).getByLabelText('Mock structured JSON data')).toHaveValue('{\n  "name": "generated-schema",\n  "version": 1\n}')
     })
 
     await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
@@ -84,7 +99,7 @@ describe('schemas workflows', () => {
     await user.upload(sourceFileInput, new File(['customer record'], 'customer.txt', { type: 'text/plain' }))
     await user.click(within(generateJsonFilePanel).getByRole('button', { name: 'Generate schema JSON from file' }))
     await waitFor(() => {
-      expect(within(generateJsonFilePanel).getByLabelText('Generated schema JSON')).toHaveValue('{"name":"generated-schema","version":1}')
+      expect(within(generateJsonFilePanel).getByLabelText('Mock structured JSON data')).toHaveValue('{\n  "name": "generated-schema",\n  "version": 1\n}')
     })
 
     await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-get-schema-by-id'))
@@ -99,13 +114,16 @@ describe('schemas workflows', () => {
 
   it('keeps edited generated schema draft when a later generation request fails', async () => {
     let generateCount = 0
-    stubFetch((url, init) => {
+    const fetchMock = stubFetch((url, init) => {
       if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
         generateCount += 1
         return generateCount === 1
           ? jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
           : jsonResponse(500, { detail: 'Generation failed from server' })
+      }
+      if (url.endsWith('/schemas/validate') && init?.method === 'POST') {
+        return jsonResponse(200, { valid: true, errors: [] })
       }
       throw new Error(`Unexpected request: ${url}`)
     })
@@ -117,12 +135,20 @@ describe('schemas workflows', () => {
     await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
     await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
 
-    const output = await within(generateJsonPanel).findByLabelText('Generated schema JSON')
-    await user.clear(output)
+    const output = await within(generateJsonPanel).findByLabelText('Mock structured JSON data')
     fireEvent.change(output, { target: { value: '{"name":"edited"}' } })
     await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
 
     expect(await within(generateJsonPanel).findByText('Generation failed from server')).toBeInTheDocument()
-    expect(output).toHaveValue('{"name":"edited"}')
+    expect(output).toHaveValue('{\n  "name": "edited"\n}')
+
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
+    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
+    expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
+
+    const validateCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/api/v1/schemas/validate'))
+    const validatePayload = JSON.parse(String((validateCall?.[1] as RequestInit | undefined)?.body)) as { content: string }
+    expect(JSON.parse(validatePayload.content)).toEqual({ name: 'edited' })
   })
 })

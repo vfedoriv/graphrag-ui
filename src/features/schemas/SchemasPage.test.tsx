@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './SchemasPage'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
@@ -85,8 +85,7 @@ describe('schemas page', () => {
     })
   })
 
-  it('shows JSON format guidance and reports formatting errors for invalid JSON', async () => {
-    const user = userEvent.setup()
+  it('shows structured JSON editor guidance for schema content', async () => {
     stubFetch((url, init) => {
       if (url === '/api/v1/schemas' && !init?.method) {
         return jsonResponse(200, [])
@@ -100,11 +99,9 @@ describe('schemas page', () => {
       expect(screen.getAllByText('Expected format: JSON').length).toBeGreaterThan(0)
     })
     const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
-    const jsonInput = within(createPanel).getByLabelText('Schema JSON content')
-    fireEvent.change(jsonInput, { target: { value: '{' } })
-    await user.click(within(createPanel).getByRole('button', { name: 'Format JSON' }))
 
-    expect(within(createPanel).getByText('Cannot format invalid JSON payload.')).toBeInTheDocument()
+    expect(within(createPanel).getByText('Structured editor')).toBeInTheDocument()
+    expect(within(createPanel).getByTestId('create-schema-json-json-edit-react')).toBeInTheDocument()
   })
 
   it('renders schema tabs in required workflow order', async () => {

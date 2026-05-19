@@ -21,6 +21,7 @@ import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
+import { SchemaJsonEditor } from '../../shared/ui/SchemaJsonEditor'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
@@ -34,7 +35,6 @@ export function SchemasPage() {
   const [generatedJsonOutput, setGeneratedJsonOutput] = useState('')
   const [generatedJsonFromFileOutput, setGeneratedJsonFromFileOutput] = useState('')
   const [isGeneratePending, setIsGeneratePending] = useState(false)
-  const [schemaJsonFormatError, setSchemaJsonFormatError] = useState<string | null>(null)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
   const validateMutation = useValidateSchemaMutation()
@@ -98,7 +98,10 @@ export function SchemasPage() {
         <SchemaGenerateJsonFromText
           onJsonReady={setSchemaJson}
           output={generatedJsonOutput}
-          onOutputReady={setGeneratedJsonOutput}
+          onOutputReady={(json) => {
+            setGeneratedJsonOutput(json)
+            setSchemaJson(json)
+          }}
           onPendingChange={setIsGeneratePending}
         />
       ),
@@ -110,7 +113,10 @@ export function SchemasPage() {
         <SchemaGenerateJsonFromFile
           onJsonReady={setSchemaJson}
           output={generatedJsonFromFileOutput}
-          onOutputReady={setGeneratedJsonFromFileOutput}
+          onOutputReady={(json) => {
+            setGeneratedJsonFromFileOutput(json)
+            setSchemaJson(json)
+          }}
           onPendingChange={setIsGeneratePending}
         />
       ),
@@ -121,15 +127,13 @@ export function SchemasPage() {
       content: (
         <div className='space-y-2'>
           <FieldLabel htmlFor='validate-schema-json-input'>Schema JSON content</FieldLabel>
-          <StructuredPayloadEditor
+          <SchemaJsonEditor
             id='validate-schema-json-input'
-            format='json'
-            rows={8}
+            label='Schema JSON content'
             value={schemaJson}
             onChange={setSchemaJson}
-            error={schemaJsonFormatError}
-            onErrorChange={setSchemaJsonFormatError}
             placeholder='Paste JSON schema content'
+            disabled={validateMutation.isPending}
           />
           <Button
             type='button'
@@ -150,15 +154,13 @@ export function SchemasPage() {
       content: (
         <div className='space-y-2'>
           <FieldLabel htmlFor='create-schema-json'>Schema JSON content</FieldLabel>
-          <StructuredPayloadEditor
+          <SchemaJsonEditor
             id='create-schema-json'
-            format='json'
-            rows={8}
+            label='Schema JSON content'
             value={schemaJson}
             onChange={setSchemaJson}
-            error={schemaJsonFormatError}
-            onErrorChange={setSchemaJsonFormatError}
             placeholder='Paste JSON schema content'
+            disabled={createMutation.isPending}
           />
           <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: schemaJson, sourceType: 'PREDEFINED' })}>Create</Button>
           {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
@@ -357,7 +359,14 @@ function SchemaGenerateJsonFromText(
         Generate schema JSON
       </Button>
       <FieldLabel htmlFor='generate-json-text-output'>Generated schema JSON</FieldLabel>
-      <Textarea id='generate-json-text-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
+      <SchemaJsonEditor
+        id='generate-json-text-output'
+        label='Generated schema JSON'
+        value={output}
+        onChange={onOutputReady}
+        placeholder='Generated JSON response'
+        disabled={generateJson.isPending}
+      />
       {generateJson.error && <Alert title='Generation failed' message={(generateJson.error as Error).message} />}
     </div>
   )
@@ -431,7 +440,14 @@ function SchemaGenerateJsonFromFile(
         Generate schema JSON from file
       </Button>
       <FieldLabel htmlFor='generate-json-file-output'>Generated schema JSON</FieldLabel>
-      <Textarea id='generate-json-file-output' rows={8} value={output} onChange={(e) => onOutputReady(e.target.value)} placeholder='Generated JSON response' />
+      <SchemaJsonEditor
+        id='generate-json-file-output'
+        label='Generated schema JSON'
+        value={output}
+        onChange={onOutputReady}
+        placeholder='Generated JSON response'
+        disabled={generateJsonFromFile.isPending}
+      />
       {(error || generateJsonFromFile.error) && <Alert title='Generation failed' message={error ?? (generateJsonFromFile.error as Error).message} />}
     </div>
   )
