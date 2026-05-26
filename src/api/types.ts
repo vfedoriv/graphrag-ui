@@ -84,6 +84,8 @@ export type GenerateSchemaExampleResponse = {
   example: string
 }
 
+export type GenerateSchemaExampleRawResponse = string | GenerateSchemaExampleResponse
+
 export type GenerateSchemaRequest = {
   name: string
   version: number

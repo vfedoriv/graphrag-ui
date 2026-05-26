@@ -151,4 +151,32 @@ describe('schemas workflows', () => {
     const validatePayload = JSON.parse(String((validateCall?.[1] as RequestInit | undefined)?.body)) as { content: string }
     expect(JSON.parse(validatePayload.content)).toEqual({ name: 'edited' })
   })
+
+  it('renders normalized schema example output for text and file tabs', async () => {
+    stubFetch((url, init) => {
+      if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/schemas/generate/example') && init?.method === 'POST') return jsonResponse(200, '[{"from":"text"}]')
+      if (url.endsWith('/schemas/generate/example/from-file') && init?.method === 'POST') return jsonResponse(200, { example: '[{"from":"file"}]' })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const textPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-example-text')
+    await user.type(within(textPanel).getByLabelText('Source text'), 'bio')
+    await user.click(within(textPanel).getByRole('button', { name: 'Generate schema example' }))
+    await waitFor(() => {
+      expect(within(textPanel).getByLabelText('Generated schema example')).toHaveValue('[{"from":"text"}]')
+    })
+
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-example-file'))
+    const filePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-example-file')
+    const sourceFileInput = within(filePanel).getByTestId('schemas-example-file-select-input')
+    await user.upload(sourceFileInput, new File(['bio'], 'bio.txt', { type: 'text/plain' }))
+    await user.click(within(filePanel).getByRole('button', { name: 'Generate schema example from file' }))
+    await waitFor(() => {
+      expect(within(filePanel).getByLabelText('Generated schema example')).toHaveValue('[{"from":"file"}]')
+    })
+  })
 })

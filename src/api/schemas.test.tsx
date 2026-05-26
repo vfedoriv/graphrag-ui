@@ -24,8 +24,8 @@ describe('schemas api', () => {
       if (url.endsWith('/schemas')) return jsonResponse(200, [])
       if (url.includes('/schemas/abc')) return jsonResponse(200, { id: 'abc', content: '{}' })
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
-      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, { example: '{}' })
-      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, { example: '{}' })
+      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, '{}')
+      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, '{}')
       if (url.endsWith('/schemas/generate')) return jsonResponse(200, { content: '{}' })
       if (url.endsWith('/schemas/generate/from-file')) return jsonResponse(200, { content: '{}' })
       if (url.endsWith('/knowledge-bases/kb-a/schemas/sc-1/activate')) return jsonResponse(200, {})
@@ -109,8 +109,8 @@ describe('schemas api', () => {
         })
       }
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
-      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, { example: '{"from":"file"}' })
-      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, { example: '{"from":"text"}' })
+      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, '{"from":"file"}')
+      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, '{"from":"text"}')
       if (url.endsWith('/schemas/generate/from-file')) return jsonResponse(200, { content: '{"from":"file"}' })
       if (url.endsWith('/schemas/generate')) return jsonResponse(200, { content: '{"from":"text"}' })
       throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
@@ -151,5 +151,32 @@ describe('schemas api', () => {
       '/api/v1/schemas/validate',
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+
+  it('supports both direct-string and wrapped-object schema example responses', async () => {
+    let call = 0
+    stubFetch((url) => {
+      if (url.endsWith('/schemas/generate/example')) {
+        call += 1
+        return call === 1 ? jsonResponse(200, '{"source":"direct"}') : jsonResponse(200, { example: '{"source":"wrapped"}' })
+      }
+      if (url.endsWith('/schemas/generate/example/from-file')) return jsonResponse(200, { example: '{"source":"wrapped-file"}' })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    await expect(schemasApi.generateExample({ text: 'first' })).resolves.toEqual({ example: '{"source":"direct"}' })
+    await expect(schemasApi.generateExample({ text: 'second' })).resolves.toEqual({ example: '{"source":"wrapped"}' })
+    await expect(
+      schemasApi.generateExampleFromFile({ file: new File(['source'], 'source.txt', { type: 'text/plain' }) }),
+    ).resolves.toEqual({ example: '{"source":"wrapped-file"}' })
+  })
+
+  it('throws a clear error for unexpected schema example success payload shape', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, { invalid: true })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    await expect(schemasApi.generateExample({ text: 'source' })).rejects.toThrow('Schema example response has unexpected shape')
   })
 })

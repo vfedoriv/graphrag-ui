@@ -25,6 +25,14 @@ The system SHALL expose schema generation actions as dedicated tabs under the Sc
 - **WHEN** a user executes the same tab action multiple times
 - **THEN** the system SHALL replace that tab's output text field content with the latest successful backend response
 
+#### Scenario: Parse schema example success payload returned as direct string
+- **WHEN** a user runs schema example generation from text or file and the backend returns a successful response body as a raw string containing the example array
+- **THEN** the system SHALL treat that returned string as the generated example output and render it in the tab output field
+
+#### Scenario: Parse schema example success payload returned as wrapped object
+- **WHEN** a user runs schema example generation from text or file and the backend returns a successful response object containing a string `example` field
+- **THEN** the system SHALL use `example` as the generated example output and render it in the tab output field
+
 ### Requirement: Generated artifacts remain editable before final creation
 The system SHALL keep generated JSON/example outputs editable inside their respective generation tab workflows before creating a schema, and generated schema JSON outputs SHALL be editable through the structured JSON editor.
 
