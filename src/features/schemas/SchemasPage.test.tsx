@@ -20,7 +20,7 @@ describe('schemas page', () => {
             sourceType: 'PREDEFINED',
             format: 'JSON',
             contentHash: 'hash',
-            status: 'ACTIVE',
+            status: 'INACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
           },
         ])
@@ -63,7 +63,7 @@ describe('schemas page', () => {
             sourceType: 'PREDEFINED',
             format: 'JSON',
             contentHash: 'hash',
-            status: 'ACTIVE',
+            status: 'INACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
           },
         ])
@@ -83,6 +83,38 @@ describe('schemas page', () => {
         expect.objectContaining({ method: 'POST' }),
       )
     })
+  })
+
+  it('renders non-interactive active-state action for active schema rows', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'ACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const activeButton = await screen.findByRole('button', { name: 'Active' })
+    expect(activeButton).toBeDisabled()
+    expect(
+      fetchMock.mock.calls.some(
+        ([u, req]) =>
+          String(u) === '/api/v1/knowledge-bases/kb-a/schemas/schema-a/activate' &&
+          (req as RequestInit | undefined)?.method === 'POST',
+      ),
+    ).toBe(false)
   })
 
   it('shows structured JSON editor guidance for schema content', async () => {
@@ -144,7 +176,7 @@ describe('schemas page', () => {
             sourceType: 'PREDEFINED',
             format: 'JSON',
             contentHash: 'hash',
-            status: 'ACTIVE',
+            status: 'INACTIVE',
             createdAt: '2026-01-01T00:00:00Z',
           },
         ])

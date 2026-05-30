@@ -58,12 +58,12 @@ export function SchemasPage() {
             schema.status,
             <Button
               type='button'
-              disabled={!selectedKnowledgeBaseId}
+              disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
               isPending={activateMutation.isPending}
               pendingText='Activating...'
               onClick={() => selectedKnowledgeBaseId && activateMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, schemaId: schema.id })}
             >
-              Activate
+              {schema.status === 'ACTIVE' ? 'Active' : 'Activate'}
             </Button>,
           ])}
         />
