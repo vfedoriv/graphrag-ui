@@ -2,6 +2,9 @@ export const queryKeys = {
   knowledgeBases: () => ['knowledge-bases'] as const,
   knowledgeBase: (id: string) => ['knowledge-bases', id] as const,
   schemas: () => ['schemas'] as const,
+  schemasByKnowledgeBase: (knowledgeBaseId: string) => ['schemas', 'knowledge-base', knowledgeBaseId] as const,
+  schemasByKnowledgeBaseMaybe: (knowledgeBaseId: string | null) =>
+    knowledgeBaseId ? queryKeys.schemasByKnowledgeBase(knowledgeBaseId) : (['schemas', 'knowledge-base', 'none'] as const),
   schema: (id: string) => ['schemas', id] as const,
   schemaLookup: (id: string) => ['schemas', 'lookup', id] as const,
   documents: (knowledgeBaseId: string) => ['documents', 'knowledge-base', knowledgeBaseId] as const,

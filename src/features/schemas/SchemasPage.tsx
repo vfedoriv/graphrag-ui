@@ -7,7 +7,7 @@ import {
   useGenerateSchemaJsonFromFileMutation,
   useGenerateSchemaJsonMutation,
   useGetSchemaMutation,
-  useSchemasQuery,
+  useSchemasByKnowledgeBaseQuery,
   useValidateSchemaMutation,
 } from '../../api/schemas'
 import { type SchemaSourceType } from '../../api/types'
@@ -28,7 +28,7 @@ import { Textarea } from '../../shared/ui/Textarea'
 
 export function SchemasPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
-  const { data = [] } = useSchemasQuery()
+  const { data = [] } = useSchemasByKnowledgeBaseQuery(selectedKnowledgeBaseId)
   const [schemaJson, setSchemaJson] = useState('')
   const [schemaId, setSchemaId] = useState('')
   const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
@@ -46,7 +46,7 @@ export function SchemasPage() {
   const topSection = (
     <>
       {data.length === 0 ? (
-        <EmptyState title='No Schemas' body='Create or generate one, then activate it for the selected knowledge base.' />
+        <EmptyState title='No Schemas for selected knowledge base' body='Create or generate one, then activate it for the selected knowledge base.' />
       ) : (
         <Table
           headers={['ID', 'Name', 'Version', 'Source Type', 'Status', 'Activate']}

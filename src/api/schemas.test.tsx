@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { renderHook } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
   schemasApi,
@@ -10,6 +10,7 @@ import {
   useGenerateSchemaJsonFromFileMutation,
   useGenerateSchemaJsonMutation,
   useGetSchemaMutation,
+  useSchemasByKnowledgeBaseQuery,
   useValidateSchemaMutation,
 } from './schemas'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
@@ -33,6 +34,7 @@ describe('schemas api', () => {
     })
 
     await schemasApi.list()
+    await schemasApi.listForKnowledgeBase('kb-a')
     await schemasApi.get('abc')
     await schemasApi.validate({ content: 'x' })
     await schemasApi.create({ content: 'x' })
@@ -49,6 +51,7 @@ describe('schemas api', () => {
 
     const urls = fetchMock.mock.calls.map((call) => String(call[0]))
     expect(urls.some((u) => u.endsWith('/api/v1/schemas'))).toBe(true)
+    expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/schemas'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/validate'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/example'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/example/from-file'))).toBe(true)
@@ -90,7 +93,25 @@ describe('schemas api', () => {
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases', 'kb-a'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'knowledge-base', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases'] })
+  })
+
+  it('loads schemas via knowledge-base-scoped query hook', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas')) {
+        return jsonResponse(200, [{ id: 'schema-a', name: 'Schema A', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' }])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const queryClient = createTestQueryClient()
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+
+    const { result } = renderHook(() => useSchemasByKnowledgeBaseQuery('kb-a'), { wrapper })
+    await waitFor(() => expect(result.current.data).toHaveLength(1))
   })
 
   it('exposes mutation hooks for schema endpoint workflows', async () => {

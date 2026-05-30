@@ -96,6 +96,17 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
     return
   }
 
+  const knowledgeBaseSchemasMatch = path.match(/^\/knowledge-bases\/([^/]+)\/schemas$/)
+  if (knowledgeBaseSchemasMatch && method === 'GET') {
+    const kb = state.knowledgeBases.find((item) => item.id === knowledgeBaseSchemasMatch[1])
+    if (!kb) {
+      await problem(route, 404, 'Not found', 'Knowledge base was not found.')
+      return
+    }
+    await json(route, state.schemas)
+    return
+  }
+
   if (method === 'GET' && path === '/schemas') {
     await json(route, state.schemas)
     return

@@ -32,6 +32,7 @@ function normalizeSchemaExampleResponse(raw: GenerateSchemaExampleRawResponse): 
 
 export const schemasApi = {
   list: () => apiFetch<Schema[]>('/schemas'),
+  listForKnowledgeBase: (knowledgeBaseId: string) => apiFetch<Schema[]>(`/knowledge-bases/${knowledgeBaseId}/schemas`),
   get: (id: string) => apiFetch<SchemaDetails>(`/schemas/${id}`),
   validate: (payload: ValidateSchemaRequest) =>
     apiFetch<SchemaValidationResponse>('/schemas/validate', { method: 'POST', body: toJsonBody(payload) }),
@@ -75,6 +76,19 @@ export const schemasApi = {
 
 export function useSchemasQuery() {
   return useQuery({ queryKey: queryKeys.schemas(), queryFn: schemasApi.list })
+}
+
+export function useSchemasByKnowledgeBaseQuery(knowledgeBaseId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.schemasByKnowledgeBaseMaybe(knowledgeBaseId),
+    queryFn: () => {
+      if (!knowledgeBaseId) {
+        throw new Error('Cannot load schemas without a knowledge base id')
+      }
+      return schemasApi.listForKnowledgeBase(knowledgeBaseId)
+    },
+    enabled: Boolean(knowledgeBaseId),
+  })
 }
 
 export function useSchemaQuery(id: string | null) {
@@ -129,6 +143,7 @@ export function useActivateSchemaMutation() {
       schemasApi.activate(knowledgeBaseId, schemaId),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase(vars.knowledgeBaseId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemasByKnowledgeBase(vars.knowledgeBaseId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() })
     },
   })

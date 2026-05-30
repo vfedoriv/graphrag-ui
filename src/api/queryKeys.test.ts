@@ -4,6 +4,9 @@ describe('query keys', () => {
   it('produces stable keys', () => {
     expect(queryKeys.knowledgeBases()).toEqual(['knowledge-bases'])
     expect(queryKeys.knowledgeBase('kb')).toEqual(['knowledge-bases', 'kb'])
+    expect(queryKeys.schemasByKnowledgeBase('kb-1')).toEqual(['schemas', 'knowledge-base', 'kb-1'])
+    expect(queryKeys.schemasByKnowledgeBaseMaybe('kb-1')).toEqual(['schemas', 'knowledge-base', 'kb-1'])
+    expect(queryKeys.schemasByKnowledgeBaseMaybe(null)).toEqual(['schemas', 'knowledge-base', 'none'])
     expect(queryKeys.schemaLookup('schema-1')).toEqual(['schemas', 'lookup', 'schema-1'])
     expect(queryKeys.documents('kb-1')).toEqual(['documents', 'knowledge-base', 'kb-1'])
     expect(queryKeys.documentsMaybe('kb-1')).toEqual(['documents', 'knowledge-base', 'kb-1'])

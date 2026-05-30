@@ -32,7 +32,7 @@ export const schemasFixture: Schema[] = [
     sourceType: 'PREDEFINED',
     format: 'JSON',
     contentHash: 'hash-customer',
-    status: 'ACTIVE',
+    status: 'INACTIVE',
     createdAt: '2026-05-03T10:00:00.000Z',
   },
 ]

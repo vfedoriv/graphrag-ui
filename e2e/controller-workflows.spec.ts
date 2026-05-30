@@ -38,13 +38,15 @@ test('validates, creates, and activates schemas for the selected knowledge base'
 
   await page.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json').click()
   const validatePanel = page.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
-  await validatePanel.getByLabel('Schema JSON content').fill('{"nodes":[],"relationships":[]}')
+  await validatePanel.getByRole('button', { name: 'Raw View' }).click()
+  await validatePanel.getByRole('textbox', { name: 'Schema JSON content' }).fill('{"nodes":[],"relationships":[]}')
   await validatePanel.getByRole('button', { name: 'Validate schema JSON' }).click()
   await expect(validatePanel.getByText('Schema is valid.')).toBeVisible()
 
   await page.getByTestId('schemas-endpoint-tabs-tab-create-schema').click()
   const createPanel = page.getByTestId('schemas-endpoint-tabs-panel-create-schema')
-  await createPanel.getByLabel('Schema JSON content').fill('{"nodes":[{"label":"Person"}],"relationships":[]}')
+  await createPanel.getByRole('button', { name: 'Raw View' }).click()
+  await createPanel.getByRole('textbox', { name: 'Schema JSON content' }).fill('{"nodes":[{"label":"Person"}],"relationships":[]}')
   await createPanel.getByRole('button', { name: 'Create' }).click()
   await expect(page.getByRole('cell', { name: 'schema-created' })).toBeVisible()
   expect(api.unhandled).toEqual([])

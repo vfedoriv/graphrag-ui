@@ -60,7 +60,7 @@ describe('schemas workflows', () => {
     let getByIdCount = 0
     stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
-      if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
         return jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
       }
@@ -115,7 +115,7 @@ describe('schemas workflows', () => {
   it('keeps edited generated schema draft when a later generation request fails', async () => {
     let generateCount = 0
     const fetchMock = stubFetch((url, init) => {
-      if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
         generateCount += 1
         return generateCount === 1
@@ -154,7 +154,7 @@ describe('schemas workflows', () => {
 
   it('renders normalized schema example output for text and file tabs', async () => {
     stubFetch((url, init) => {
-      if (url.endsWith('/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate/example') && init?.method === 'POST') return jsonResponse(200, '[{"from":"text"}]')
       if (url.endsWith('/schemas/generate/example/from-file') && init?.method === 'POST') return jsonResponse(200, { example: '[{"from":"file"}]' })
       throw new Error(`Unexpected request: ${url}`)

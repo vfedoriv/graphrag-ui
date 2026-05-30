@@ -11,7 +11,7 @@ describe('schemas page', () => {
   it('shows activate and validate error alerts', async () => {
     const user = userEvent.setup()
     stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [
           {
             id: 'schema-a',
@@ -54,7 +54,7 @@ describe('schemas page', () => {
   it('activates schema from table row action', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [
           {
             id: 'schema-a',
@@ -87,7 +87,7 @@ describe('schemas page', () => {
 
   it('renders non-interactive active-state action for active schema rows', async () => {
     const fetchMock = stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [
           {
             id: 'schema-a',
@@ -119,7 +119,7 @@ describe('schemas page', () => {
 
   it('shows structured JSON editor guidance for schema content', async () => {
     stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [])
       }
       throw new Error(`Unexpected request: ${url}`)
@@ -139,7 +139,7 @@ describe('schemas page', () => {
 
   it('renders schema tabs in required workflow order', async () => {
     stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [])
       }
       throw new Error(`Unexpected request: ${url}`)
@@ -167,7 +167,7 @@ describe('schemas page', () => {
     const user = userEvent.setup()
     let resolveActivate: ((value: ReturnType<typeof jsonResponse>) => void) | null = null
     const fetchMock = stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [
           {
             id: 'schema-a',
@@ -210,7 +210,7 @@ describe('schemas page', () => {
 
   it('shows visible fallback when API returns unsupported schema source type', async () => {
     stubFetch((url, init) => {
-      if (url === '/api/v1/schemas' && !init?.method) {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [
           {
             id: 'schema-a',
@@ -231,5 +231,17 @@ describe('schemas page', () => {
 
     expect(await screen.findByText('Unsupported schema source type')).toBeInTheDocument()
     expect(screen.getByText('UNSUPPORTED (LEGACY)')).toBeInTheDocument()
+  })
+
+  it('shows contextual empty state when selected knowledge base has no schemas', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
+        return jsonResponse(200, [])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+    expect(await screen.findByText('No Schemas for selected knowledge base')).toBeInTheDocument()
   })
 })
