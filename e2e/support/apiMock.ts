@@ -15,25 +15,33 @@ import type { DocumentUpload, KnowledgeBase, Schema } from '../../src/api/types'
 type ApiMockState = {
   knowledgeBases: KnowledgeBase[]
   schemas: Schema[]
+  schemasByKnowledgeBase: Record<string, Schema[]>
   documentsByKnowledgeBase: Record<string, DocumentUpload[]>
   unhandled: string[]
   requests: string[]
+  failOnceByRequest: Record<string, string>
 }
 
 export type GraphRagApiMock = ApiMockState & {
   selectedKnowledgeBaseRequests: (knowledgeBaseId: string) => string[]
+  failOnce: (request: string, detail: string) => void
 }
 
 export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
   const state: ApiMockState = {
     knowledgeBases: structuredClone(knowledgeBasesFixture),
     schemas: structuredClone(schemasFixture),
+    schemasByKnowledgeBase: {
+      'kb-alpha': structuredClone(schemasFixture),
+      'kb-beta': [],
+    },
     documentsByKnowledgeBase: {
       'kb-alpha': structuredClone(documentsFixture),
       'kb-beta': [],
     },
     unhandled: [],
     requests: [],
+    failOnceByRequest: {},
   }
 
   await page.route('**/api/v1/**', async (route) => {
@@ -44,6 +52,9 @@ export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
     ...state,
     selectedKnowledgeBaseRequests: (knowledgeBaseId: string) =>
       state.requests.filter((request) => request.includes(`/knowledge-bases/${knowledgeBaseId}/`)),
+    failOnce: (request: string, detail: string) => {
+      state.failOnceByRequest[request] = detail
+    },
   }
 }
 
@@ -54,6 +65,12 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
   const path = url.pathname.replace('/api/v1', '')
   const key = `${method} ${path}${url.search}`
   state.requests.push(key)
+  const failureDetail = state.failOnceByRequest[key]
+  if (failureDetail) {
+    delete state.failOnceByRequest[key]
+    await problem(route, 500, 'Mock failure', failureDetail)
+    return
+  }
 
   if (method === 'GET' && path === '/knowledge-bases') {
     await json(route, state.knowledgeBases)
@@ -103,7 +120,7 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
       await problem(route, 404, 'Not found', 'Knowledge base was not found.')
       return
     }
-    await json(route, state.schemas)
+    await json(route, state.schemasByKnowledgeBase[knowledgeBaseSchemasMatch[1]] ?? [])
     return
   }
 
@@ -129,6 +146,7 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
       createdAt: '2026-05-06T11:00:00.000Z',
     }
     state.schemas.push(created)
+    state.schemasByKnowledgeBase['kb-alpha'] = [...(state.schemasByKnowledgeBase['kb-alpha'] ?? []), created]
     await json(route, created, 201)
     return
   }

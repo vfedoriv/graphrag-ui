@@ -52,6 +52,48 @@ test('validates, creates, and activates schemas for the selected knowledge base'
   expect(api.unhandled).toEqual([])
 })
 
+test('shows selected knowledge-base schema edge states', async ({ page }) => {
+  const api = await mockGraphRagApi(page)
+  api.schemasByKnowledgeBase['kb-alpha'] = api.schemasByKnowledgeBase['kb-alpha'].map((schema) => ({
+    ...schema,
+    status: 'ACTIVE',
+  }))
+  await selectKnowledgeBase(page)
+
+  await page.goto('/schemas')
+  await expect(page.getByRole('cell', { name: 'schema-customer' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Active' })).toBeDisabled()
+
+  await page.getByLabel('knowledge-base-selector').selectOption('kb-beta')
+  await expect(page.locator('header p.font-semibold', { hasText: 'Beta Archive (kb-beta)' })).toBeVisible()
+  await expect(page.getByText('No Schemas for selected knowledge base')).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'schema-customer' })).toHaveCount(0)
+  expect(api.requests).toEqual(expect.arrayContaining([
+    'GET /knowledge-bases/kb-alpha/schemas',
+    'GET /knowledge-bases/kb-beta/schemas',
+  ]))
+  expect(api.unhandled).toEqual([])
+})
+
+test('surfaces no-selected-knowledge-base controller context', async ({ page }) => {
+  const api = await mockGraphRagApi(page)
+
+  await page.goto('/schemas')
+  await expect(page.getByText('No knowledge base selected')).toBeVisible()
+  await expect(page.getByText('Activation requires selecting a knowledge base in the header or KB page.')).toBeVisible()
+
+  await page.goto('/documents')
+  await expect(page.getByText('No knowledge base selected')).toBeVisible()
+  await expect(page.getByText('Select a knowledge base before uploading documents.')).toBeVisible()
+
+  await page.goto('/queries')
+  await expect(page.getByText('No knowledge base selected')).toBeVisible()
+  await expect(page.getByText('Select a knowledge base before running query workflows.')).toBeVisible()
+
+  expect(api.selectedKnowledgeBaseRequests('kb-alpha')).toEqual([])
+  expect(api.unhandled).toEqual([])
+})
+
 test('uploads, processes, and inspects document chunks', async ({ page }) => {
   const api = await mockGraphRagApi(page)
   await selectKnowledgeBase(page)
@@ -74,6 +116,36 @@ test('uploads, processes, and inspects document chunks', async ({ page }) => {
   await uploadedRow.getByRole('button', { name: 'View chunks' }).click()
   await expect(page.getByText('Selected document: doc-uploaded')).toBeVisible()
   await expect(page.getByTestId('output-preview-content')).toContainText('Alpha customer chunk text')
+  expect(api.unhandled).toEqual([])
+})
+
+test('surfaces API failure states across controller workflows', async ({ page }) => {
+  const api = await mockGraphRagApi(page)
+  await selectKnowledgeBase(page)
+
+  api.failOnce('POST /schemas/validate', 'Schema validation failed in browser coverage.')
+  await page.goto('/schemas')
+  await page.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json').click()
+  const validatePanel = page.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+  await validatePanel.getByRole('button', { name: 'Validate schema JSON' }).click()
+  await expect(validatePanel.getByText('Validate failed')).toBeVisible()
+  await expect(validatePanel.getByText('Schema validation failed in browser coverage.')).toBeVisible()
+
+  api.failOnce('POST /documents/doc-alpha/process?allowOverwrite=false', 'Document processing failed in browser coverage.')
+  await page.goto('/documents')
+  const documentRow = page.getByRole('row', { name: /alpha-notes\.txt/ })
+  await documentRow.getByRole('button', { name: 'Process' }).click()
+  await expect(page.getByText('Process failed')).toBeVisible()
+  await expect(page.getByText('Document processing failed in browser coverage.')).toBeVisible()
+
+  api.failOnce('POST /knowledge-bases/kb-alpha/queries/ask', 'Ask query failed in browser coverage.')
+  await page.goto('/queries')
+  const askPanel = page.getByTestId('queries-endpoint-tabs-panel-ask-query')
+  await askPanel.getByLabel('Question prompt').fill('Trigger an error')
+  await askPanel.getByRole('button', { name: 'Ask' }).click()
+  await expect(askPanel.getByText('Ask failed')).toBeVisible()
+  await expect(askPanel.getByText('Ask query failed in browser coverage.')).toBeVisible()
+
   expect(api.unhandled).toEqual([])
 })
 
