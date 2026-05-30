@@ -18,7 +18,7 @@ describe('documents workflows', () => {
       if (url.endsWith('/documents/doc-1/process?allowOverwrite=false')) {
         return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a', originalFilename: 'd.txt', contentType: 'text/plain', sizeBytes: 10, sha256: 'x', contentUri: 'uri', status: 'PROCESSED', uploadedAt: '', processedAt: '', errorMessage: null })
       }
-      if (url.endsWith('/documents/doc-1/chunks')) return jsonResponse(200, [{ id: 'chunk-1', documentId: 'doc-1', chunkIndex: 0, text: 'hello', tokenEstimate: 1, metadata: '{}' }])
+      if (url.endsWith('/documents/doc-1/chunks')) return jsonResponse(200, [{ id: 'chunk-1', documentId: 'doc-1', chunkIndex: 0, text: 'hello', tokenEstimate: 1, metadata: '{"source":"source-doc.txt"}' }])
       return jsonResponse(200, {})
     })
 
@@ -36,8 +36,12 @@ describe('documents workflows', () => {
     await user.click(await screen.findByRole('button', { name: 'View chunks' }))
 
     expect(await screen.findByText(/Selected document: doc-1/i)).toBeInTheDocument()
-    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-x-auto')
-    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-y-auto')
+    expect(await screen.findByTestId('document-chunks-readable-view')).toHaveClass('overflow-y-auto')
+    expect(screen.getByRole('button', { name: 'Readable view' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Chunk 0')).toBeInTheDocument()
+    expect(screen.getByText('Source')).toBeInTheDocument()
+    expect(screen.getByText('source-doc.txt')).toBeInTheDocument()
+    expect(screen.getByText('hello')).toBeInTheDocument()
 
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map((c) => String(c[0]))
