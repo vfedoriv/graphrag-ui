@@ -119,6 +119,7 @@ export type DocumentUpload = {
   sizeBytes: number
   sha256: string
   contentUri: string
+  localPath?: string | null
   status: string
   uploadedAt: string
   processedAt: string | null

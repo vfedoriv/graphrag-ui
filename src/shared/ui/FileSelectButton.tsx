@@ -6,9 +6,22 @@ type FileSelectButtonProps = {
   onFileSelected: (file: File) => void | Promise<void>
   accept?: string
   testId?: string
+  className?: string
+  disabled?: boolean
+  isPending?: boolean
+  pendingText?: string
 }
 
-export function FileSelectButton({ buttonLabel, onFileSelected, accept, testId }: FileSelectButtonProps) {
+export function FileSelectButton({
+  buttonLabel,
+  onFileSelected,
+  accept,
+  testId,
+  className,
+  disabled,
+  isPending,
+  pendingText,
+}: FileSelectButtonProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const inputId = useId()
 
@@ -32,6 +45,10 @@ export function FileSelectButton({ buttonLabel, onFileSelected, accept, testId }
       />
       <Button
         type='button'
+        className={className}
+        disabled={disabled}
+        isPending={isPending}
+        pendingText={pendingText}
         onClick={() => inputRef.current?.click()}
         data-testid={testId}
       >

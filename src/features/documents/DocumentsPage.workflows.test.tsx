@@ -341,4 +341,231 @@ describe('documents workflows', () => {
     expect(await screen.findByText('processing.txt')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Processing...' })).toBeDisabled()
   })
+
+  it('confirms replacement and clears selected chunk output', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'd.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'PROCESSED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/documents/doc-1/chunks')) {
+        return jsonResponse(200, [
+          { id: 'chunk-1', documentId: 'doc-1', chunkIndex: 0, text: 'stale chunk', tokenEstimate: 1, metadata: '{}' },
+        ])
+      }
+      if (url.endsWith('/knowledge-bases/kb-a/documents/doc-1') && init?.method === 'PUT') {
+        return jsonResponse(200, {
+          id: 'doc-1',
+          knowledgeBaseId: 'kb-a',
+          originalFilename: 'replacement.txt',
+          contentType: 'text/plain',
+          sizeBytes: 12,
+          sha256: 'y',
+          contentUri: 'uri2',
+          status: 'UPLOADED',
+          uploadedAt: '',
+          processedAt: null,
+          errorMessage: null,
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'View chunks' }))
+    expect(await screen.findByText('stale chunk')).toBeInTheDocument()
+
+    const input = (await screen.findByTestId('documents-replace-doc-1-input')) as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['new'], 'replacement.txt', { type: 'text/plain' })] } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Choose a document in the table above and click View chunks.')).toBeInTheDocument()
+    })
+
+    const replaceCall = fetchMock.mock.calls.find(
+      (call) =>
+        String(call[0]).endsWith('/api/v1/knowledge-bases/kb-a/documents/doc-1') &&
+        ((call[1] as RequestInit | undefined)?.method === 'PUT'),
+    )
+    expect(replaceCall).toBeTruthy()
+    expect((replaceCall?.[1] as RequestInit).body instanceof FormData).toBe(true)
+  })
+
+  it('does not replace when confirmation is declined', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'd.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const input = (await screen.findByTestId('documents-replace-doc-1-input')) as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['new'], 'replacement.txt', { type: 'text/plain' })] } })
+
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map((call) => String(call[0]))
+      expect(urls.some((url) => url.endsWith('/api/v1/knowledge-bases/kb-a/documents/doc-1'))).toBe(false)
+    })
+  })
+
+  it('shows replacement failure feedback while keeping the list visible', async () => {
+    stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'd.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/knowledge-bases/kb-a/documents/doc-1') && init?.method === 'PUT') {
+        return jsonResponse(409, { detail: 'Replacement duplicates another document' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const input = (await screen.findByTestId('documents-replace-doc-1-input')) as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['new'], 'replacement.txt', { type: 'text/plain' })] } })
+
+    expect(await screen.findByText('Replace failed')).toBeInTheDocument()
+    expect(screen.getByText('Replacement duplicates another document')).toBeInTheDocument()
+    expect(screen.getByText('d.txt')).toBeInTheDocument()
+  })
+
+  it('confirms deletion and clears selected chunk output', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'd.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'PROCESSED',
+            uploadedAt: '',
+            processedAt: '',
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/documents/doc-1/chunks')) {
+        return jsonResponse(200, [
+          { id: 'chunk-1', documentId: 'doc-1', chunkIndex: 0, text: 'delete chunk', tokenEstimate: 1, metadata: '{}' },
+        ])
+      }
+      if (url.endsWith('/knowledge-bases/kb-a/documents/doc-1') && init?.method === 'DELETE') {
+        return {
+          ok: true,
+          status: 204,
+          text: async () => '',
+          json: async () => undefined,
+        }
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'View chunks' }))
+    expect(await screen.findByText('delete chunk')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Choose a document in the table above and click View chunks.')).toBeInTheDocument()
+    })
+
+    expect(
+      fetchMock.mock.calls.some(
+        (call) =>
+          String(call[0]).endsWith('/api/v1/knowledge-bases/kb-a/documents/doc-1') &&
+          ((call[1] as RequestInit | undefined)?.method === 'DELETE'),
+      ),
+    ).toBe(true)
+  })
+
+  it('shows deletion failure feedback while keeping the list visible', async () => {
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/documents') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-1',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'd.txt',
+            contentType: 'text/plain',
+            sizeBytes: 10,
+            sha256: 'x',
+            contentUri: 'uri',
+            status: 'UPLOADED',
+            uploadedAt: '',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url.endsWith('/knowledge-bases/kb-a/documents/doc-1') && init?.method === 'DELETE') {
+        return jsonResponse(500, { detail: 'Stored binary deletion failed' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(screen.getByText('Stored binary deletion failed')).toBeInTheDocument()
+    expect(screen.getByText('d.txt')).toBeInTheDocument()
+  })
 })

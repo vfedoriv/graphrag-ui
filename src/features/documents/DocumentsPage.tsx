@@ -1,6 +1,13 @@
-import { useState } from 'react'
-import { useDocumentChunksQuery, useDocumentsQuery, useProcessDocumentMutation, useUploadDocumentMutation } from '../../api/documents'
-import { ApiError, type DocumentChunk } from '../../api/types'
+import { useEffect, useState } from 'react'
+import {
+  useDeleteDocumentMutation,
+  useDocumentChunksQuery,
+  useDocumentsQuery,
+  useProcessDocumentMutation,
+  useReplaceDocumentMutation,
+  useUploadDocumentMutation,
+} from '../../api/documents'
+import { ApiError, type DocumentChunk, type DocumentUpload } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -13,19 +20,42 @@ import { Table } from '../../shared/ui/Table'
 import { isCompletedOrSuccessfullyProcessed, isDocumentProcessingStatus } from './documentStatus'
 
 type ChunkViewMode = 'readable' | 'json'
+const documentOpenedMessage = 'Document opened in another window'
 
 export function DocumentsPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const { data: documents = [] } = useDocumentsQuery(selectedKnowledgeBaseId)
   const uploadMutation = useUploadDocumentMutation()
   const processMutation = useProcessDocumentMutation()
+  const replaceMutation = useReplaceDocumentMutation()
+  const deleteMutation = useDeleteDocumentMutation()
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
   const [processingDocumentIds, setProcessingDocumentIds] = useState<Set<string>>(new Set())
+  const [replacingDocumentIds, setReplacingDocumentIds] = useState<Set<string>>(new Set())
+  const [deletingDocumentIds, setDeletingDocumentIds] = useState<Set<string>>(new Set())
+  const [copiedPathDocumentId, setCopiedPathDocumentId] = useState<string | null>(null)
+  const [openingDocumentIds, setOpeningDocumentIds] = useState<Set<string>>(new Set())
+  const [openErrorMessage, setOpenErrorMessage] = useState<string | null>(null)
+  const [openSuccessMessage, setOpenSuccessMessage] = useState<string | null>(null)
   const [chunkViewMode, setChunkViewMode] = useState<ChunkViewMode>('readable')
   const chunksQuery = useDocumentChunksQuery(selectedDocumentId)
   const hasBackendProcessingDocument = documents.some((doc) => isDocumentProcessingStatus(doc.status))
-  const isAnyPending = uploadMutation.isPending || processMutation.isPending || chunksQuery.isLoading || hasBackendProcessingDocument
+  const isAnyPending =
+    uploadMutation.isPending ||
+    processMutation.isPending ||
+    replaceMutation.isPending ||
+    deleteMutation.isPending ||
+    chunksQuery.isLoading ||
+    hasBackendProcessingDocument
+
+  useEffect(() => {
+    if (!openSuccessMessage) return undefined
+    const timeoutId = window.setTimeout(() => {
+      setOpenSuccessMessage(null)
+    }, 10000)
+    return () => window.clearTimeout(timeoutId)
+  }, [openSuccessMessage])
 
   const handleProcessDocument = async (documentId: string, status: string) => {
     const runProcess = async (allowOverwrite: boolean) => {
@@ -63,6 +93,101 @@ export function DocumentsPage() {
     }
   }
 
+  const clearSelectedDocumentIfNeeded = (documentId: string) => {
+    if (selectedDocumentId === documentId) {
+      setSelectedDocumentId(null)
+      setChunkViewMode('readable')
+    }
+  }
+
+  const handleReplaceDocument = async (documentId: string, file: File) => {
+    if (!selectedKnowledgeBaseId) return
+    const confirmed = window.confirm('Replace this document? Existing processed chunks and extracted artifacts will be cleared.')
+    if (!confirmed) return
+    setReplacingDocumentIds((prev) => {
+      const next = new Set(prev)
+      next.add(documentId)
+      return next
+    })
+    try {
+      await replaceMutation.mutateAsync({ knowledgeBaseId: selectedKnowledgeBaseId, documentId, file })
+      clearSelectedDocumentIfNeeded(documentId)
+    } catch {
+      // Mutation error state renders the user-facing alert.
+    } finally {
+      setReplacingDocumentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(documentId)
+        return next
+      })
+    }
+  }
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!selectedKnowledgeBaseId) return
+    const confirmed = window.confirm('Delete this document and its document-scoped artifacts?')
+    if (!confirmed) return
+    setDeletingDocumentIds((prev) => {
+      const next = new Set(prev)
+      next.add(documentId)
+      return next
+    })
+    try {
+      await deleteMutation.mutateAsync({ knowledgeBaseId: selectedKnowledgeBaseId, documentId })
+      clearSelectedDocumentIfNeeded(documentId)
+    } catch {
+      // Mutation error state renders the user-facing alert.
+    } finally {
+      setDeletingDocumentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(documentId)
+        return next
+      })
+    }
+  }
+
+  const handleOpenDocument = async (doc: DocumentUpload) => {
+    setOpenErrorMessage(null)
+    setOpenSuccessMessage(null)
+    if (doc.localPath) {
+      setOpeningDocumentIds((prev) => {
+        const next = new Set(prev)
+        next.add(doc.id)
+        return next
+      })
+      try {
+        await requestLocalFileOpen(doc.localPath)
+        setOpenSuccessMessage(documentOpenedMessage)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to open local file.'
+        setOpenErrorMessage(message)
+      } finally {
+        setOpeningDocumentIds((prev) => {
+          const next = new Set(prev)
+          next.delete(doc.id)
+          return next
+        })
+      }
+      return
+    }
+
+    const target = getDocumentOpenTarget(doc)
+    if (!target) {
+      setOpenErrorMessage('No local path or openable document URI is available.')
+      return
+    }
+    const opened = window.open(target, '_blank', 'noopener,noreferrer')
+    if (!opened) {
+      setOpenErrorMessage('The browser blocked opening this document. Copy the source path and open it locally.')
+    }
+  }
+
+  const handleCopyPath = async (doc: DocumentUpload) => {
+    if (!doc.localPath) return
+    await navigator.clipboard.writeText(doc.localPath)
+    setCopiedPathDocumentId(doc.id)
+  }
+
   const processErrorMessage = (() => {
     const error = processMutation.error
     if (error instanceof ApiError && error.status === 409) {
@@ -79,36 +204,42 @@ export function DocumentsPage() {
     <EmptyState title='No Documents' body='Upload a document and process it to inspect chunks.' />
   ) : (
     <Table
-      headers={['Filename', 'Status', 'Error', 'Actions']}
+      headers={['Filename', 'Status', 'Source path', 'Error', 'Actions']}
       rows={documents.map((doc) => [
         doc.originalFilename,
         doc.status,
+        <DocumentSourceContext
+          doc={doc}
+          wasCopied={copiedPathDocumentId === doc.id}
+          isOpening={openingDocumentIds.has(doc.id)}
+          onOpen={() => handleOpenDocument(doc)}
+          onCopy={() => {
+            void handleCopyPath(doc)
+          }}
+        />,
         doc.errorMessage ?? '-',
-        <div className='flex gap-2'>
-          <Button
-            type='button'
-            isPending={processingDocumentIds.has(doc.id) || isDocumentProcessingStatus(doc.status)}
-            pendingText='Processing...'
-            onClick={() => {
-              void handleProcessDocument(doc.id, doc.status)
-            }}
-            className='bg-slate-700'
-          >
-            Process
-          </Button>
-          <Button
-            type='button'
-            isPending={chunksQuery.isLoading && selectedDocumentId === doc.id}
-            pendingText='Loading...'
-            onClick={() => {
-              setSelectedDocumentId(doc.id)
-              setChunkViewMode('readable')
-            }}
-          >
-            View chunks
-          </Button>
-        </div>,
+        <DocumentRowActions
+          isProcessing={processingDocumentIds.has(doc.id) || isDocumentProcessingStatus(doc.status)}
+          isLoadingChunks={chunksQuery.isLoading && selectedDocumentId === doc.id}
+          isReplacing={replacingDocumentIds.has(doc.id)}
+          isDeleting={deletingDocumentIds.has(doc.id)}
+          onProcess={() => {
+            void handleProcessDocument(doc.id, doc.status)
+          }}
+          onReplace={(file) => {
+            void handleReplaceDocument(doc.id, file)
+          }}
+          onViewChunks={() => {
+            setSelectedDocumentId(doc.id)
+            setChunkViewMode('readable')
+          }}
+          onDelete={() => {
+            void handleDeleteDocument(doc.id)
+          }}
+          replaceTestId={`documents-replace-${doc.id}`}
+        />,
       ])}
+      rowKeys={documents.map((doc) => doc.id)}
     />
   )
 
@@ -132,6 +263,10 @@ export function DocumentsPage() {
             {selectedUploadFilename ? <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p> : null}
             {uploadMutation.error ? <Alert title='Upload failed' message={(uploadMutation.error as Error).message} /> : null}
             {processErrorMessage ? <Alert title='Process failed' message={processErrorMessage} /> : null}
+            {openSuccessMessage ? <Alert title='Open requested' message={openSuccessMessage} tone='success' /> : null}
+            {openErrorMessage ? <Alert title='Open failed' message={openErrorMessage} /> : null}
+            {replaceMutation.error ? <Alert title='Replace failed' message={(replaceMutation.error as Error).message} /> : null}
+            {deleteMutation.error ? <Alert title='Delete failed' message={(deleteMutation.error as Error).message} /> : null}
           </section>
           {topSection}
           <section className='space-y-2'>
@@ -156,6 +291,161 @@ export function DocumentsPage() {
       testId='documents-controller-page'
     />
   )
+}
+
+function DocumentRowActions({
+  isProcessing,
+  isLoadingChunks,
+  isReplacing,
+  isDeleting,
+  onProcess,
+  onReplace,
+  onViewChunks,
+  onDelete,
+  replaceTestId,
+}: {
+  isProcessing: boolean
+  isLoadingChunks: boolean
+  isReplacing: boolean
+  isDeleting: boolean
+  onProcess: () => void
+  onReplace: (file: File) => void
+  onViewChunks: () => void
+  onDelete: () => void
+  replaceTestId: string
+}) {
+  return (
+    <div className='grid w-[28rem] grid-cols-[7rem_7rem_9rem] gap-2'>
+      <Button
+        type='button'
+        isPending={isProcessing}
+        pendingText='Processing...'
+        onClick={onProcess}
+        className='w-full bg-slate-700'
+      >
+        Process
+      </Button>
+      <FileSelectButton
+        buttonLabel='Replace'
+        testId={replaceTestId}
+        className='w-full bg-amber-700'
+        isPending={isReplacing}
+        pendingText='Replacing...'
+        disabled={isDeleting}
+        onFileSelected={onReplace}
+      />
+      <Button
+        type='button'
+        isPending={isLoadingChunks}
+        pendingText='Loading...'
+        onClick={onViewChunks}
+        className='w-full'
+      >
+        View chunks
+      </Button>
+      <Button
+        type='button'
+        className='col-start-1 w-full bg-red-700'
+        isPending={isDeleting}
+        pendingText='Deleting...'
+        disabled={isReplacing}
+        onClick={onDelete}
+      >
+        Delete
+      </Button>
+    </div>
+  )
+}
+
+function DocumentSourceContext({
+  doc,
+  wasCopied,
+  isOpening,
+  onOpen,
+  onCopy,
+}: {
+  doc: DocumentUpload
+  wasCopied: boolean
+  isOpening: boolean
+  onOpen: () => void
+  onCopy: () => void
+}) {
+  const openTarget = getDocumentOpenTarget(doc)
+  const hasActions = Boolean(openTarget || doc.localPath)
+
+  return (
+    <div className='w-56'>
+      {hasActions ? (
+        <div className='grid grid-cols-2 gap-2'>
+          <Button
+            type='button'
+            className='w-full bg-emerald-700 px-2 py-1.5 text-xs'
+            isPending={isOpening}
+            pendingText='Opening...'
+            disabled={!openTarget}
+            onClick={() => {
+              void onOpen()
+            }}
+          >
+            Open
+          </Button>
+          <Button
+            type='button'
+            className='w-full bg-slate-600 px-2 py-1.5 text-xs'
+            disabled={!doc.localPath}
+            onClick={onCopy}
+          >
+            {wasCopied ? 'Copied' : 'Copy path'}
+          </Button>
+        </div>
+      ) : (
+        <span className='text-sm text-slate-500'>-</span>
+      )}
+    </div>
+  )
+}
+
+function getDocumentOpenTarget(doc: DocumentUpload) {
+  if (doc.localPath) return doc.localPath
+  if (isUsableDocumentUri(doc.contentUri)) return doc.contentUri
+  return null
+}
+
+async function requestLocalFileOpen(localPath: string) {
+  const response = await fetch('/__graphrag-ui/open-local-file', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: localPath }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await getOpenFailureMessage(response))
+  }
+}
+
+async function getOpenFailureMessage(response: Response) {
+  try {
+    const payload = (await response.json()) as unknown
+    if (isRecord(payload) && typeof payload.detail === 'string') {
+      return payload.detail
+    }
+  } catch {
+    // Fall through to status-based feedback.
+  }
+  if (response.status === 404) {
+    return 'Local file opening is not available from this server. Copy the source path and open it locally.'
+  }
+  return 'Unable to open local file. Copy the source path and open it locally.'
+}
+
+function isUsableDocumentUri(value: string | null | undefined) {
+  if (!value) return false
+  try {
+    const parsed = new URL(value)
+    return ['file:', 'http:', 'https:'].includes(parsed.protocol)
+  } catch {
+    return false
+  }
 }
 
 function DocumentChunksInspector({
