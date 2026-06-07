@@ -31,8 +31,8 @@ export function AppLayout() {
 
   return (
     <div className='min-h-screen bg-[radial-gradient(circle_at_10%_10%,#e8f5e9_0,#f8fafc_40%,#f1f5f9_100%)] text-slate-900'>
-      <div className='mx-auto grid max-w-7xl grid-cols-1 gap-4 p-4 md:grid-cols-[250px_1fr]'>
-        <aside className='rounded-xl border border-slate-300 bg-white p-4'>
+      <div className='grid w-full grid-cols-1 gap-4 p-4 md:grid-cols-[250px_minmax(0,1fr)] lg:p-6'>
+        <aside className='w-full rounded-xl border border-slate-300 bg-white p-4 md:w-[250px]'>
           <p className='mb-4 font-serif text-xl font-bold tracking-tight text-slate-900'>GraphRAG UI</p>
           <nav className='space-y-2'>
             {navItems.map((item) => (
