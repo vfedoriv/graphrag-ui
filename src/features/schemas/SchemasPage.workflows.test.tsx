@@ -1,11 +1,13 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './SchemasPage'
+import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
 describe('schemas workflows', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     localStorage.clear()
   })
 
@@ -179,4 +181,236 @@ describe('schemas workflows', () => {
       expect(within(filePanel).getByLabelText('Generated schema example')).toHaveValue('[{"from":"file"}]')
     })
   })
+
+  it('loads schema content for update, saves edits, and preserves draft on update failure', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-a') && !init?.method) {
+        return jsonResponse(200, {
+          id: 'schema-a',
+          name: 'Schema A',
+          version: 1,
+          sourceType: 'PREDEFINED',
+          format: 'JSON',
+          contentHash: 'hash',
+          status: 'INACTIVE',
+          createdAt: '2026-01-01T00:00:00Z',
+          content: '{"name":"Schema A","version":1}',
+        })
+      }
+      if (url.endsWith('/schemas/schema-a') && init?.method === 'PUT') {
+        return jsonResponse(409, { detail: 'Schema identity conflict from server' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Update schema')).toBeInTheDocument()
+    const editor = screen.getAllByLabelText('Mock structured JSON data')[0]
+    fireEvent.change(editor, { target: { value: '{"name":"Schema A","version":1,"description":"edited"}' } })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Update failed')).toBeInTheDocument()
+    expect(screen.getByText('Schema identity conflict from server')).toBeInTheDocument()
+    expect(editor).toHaveValue('{\n  "name": "Schema A",\n  "version": 1,\n  "description": "edited"\n}')
+
+    const updateCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/api/v1/schemas/schema-a') && (init as RequestInit | undefined)?.method === 'PUT',
+    )
+    const updatePayload = JSON.parse(String((updateCall?.[1] as RequestInit | undefined)?.body)) as { content: string, sourceType: string }
+    expect(JSON.parse(updatePayload.content)).toEqual({ name: 'Schema A', version: 1, description: 'edited' })
+    expect(updatePayload.sourceType).toBe('PREDEFINED')
+  })
+
+  it('cancels schema update without sending a PUT request', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-a') && !init?.method) {
+        return jsonResponse(200, {
+          id: 'schema-a',
+          name: 'Schema A',
+          version: 1,
+          sourceType: 'PREDEFINED',
+          format: 'JSON',
+          contentHash: 'hash',
+          status: 'INACTIVE',
+          createdAt: '2026-01-01T00:00:00Z',
+          content: '{"name":"Schema A","version":1}',
+        })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Update schema')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Update schema')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) => String(url).endsWith('/api/v1/schemas/schema-a') && (init as RequestInit | undefined)?.method === 'PUT',
+      ),
+    ).toBe(false)
+  })
+
+  it('confirms schema delete, skips deletion when canceled, and shows delete failures', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    confirmSpy.mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-a') && init?.method === 'DELETE') {
+        return jsonResponse(409, { detail: 'Schema is active from server' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+    await user.click(deleteButton)
+    expect(confirmSpy).toHaveBeenCalledWith('Delete schema Schema A v1 (schema-a)?')
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) => String(url).endsWith('/api/v1/schemas/schema-a') && (init as RequestInit | undefined)?.method === 'DELETE',
+      ),
+    ).toBe(false)
+
+    await user.click(deleteButton)
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/schemas/schema-a', expect.objectContaining({ method: 'DELETE' }))
+    })
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(screen.getByText('Schema Schema A v1 (schema-a): Schema is active from server')).toBeInTheDocument()
+  })
+
+  it('clears schema mutation alerts when selected knowledge base changes', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash-a',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.endsWith('/knowledge-bases/kb-b/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-b',
+            name: 'Schema B',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash-b',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-a') && !init?.method) {
+        return jsonResponse(200, {
+          id: 'schema-a',
+          name: 'Schema A',
+          version: 1,
+          sourceType: 'PREDEFINED',
+          format: 'JSON',
+          contentHash: 'hash-a',
+          status: 'INACTIVE',
+          createdAt: '2026-01-01T00:00:00Z',
+          content: '{"name":"Schema A","version":1}',
+        })
+      }
+      if (url.endsWith('/schemas/schema-a') && init?.method === 'PUT') {
+        return jsonResponse(409, { detail: 'Cannot update active schema: schema-a' })
+      }
+      if (url.endsWith('/schemas/schema-a') && init?.method === 'DELETE') {
+        return jsonResponse(409, { detail: 'Cannot delete active schema: schema-a' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPageWithKnowledgeBaseSwitcher />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Update' }))
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Update failed')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Switch knowledge base' }))
+
+    expect(await screen.findByText('schema-b')).toBeInTheDocument()
+    expect(screen.queryByText('Update failed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Delete failed')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Cannot update active schema/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Cannot delete active schema/)).not.toBeInTheDocument()
+  })
 })
+
+function SchemasPageWithKnowledgeBaseSwitcher() {
+  const { setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+
+  return (
+    <>
+      <button type='button' onClick={() => setSelectedKnowledgeBaseId('kb-b')}>
+        Switch knowledge base
+      </button>
+      <SchemasPage />
+    </>
+  )
+}

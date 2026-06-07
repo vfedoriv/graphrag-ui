@@ -13,6 +13,7 @@ import type {
   Schema,
   SchemaDetails,
   SchemaValidationResponse,
+  UpdateSchemaRequest,
   ValidateSchemaRequest,
 } from './types'
 import { ApiError } from './types'
@@ -38,6 +39,9 @@ export const schemasApi = {
     apiFetch<SchemaValidationResponse>('/schemas/validate', { method: 'POST', body: toJsonBody(payload) }),
   create: (payload: CreateSchemaRequest) =>
     apiFetch<Schema>('/schemas', { method: 'POST', body: toJsonBody(payload) }),
+  update: (schemaId: string, payload: UpdateSchemaRequest) =>
+    apiFetch<SchemaDetails>(`/schemas/${schemaId}`, { method: 'PUT', body: toJsonBody(payload) }),
+  delete: (schemaId: string) => apiFetch<void>(`/schemas/${schemaId}`, { method: 'DELETE' }),
   generateExample: async (payload: GenerateSchemaExampleRequest) => {
     const raw = await apiFetch<GenerateSchemaExampleRawResponse>('/schemas/generate/example', {
       method: 'POST',
@@ -117,6 +121,37 @@ export function useCreateSchemaMutation() {
   return useMutation({
     mutationFn: schemasApi.create,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schemas() }),
+  })
+}
+
+export function useUpdateSchemaMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ schemaId, payload }: { schemaId: string; payload: UpdateSchemaRequest; knowledgeBaseId?: string | null }) =>
+      schemasApi.update(schemaId, payload),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemas() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schema(vars.schemaId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemaLookup(vars.schemaId) })
+      if (vars.knowledgeBaseId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.schemasByKnowledgeBase(vars.knowledgeBaseId) })
+      }
+    },
+  })
+}
+
+export function useDeleteSchemaMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ schemaId }: { schemaId: string; knowledgeBaseId?: string | null }) => schemasApi.delete(schemaId),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemas() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schema(vars.schemaId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemaLookup(vars.schemaId) })
+      if (vars.knowledgeBaseId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.schemasByKnowledgeBase(vars.knowledgeBaseId) })
+      }
+    },
   })
 }
 

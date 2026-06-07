@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react'
 import {
   useActivateSchemaMutation,
   useCreateSchemaMutation,
+  useDeleteSchemaMutation,
   useGenerateSchemaExampleFromFileMutation,
   useGenerateSchemaExampleMutation,
   useGenerateSchemaJsonFromFileMutation,
   useGenerateSchemaJsonMutation,
   useGetSchemaMutation,
   useSchemasByKnowledgeBaseQuery,
+  useUpdateSchemaMutation,
   useValidateSchemaMutation,
 } from '../../api/schemas'
-import { type SchemaSourceType } from '../../api/types'
+import { type Schema, type SchemaDetails, type SchemaSourceType } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -28,20 +30,105 @@ import { Textarea } from '../../shared/ui/Textarea'
 
 export function SchemasPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+
+  return <SchemasPageContent key={selectedKnowledgeBaseId ?? 'none'} selectedKnowledgeBaseId={selectedKnowledgeBaseId} />
+}
+
+function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBaseId: string | null }) {
   const { data = [] } = useSchemasByKnowledgeBaseQuery(selectedKnowledgeBaseId)
   const [schemaJson, setSchemaJson] = useState('')
   const [schemaId, setSchemaId] = useState('')
   const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
   const [generatedJsonOutput, setGeneratedJsonOutput] = useState('')
   const [generatedJsonFromFileOutput, setGeneratedJsonFromFileOutput] = useState('')
+  const [editingSchema, setEditingSchema] = useState<SchemaDetails | null>(null)
+  const [updateDraft, setUpdateDraft] = useState('')
+  const [updateSuccess, setUpdateSuccess] = useState('')
+  const [deleteTargetLabel, setDeleteTargetLabel] = useState('')
+  const [deleteSuccess, setDeleteSuccess] = useState('')
   const [isGeneratePending, setIsGeneratePending] = useState(false)
   const createMutation = useCreateSchemaMutation()
   const activateMutation = useActivateSchemaMutation()
   const validateMutation = useValidateSchemaMutation()
   const getSchemaMutation = useGetSchemaMutation()
-  const isAnyPending = createMutation.isPending || activateMutation.isPending || getSchemaMutation.isPending || validateMutation.isPending || isGeneratePending
+  const getSchemaForUpdateMutation = useGetSchemaMutation()
+  const updateMutation = useUpdateSchemaMutation()
+  const deleteMutation = useDeleteSchemaMutation()
+  const isAnyPending =
+    createMutation.isPending ||
+    activateMutation.isPending ||
+    getSchemaMutation.isPending ||
+    getSchemaForUpdateMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    validateMutation.isPending ||
+    isGeneratePending
 
   const unsupportedSourceTypeSchemas = data.filter((schema) => !isSupportedSchemaSourceType(schema.sourceType))
+  const activeDeleteSchemaId = deleteMutation.variables?.schemaId
+
+  const openUpdateEditor = async (schema: Schema) => {
+    setUpdateSuccess('')
+    setDeleteSuccess('')
+    setDeleteTargetLabel('')
+    getSchemaForUpdateMutation.reset()
+    updateMutation.reset()
+    deleteMutation.reset()
+    try {
+      const details = await getSchemaForUpdateMutation.mutateAsync(schema.id)
+      setEditingSchema(details)
+      setUpdateDraft(details.content)
+    } catch {
+      // surfaced via getSchemaForUpdateMutation.error
+    }
+  }
+
+  const saveUpdate = async () => {
+    if (!editingSchema) return
+
+    updateMutation.reset()
+    try {
+      const updated = await updateMutation.mutateAsync({
+        schemaId: editingSchema.id,
+        knowledgeBaseId: selectedKnowledgeBaseId,
+        payload: {
+          content: updateDraft,
+          sourceType: isSupportedSchemaSourceType(editingSchema.sourceType) ? editingSchema.sourceType : undefined,
+        },
+      })
+      setEditingSchema(updated)
+      setUpdateDraft(updated.content)
+      setUpdateSuccess(`Schema ${updated.name} v${updated.version} updated.`)
+    } catch {
+      // surfaced via updateMutation.error
+    }
+  }
+
+  const cancelUpdate = () => {
+    setEditingSchema(null)
+    setUpdateDraft('')
+    setUpdateSuccess('')
+  }
+
+  const deleteSchema = async (schema: Schema) => {
+    const label = `${schema.name} v${schema.version} (${schema.id})`
+    const confirmed = window.confirm(`Delete schema ${label}?`)
+    if (!confirmed) return
+
+    deleteMutation.reset()
+    setDeleteTargetLabel(label)
+    setDeleteSuccess('')
+    try {
+      await deleteMutation.mutateAsync({ schemaId: schema.id, knowledgeBaseId: selectedKnowledgeBaseId })
+      if (editingSchema?.id === schema.id) {
+        cancelUpdate()
+      }
+      setDeleteSuccess(`Schema ${label} deleted.`)
+      setDeleteTargetLabel('')
+    } catch {
+      // surfaced via deleteMutation.error
+    }
+  }
 
   const topSection = (
     <>
@@ -49,24 +136,78 @@ export function SchemasPage() {
         <EmptyState title='No Schemas for selected knowledge base' body='Create or generate one, then activate it for the selected knowledge base.' />
       ) : (
         <Table
-          headers={['ID', 'Name', 'Version', 'Source Type', 'Status', 'Activate']}
+          headers={['ID', 'Name', 'Version', 'Source Type', 'Status', 'Actions']}
+          rowKeys={data.map((schema) => schema.id)}
           rows={data.map((schema) => [
             schema.id,
             schema.name,
             String(schema.version),
             formatSchemaSourceTypeLabel(schema.sourceType),
             schema.status,
-            <Button
-              type='button'
-              disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
-              isPending={activateMutation.isPending}
-              pendingText='Activating...'
-              onClick={() => selectedKnowledgeBaseId && activateMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, schemaId: schema.id })}
-            >
-              {schema.status === 'ACTIVE' ? 'Active' : 'Activate'}
-            </Button>,
+            <div className='flex flex-wrap gap-2'>
+              <Button
+                type='button'
+                disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
+                isPending={activateMutation.isPending}
+                pendingText='Activating...'
+                onClick={() => selectedKnowledgeBaseId && activateMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, schemaId: schema.id })}
+              >
+                {schema.status === 'ACTIVE' ? 'Active' : 'Activate'}
+              </Button>
+              <Button
+                type='button'
+                className='bg-slate-700'
+                isPending={getSchemaForUpdateMutation.isPending && getSchemaForUpdateMutation.variables === schema.id}
+                pendingText='Loading...'
+                onClick={() => {
+                  void openUpdateEditor(schema)
+                }}
+              >
+                Update
+              </Button>
+              <Button
+                type='button'
+                className='bg-red-700'
+                isPending={deleteMutation.isPending && activeDeleteSchemaId === schema.id}
+                pendingText='Deleting...'
+                onClick={() => {
+                  void deleteSchema(schema)
+                }}
+              >
+                Delete
+              </Button>
+            </div>,
           ])}
         />
+      )}
+      {editingSchema && (
+        <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
+          <div>
+            <h3 className='text-sm font-semibold text-slate-900'>Update schema</h3>
+            <p className='text-sm text-slate-600'>
+              {editingSchema.name} v{editingSchema.version} ({editingSchema.id})
+            </p>
+          </div>
+          <FieldLabel htmlFor='update-schema-json'>Schema JSON content</FieldLabel>
+          <SchemaJsonEditor
+            id='update-schema-json'
+            label='Schema JSON content'
+            value={updateDraft}
+            onChange={setUpdateDraft}
+            placeholder='Schema JSON content'
+            disabled={updateMutation.isPending}
+          />
+          <div className='flex flex-wrap gap-2'>
+            <Button type='button' className='bg-emerald-700' isPending={updateMutation.isPending} pendingText='Saving...' onClick={() => void saveUpdate()}>
+              Save
+            </Button>
+            <Button type='button' className='bg-white text-slate-900' disabled={updateMutation.isPending} onClick={cancelUpdate}>
+              Cancel
+            </Button>
+          </div>
+          {updateSuccess && <p className='text-sm text-emerald-700'>{updateSuccess}</p>}
+          {updateMutation.error && <Alert title='Update failed' message={(updateMutation.error as Error).message} />}
+        </div>
       )}
       {unsupportedSourceTypeSchemas.length > 0 && (
         <Alert
@@ -76,6 +217,9 @@ export function SchemasPage() {
       )}
       {!selectedKnowledgeBaseId && <Alert title='No knowledge base selected' message='Activation requires selecting a knowledge base in the header or KB page.' tone='info' />}
       {activateMutation.error && <Alert title='Activate failed' message={(activateMutation.error as Error).message} />}
+      {getSchemaForUpdateMutation.error && <Alert title='Load schema for update failed' message={(getSchemaForUpdateMutation.error as Error).message} />}
+      {deleteSuccess && <p className='text-sm text-emerald-700'>{deleteSuccess}</p>}
+      {deleteMutation.error && <Alert title='Delete failed' message={`Schema ${deleteTargetLabel}: ${(deleteMutation.error as Error).message}`} />}
       {isAnyPending ? <ProgressBanner message='Waiting for schema workflow response...' /> : null}
     </>
   )

@@ -5,12 +5,14 @@ import {
   schemasApi,
   useActivateSchemaMutation,
   useCreateSchemaMutation,
+  useDeleteSchemaMutation,
   useGenerateSchemaExampleFromFileMutation,
   useGenerateSchemaExampleMutation,
   useGenerateSchemaJsonFromFileMutation,
   useGenerateSchemaJsonMutation,
   useGetSchemaMutation,
   useSchemasByKnowledgeBaseQuery,
+  useUpdateSchemaMutation,
   useValidateSchemaMutation,
 } from './schemas'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
@@ -21,8 +23,9 @@ describe('schemas api', () => {
   })
 
   it('calls schema endpoints with expected payloads', async () => {
-    const fetchMock = stubFetch((url) => {
+    const fetchMock = stubFetch((url, init) => {
       if (url.endsWith('/schemas')) return jsonResponse(200, [])
+      if (url.includes('/schemas/abc') && init?.method === 'DELETE') return jsonResponse(204, {})
       if (url.includes('/schemas/abc')) return jsonResponse(200, { id: 'abc', content: '{}' })
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
       if (url.endsWith('/schemas/generate/example')) return jsonResponse(200, '{}')
@@ -38,6 +41,8 @@ describe('schemas api', () => {
     await schemasApi.get('abc')
     await schemasApi.validate({ content: 'x' })
     await schemasApi.create({ content: 'x' })
+    await schemasApi.update('abc', { content: '{"name":"updated"}', sourceType: 'PREDEFINED' })
+    await schemasApi.delete('abc')
     await schemasApi.generateExample({ text: 'input' })
     await schemasApi.generateExampleFromFile({ file: new File(['source'], 'source.txt', { type: 'text/plain' }) })
     await schemasApi.generateJson({ name: 'n', version: 1, text: 't', example: '{}' })
@@ -53,11 +58,23 @@ describe('schemas api', () => {
     expect(urls.some((u) => u.endsWith('/api/v1/schemas'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/schemas'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/validate'))).toBe(true)
+    expect(urls.some((u) => u.endsWith('/api/v1/schemas/abc'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/example'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/example/from-file'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/from-file'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/schemas/sc-1/activate'))).toBe(true)
+
+    const updateCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/api/v1/schemas/abc') && (init as RequestInit | undefined)?.method === 'PUT',
+    )
+    expect(updateCall?.[1]).toEqual(expect.objectContaining({ method: 'PUT' }))
+    expect(JSON.parse(String((updateCall?.[1] as RequestInit | undefined)?.body))).toEqual({
+      content: '{"name":"updated"}',
+      sourceType: 'PREDEFINED',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/schemas/abc', expect.objectContaining({ method: 'DELETE' }))
 
     const exampleFromFileCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/api/v1/schemas/generate/example/from-file'))
     const exampleFromFileBody = exampleFromFileCall?.[1] && (exampleFromFileCall[1] as RequestInit).body
@@ -71,9 +88,10 @@ describe('schemas api', () => {
     expect((jsonFromFileBody as FormData).get('file')).toBeInstanceOf(File)
   })
 
-  it('invalidates caches for create and activate mutations', async () => {
+  it('invalidates caches for create, activate, update, and delete mutations', async () => {
     stubFetch((url) => {
       if (url.endsWith('/schemas')) return jsonResponse(200, { id: 'schema-1' })
+      if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', content: '{}' })
       if (url.endsWith('/activate')) return jsonResponse(200, {})
       return jsonResponse(200, {})
     })
@@ -91,10 +109,18 @@ describe('schemas api', () => {
     const { result: activateResult } = renderHook(() => useActivateSchemaMutation(), { wrapper })
     await activateResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', schemaId: 'schema-1' })
 
+    const { result: updateResult } = renderHook(() => useUpdateSchemaMutation(), { wrapper })
+    await updateResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', schemaId: 'schema-1', payload: { content: '{}' } })
+
+    const { result: deleteResult } = renderHook(() => useDeleteSchemaMutation(), { wrapper })
+    await deleteResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', schemaId: 'schema-1' })
+
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'knowledge-base', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'schema-1'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'lookup', 'schema-1'] })
   })
 
   it('loads schemas via knowledge-base-scoped query hook', async () => {

@@ -24,6 +24,22 @@ The system SHALL allow activating a selected schema against the currently select
 - **WHEN** a schema row is reported with `ACTIVE` status in the schema list
 - **THEN** the row action SHALL show an active-state caption and SHALL be non-interactive
 
+### Requirement: Schema list supports mutation actions
+The system SHALL expose update and delete actions for schemas in the Schemas page list while preserving existing list, activation, create, get-by-id, and validation workflows.
+
+#### Scenario: Schema list renders update and delete actions
+- **WHEN** a user opens the Schemas page with schemas for the selected knowledge base
+- **THEN** each schema row SHALL expose controls for update and delete in addition to the existing activation state/action
+
+#### Scenario: Active schema mutation is guarded by backend response
+- **WHEN** a schema update or delete request is rejected because the schema is active or otherwise conflicts with backend mutation rules
+- **THEN** the system SHALL render the backend conflict as visible error feedback in the Schemas page context
+- **AND** the system SHALL NOT remove the schema row or report a successful update
+
+#### Scenario: Existing schema workflows remain available
+- **WHEN** update and delete actions are added to the Schemas page
+- **THEN** the existing generate, validate, create, get-by-id, and activate workflows SHALL remain available from the same controller page
+
 ### Requirement: Schema activation and validation failures are visible
 The system SHALL show explicit error feedback when schema activation requests fail and when schema JSON validation requests fail.
 
@@ -93,4 +109,3 @@ The system SHALL preserve existing user-editable schema draft content when a sch
 #### Scenario: Schema creation fails after structured draft edit
 - **WHEN** a user edits schema JSON through the structured editor and a create request fails
 - **THEN** the system SHALL keep the edited schema JSON draft visible and render an inline creation failure alert
-

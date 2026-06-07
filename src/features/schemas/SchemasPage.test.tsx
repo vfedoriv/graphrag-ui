@@ -76,6 +76,8 @@ describe('schemas page', () => {
 
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
+    expect(await screen.findByRole('button', { name: 'Update' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Activate' }))
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

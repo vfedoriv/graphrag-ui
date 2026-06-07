@@ -66,6 +66,11 @@ export type CreateSchemaRequest = {
   sourceType?: SchemaSourceType
 }
 
+export type UpdateSchemaRequest = {
+  content: string
+  sourceType?: SchemaSourceType
+}
+
 export type ValidateSchemaRequest = {
   content: string
 }
