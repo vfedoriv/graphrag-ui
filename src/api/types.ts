@@ -177,3 +177,57 @@ export type QueryAskResponse = {
   generatedQuery: GeneratedQueryResponse
   execution: QueryExecutionResponse
 }
+
+export type HybridSearchRequest = {
+  query: string
+  topK?: number
+  graphDepth?: number
+  includeChunkText?: boolean
+}
+
+export type HybridSearchSource = {
+  documentId: string
+  filename?: string | null
+  contentType?: string | null
+  metadata?: Record<string, unknown>
+}
+
+export type HybridSearchGraphEntity = {
+  id: string
+  type?: string | null
+  labels?: string[]
+  properties: Record<string, unknown>
+}
+
+export type HybridSearchGraphRelationship = {
+  id: string
+  type: string
+  startEntityId: string
+  endEntityId: string
+  properties: Record<string, unknown>
+}
+
+export type HybridSearchGraphContext = {
+  entities: HybridSearchGraphEntity[]
+  relationships: HybridSearchGraphRelationship[]
+}
+
+export type HybridSearchHit = {
+  chunkId: string
+  documentId: string
+  chunkIndex: number
+  score: number
+  text?: string | null
+  source: HybridSearchSource
+  graphContext: HybridSearchGraphContext
+}
+
+export type HybridSearchResponse = {
+  query: string
+  topK: number
+  graphDepth: number
+  includeChunkText: boolean
+  hits: HybridSearchHit[]
+  hitCount: number
+  executionTimeMs: number
+}

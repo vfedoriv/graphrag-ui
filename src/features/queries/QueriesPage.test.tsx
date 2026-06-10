@@ -43,6 +43,16 @@ describe('queries page', () => {
     expect((paramsInput as HTMLTextAreaElement).value).toBe('{\n  "x": 1\n}')
   })
 
+  it('shows the hybrid search tab alongside existing query tabs', () => {
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(screen.getByTestId('queries-endpoint-tabs-tab-ask-query')).toHaveTextContent('Ask query')
+    expect(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search')).toHaveTextContent('Hybrid search')
+    expect(screen.getByTestId('queries-endpoint-tabs-tab-generate-cypher')).toHaveTextContent('Generate Cypher')
+    expect(screen.getByTestId('queries-endpoint-tabs-tab-validate-cypher')).toHaveTextContent('Validate Cypher')
+    expect(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher')).toHaveTextContent('Execute Cypher')
+  })
+
   it('shows pending indicator and prevents duplicate ask clicks while request is in flight', async () => {
     const user = userEvent.setup()
     let resolveAsk: ((value: ReturnType<typeof jsonResponse>) => void) | null = null
@@ -110,5 +120,53 @@ describe('queries page', () => {
 
     expect(within(executePanel).getByText('Cannot submit invalid JSON parameters.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks hybrid search while local option bounds are invalid', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch((url) => {
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
+    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
+
+    fireEvent.change(within(hybridPanel).getByLabelText('Hit limit'), { target: { value: '0' } })
+    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
+    expect(within(hybridPanel).getByText('Hybrid search options invalid')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('Hit limit must be at least 1.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    fireEvent.change(within(hybridPanel).getByLabelText('Hit limit'), { target: { value: '3' } })
+    fireEvent.change(within(hybridPanel).getByLabelText('Graph depth'), { target: { value: '-1' } })
+    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
+    expect(within(hybridPanel).getByText('Graph depth must be 0 or greater.')).toBeInTheDocument()
+    expect((within(hybridPanel).getByLabelText('Graph depth') as HTMLInputElement).value).toBe('-1')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('shows hybrid search failure feedback without clearing inputs', async () => {
+    const user = userEvent.setup()
+    stubFetch((url) => {
+      if (url.endsWith('/queries/hybrid-search')) {
+        return jsonResponse(500, { detail: 'Hybrid backend unavailable' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
+    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
+    await user.type(within(hybridPanel).getByLabelText('Search query'), 'find graph evidence')
+    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
+
+    await waitFor(() => {
+      expect(within(hybridPanel).getByText('Hybrid search failed')).toBeInTheDocument()
+      expect(within(hybridPanel).getByText('Hybrid backend unavailable')).toBeInTheDocument()
+    })
+    expect((within(hybridPanel).getByLabelText('Search query') as HTMLTextAreaElement).value).toBe('find graph evidence')
   })
 })

@@ -2,6 +2,8 @@ import { useMutation } from '@tanstack/react-query'
 import { apiFetch, toJsonBody } from './client'
 import type {
   GeneratedQueryResponse,
+  HybridSearchRequest,
+  HybridSearchResponse,
   QueryAskResponse,
   QueryExecutionResponse,
   QueryGenerateRequest,
@@ -30,6 +32,11 @@ export const queriesApi = {
       method: 'POST',
       body: toJsonBody(payload),
     }),
+  hybridSearch: (knowledgeBaseId: string, payload: HybridSearchRequest) =>
+    apiFetch<HybridSearchResponse>(`/knowledge-bases/${knowledgeBaseId}/queries/hybrid-search`, {
+      method: 'POST',
+      body: toJsonBody(payload),
+    }),
 }
 
 export const useGenerateQueryMutation = () => useMutation({ mutationFn: ({ knowledgeBaseId, prompt }: { knowledgeBaseId: string; prompt: string }) => queriesApi.generate(knowledgeBaseId, { prompt }) })
@@ -39,3 +46,5 @@ export const useValidateQueryMutation = () => useMutation({ mutationFn: ({ knowl
 export const useExecuteQueryMutation = () => useMutation({ mutationFn: ({ knowledgeBaseId, payload }: { knowledgeBaseId: string; payload: QueryValidateRequest }) => queriesApi.execute(knowledgeBaseId, payload) })
 
 export const useAskQueryMutation = () => useMutation({ mutationFn: ({ knowledgeBaseId, prompt }: { knowledgeBaseId: string; prompt: string }) => queriesApi.ask(knowledgeBaseId, { prompt }) })
+
+export const useHybridSearchMutation = () => useMutation({ mutationFn: ({ knowledgeBaseId, payload }: { knowledgeBaseId: string; payload: HybridSearchRequest }) => queriesApi.hybridSearch(knowledgeBaseId, payload) })
