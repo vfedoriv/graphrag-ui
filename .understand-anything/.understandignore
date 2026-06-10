@@ -1,0 +1,7 @@
+# .understandignore - patterns for files/dirs to exclude from analysis
+node_modules/
+.git/
+dist/
+coverage/
+playwright-report/
+test-results/
