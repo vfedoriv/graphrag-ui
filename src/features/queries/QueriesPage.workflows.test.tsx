@@ -206,4 +206,114 @@ describe('queries workflows', () => {
     expect(within(hybridPanel).getByText('The search completed but returned no ranked chunk evidence.')).toBeInTheDocument()
     expect(within(hybridPanel).getByText('No')).toBeInTheDocument()
   })
+
+  it('renders hybrid search hits when graph context is omitted', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/queries/hybrid-search')) {
+        return jsonResponse(200, {
+          query: 'without graph',
+          topK: 1,
+          graphDepth: 1,
+          includeChunkText: false,
+          hitCount: 1,
+          executionTimeMs: 6,
+          hits: [
+            {
+              chunkId: 'chunk-no-graph',
+              documentId: 'doc-no-graph',
+              chunkIndex: 0,
+              score: 0.73,
+              source: {
+                documentId: 'doc-no-graph',
+                metadata: {},
+              },
+            },
+          ],
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
+    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
+    await user.type(within(hybridPanel).getByLabelText('Search query'), 'without graph')
+    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
+
+    expect(await within(hybridPanel).findByText('Rank 1: chunk-no-graph')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('No graph entities returned for this hit.')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('No graph relationships returned for this hit.')).toBeInTheDocument()
+  })
+
+  it('renders hybrid search graph and source fields from backend response shape', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/queries/hybrid-search')) {
+        return jsonResponse(200, {
+          query: 'used grease content',
+          topK: 5,
+          graphDepth: 2,
+          includeChunkText: true,
+          hitCount: 1,
+          executionTimeMs: 8,
+          hits: [
+            {
+              chunkId: 'chunk-backend',
+              documentId: 'doc-backend',
+              chunkIndex: 4,
+              score: 0.729,
+              text: 'backend chunk text',
+              source: {
+                documentId: 'doc-backend',
+                originalFilename: 'manual.pdf',
+                contentType: 'application/pdf',
+                sizeBytes: 8713682,
+                chunkMetadata: '{"source":"manual.pdf"}',
+              },
+              graph: {
+                entities: [
+                  {
+                    elementId: '4:backend:162',
+                    labels: ['PartNumber'],
+                    properties: {
+                      category: 'Side plate kit',
+                      confidence: 0.9,
+                    },
+                  },
+                  {
+                    elementId: '4:backend:98',
+                    labels: ['Model'],
+                    properties: {
+                      confidence: 0.9,
+                    },
+                  },
+                ],
+                relationships: [],
+              },
+            },
+          ],
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
+    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
+    await user.type(within(hybridPanel).getByLabelText('Search query'), 'used grease content')
+    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
+
+    expect(await within(hybridPanel).findByText('Rank 1: chunk-backend')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('manual.pdf')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('8713682 bytes')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('4:backend:162')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('PartNumber')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('4:backend:98')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('Model')).toBeInTheDocument()
+    expect(within(hybridPanel).getByText(/Side plate kit/)).toBeInTheDocument()
+    expect(within(hybridPanel).getByText('No graph relationships returned for this hit.')).toBeInTheDocument()
+  })
 })

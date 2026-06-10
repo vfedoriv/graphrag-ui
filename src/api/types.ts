@@ -188,22 +188,29 @@ export type HybridSearchRequest = {
 export type HybridSearchSource = {
   documentId: string
   filename?: string | null
+  originalFilename?: string | null
   contentType?: string | null
+  sizeBytes?: number | null
   metadata?: Record<string, unknown>
+  chunkMetadata?: string | Record<string, unknown> | null
 }
 
 export type HybridSearchGraphEntity = {
-  id: string
+  id?: string
+  elementId?: string
   type?: string | null
   labels?: string[]
   properties: Record<string, unknown>
 }
 
 export type HybridSearchGraphRelationship = {
-  id: string
+  id?: string
+  elementId?: string
   type: string
-  startEntityId: string
-  endEntityId: string
+  startEntityId?: string
+  endEntityId?: string
+  startElementId?: string
+  endElementId?: string
   properties: Record<string, unknown>
 }
 
@@ -219,7 +226,8 @@ export type HybridSearchHit = {
   score: number
   text?: string | null
   source: HybridSearchSource
-  graphContext: HybridSearchGraphContext
+  graphContext?: HybridSearchGraphContext | null
+  graph?: HybridSearchGraphContext | null
 }
 
 export type HybridSearchResponse = {

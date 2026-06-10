@@ -24,8 +24,26 @@ function formatJson(value: unknown) {
   return JSON.stringify(value ?? {}, null, 2)
 }
 
+function entityIdentifier(entity: HybridSearchGraphEntity) {
+  return entity.id ?? entity.elementId ?? ''
+}
+
+function relationshipIdentifier(relationship: HybridSearchGraphRelationship) {
+  return relationship.id ?? relationship.elementId ?? ''
+}
+
+function relationshipStartIdentifier(relationship: HybridSearchGraphRelationship) {
+  return relationship.startEntityId ?? relationship.startElementId ?? ''
+}
+
+function relationshipEndIdentifier(relationship: HybridSearchGraphRelationship) {
+  return relationship.endEntityId ?? relationship.endElementId ?? ''
+}
+
 function renderSourceMetadata(hit: HybridSearchHit) {
   const source = hit.source
+  const filename = source.filename ?? source.originalFilename
+  const metadata = source.metadata ?? source.chunkMetadata
 
   return (
     <dl className='grid gap-2 text-sm sm:grid-cols-2'>
@@ -33,10 +51,10 @@ function renderSourceMetadata(hit: HybridSearchHit) {
         <dt className='font-semibold text-slate-800'>Source document</dt>
         <dd className='text-slate-700'>{source.documentId}</dd>
       </div>
-      {source.filename ? (
+      {filename ? (
         <div>
           <dt className='font-semibold text-slate-800'>Filename</dt>
-          <dd className='text-slate-700'>{source.filename}</dd>
+          <dd className='text-slate-700'>{filename}</dd>
         </div>
       ) : null}
       {source.contentType ? (
@@ -45,10 +63,16 @@ function renderSourceMetadata(hit: HybridSearchHit) {
           <dd className='text-slate-700'>{source.contentType}</dd>
         </div>
       ) : null}
+      {source.sizeBytes ? (
+        <div>
+          <dt className='font-semibold text-slate-800'>Size</dt>
+          <dd className='text-slate-700'>{source.sizeBytes} bytes</dd>
+        </div>
+      ) : null}
       <div className='sm:col-span-2'>
         <dt className='font-semibold text-slate-800'>Source metadata</dt>
         <dd>
-          <OutputPreview label='Source metadata JSON' format='json'>{formatJson(source.metadata)}</OutputPreview>
+          <OutputPreview label='Source metadata JSON' format='json'>{formatJson(metadata)}</OutputPreview>
         </dd>
       </div>
     </dl>
@@ -63,12 +87,12 @@ function renderEntities(entities: HybridSearchGraphEntity[]) {
   return (
     <Table
       headers={['Identifier', 'Type', 'Labels', 'Properties']}
-      rowKeys={entities.map((entity) => entity.id)}
+      rowKeys={entities.map((entity, index) => entityIdentifier(entity) || index)}
       rows={entities.map((entity) => [
-        entity.id,
+        entityIdentifier(entity),
         entity.type ?? '',
         entity.labels?.join(', ') ?? '',
-        <OutputPreview label={`Entity ${entity.id} properties JSON`} format='json'>{formatJson(entity.properties)}</OutputPreview>,
+        <OutputPreview label={`Entity ${entityIdentifier(entity)} properties JSON`} format='json'>{formatJson(entity.properties)}</OutputPreview>,
       ])}
     />
   )
@@ -82,16 +106,25 @@ function renderRelationships(relationships: HybridSearchGraphRelationship[]) {
   return (
     <Table
       headers={['Identifier', 'Type', 'Start', 'End', 'Properties']}
-      rowKeys={relationships.map((relationship) => relationship.id)}
+      rowKeys={relationships.map((relationship, index) => relationshipIdentifier(relationship) || index)}
       rows={relationships.map((relationship) => [
-        relationship.id,
+        relationshipIdentifier(relationship),
         relationship.type,
-        relationship.startEntityId,
-        relationship.endEntityId,
-        <OutputPreview label={`Relationship ${relationship.id} properties JSON`} format='json'>{formatJson(relationship.properties)}</OutputPreview>,
+        relationshipStartIdentifier(relationship),
+        relationshipEndIdentifier(relationship),
+        <OutputPreview label={`Relationship ${relationshipIdentifier(relationship)} properties JSON`} format='json'>{formatJson(relationship.properties)}</OutputPreview>,
       ])}
     />
   )
+}
+
+function getGraphContext(hit: HybridSearchHit) {
+  const graph = hit.graphContext ?? hit.graph
+
+  return {
+    entities: graph?.entities ?? [],
+    relationships: graph?.relationships ?? [],
+  }
 }
 
 export function QueriesPage() {
@@ -240,41 +273,45 @@ export function QueriesPage() {
                 <Alert title='No hybrid search hits' message='The search completed but returned no ranked chunk evidence.' tone='info' />
               ) : (
                 <div className='space-y-3'>
-                  {hybridSearch.data.hits.map((hit, index) => (
-                    <section key={hit.chunkId} className='rounded-md border border-slate-300 bg-white p-3'>
-                      <h3 className='text-sm font-semibold text-slate-900'>Rank {index + 1}: {hit.chunkId}</h3>
-                      <dl className='mt-3 grid gap-2 text-sm sm:grid-cols-4'>
-                        <div>
-                          <dt className='font-semibold text-slate-800'>Chunk id</dt>
-                          <dd className='text-slate-700'>{hit.chunkId}</dd>
+                  {hybridSearch.data.hits.map((hit, index) => {
+                    const graphContext = getGraphContext(hit)
+
+                    return (
+                      <section key={hit.chunkId} className='rounded-md border border-slate-300 bg-white p-3'>
+                        <h3 className='text-sm font-semibold text-slate-900'>Rank {index + 1}: {hit.chunkId}</h3>
+                        <dl className='mt-3 grid gap-2 text-sm sm:grid-cols-4'>
+                          <div>
+                            <dt className='font-semibold text-slate-800'>Chunk id</dt>
+                            <dd className='text-slate-700'>{hit.chunkId}</dd>
+                          </div>
+                          <div>
+                            <dt className='font-semibold text-slate-800'>Document id</dt>
+                            <dd className='text-slate-700'>{hit.documentId}</dd>
+                          </div>
+                          <div>
+                            <dt className='font-semibold text-slate-800'>Chunk index</dt>
+                            <dd className='text-slate-700'>{hit.chunkIndex}</dd>
+                          </div>
+                          <div>
+                            <dt className='font-semibold text-slate-800'>Score</dt>
+                            <dd className='text-slate-700'>{hit.score}</dd>
+                          </div>
+                        </dl>
+                        <div className='mt-3 space-y-3'>
+                          {renderSourceMetadata(hit)}
+                          {hit.text ? <OutputPreview label='Chunk text'>{hit.text}</OutputPreview> : null}
+                          <div className='space-y-2'>
+                            <h4 className='text-sm font-semibold text-slate-900'>Graph entities</h4>
+                            {renderEntities(graphContext.entities)}
+                          </div>
+                          <div className='space-y-2'>
+                            <h4 className='text-sm font-semibold text-slate-900'>Graph relationships</h4>
+                            {renderRelationships(graphContext.relationships)}
+                          </div>
                         </div>
-                        <div>
-                          <dt className='font-semibold text-slate-800'>Document id</dt>
-                          <dd className='text-slate-700'>{hit.documentId}</dd>
-                        </div>
-                        <div>
-                          <dt className='font-semibold text-slate-800'>Chunk index</dt>
-                          <dd className='text-slate-700'>{hit.chunkIndex}</dd>
-                        </div>
-                        <div>
-                          <dt className='font-semibold text-slate-800'>Score</dt>
-                          <dd className='text-slate-700'>{hit.score}</dd>
-                        </div>
-                      </dl>
-                      <div className='mt-3 space-y-3'>
-                        {renderSourceMetadata(hit)}
-                        {hit.text ? <OutputPreview label='Chunk text'>{hit.text}</OutputPreview> : null}
-                        <div className='space-y-2'>
-                          <h4 className='text-sm font-semibold text-slate-900'>Graph entities</h4>
-                          {renderEntities(hit.graphContext.entities)}
-                        </div>
-                        <div className='space-y-2'>
-                          <h4 className='text-sm font-semibold text-slate-900'>Graph relationships</h4>
-                          {renderRelationships(hit.graphContext.relationships)}
-                        </div>
-                      </div>
-                    </section>
-                  ))}
+                      </section>
+                    )
+                  })}
                 </div>
               )}
             </div>
