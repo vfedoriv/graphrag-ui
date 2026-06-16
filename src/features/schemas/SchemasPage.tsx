@@ -12,7 +12,7 @@ import {
   useUpdateSchemaMutation,
   useValidateSchemaMutation,
 } from '../../api/schemas'
-import { type Schema, type SchemaDetails, type SchemaSourceType } from '../../api/types'
+import { type Schema, type SchemaDetails, type SchemaGenerationWarning, type SchemaSourceType } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -360,6 +360,25 @@ function formatSchemaSourceTypeLabel(sourceType: string) {
   return isSupportedSchemaSourceType(sourceType) ? sourceType : `UNSUPPORTED (${sourceType})`
 }
 
+function SchemaGenerationWarnings({ warnings }: { warnings?: SchemaGenerationWarning[] }) {
+  if (!warnings || warnings.length === 0) return null
+
+  return (
+    <div className='rounded-md border border-amber-300 bg-amber-50 p-3'>
+      <h4 className='text-sm font-semibold text-amber-950'>Schema generation warnings</h4>
+      <ul className='mt-2 space-y-2 text-sm text-amber-950'>
+        {warnings.map((warning, index) => (
+          <li key={`${warning.code ?? 'warning'}-${index}`}>
+            {warning.code ? <span className='font-semibold'>{warning.code}: </span> : null}
+            <span>{warning.message}</span>
+            {warning.suggestion ? <span> Suggestion: {warning.suggestion}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (isPending: boolean) => void }) {
   const [text, setText] = useState('')
   const [userPrompt, setUserPrompt] = useState('')
@@ -459,6 +478,7 @@ function SchemaGenerateJsonFromText(
   const [text, setText] = useState('')
   const [example, setExample] = useState('')
   const [exampleFormatError, setExampleFormatError] = useState<string | null>(null)
+  const [warnings, setWarnings] = useState<SchemaGenerationWarning[]>([])
   const generateJson = useGenerateSchemaJsonMutation()
 
   useEffect(() => {
@@ -495,6 +515,7 @@ function SchemaGenerateJsonFromText(
             const res = await generateJson.mutateAsync({ name, version, text, example })
             onJsonReady(res.content)
             onOutputReady(res.content)
+            setWarnings(res.warnings ?? [])
           } catch {
             // surfaced via generateJson.error
           }
@@ -511,6 +532,7 @@ function SchemaGenerateJsonFromText(
         placeholder='Generated JSON response'
         disabled={generateJson.isPending}
       />
+      <SchemaGenerationWarnings warnings={warnings} />
       {generateJson.error && <Alert title='Generation failed' message={(generateJson.error as Error).message} />}
     </div>
   )
@@ -528,6 +550,7 @@ function SchemaGenerateJsonFromFile(
   const [example, setExample] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [exampleFormatError, setExampleFormatError] = useState<string | null>(null)
+  const [warnings, setWarnings] = useState<SchemaGenerationWarning[]>([])
   const generateJsonFromFile = useGenerateSchemaJsonFromFileMutation()
 
   useEffect(() => {
@@ -576,6 +599,7 @@ function SchemaGenerateJsonFromFile(
             const res = await generateJsonFromFile.mutateAsync({ name, version, example, file: selectedFile })
             onJsonReady(res.content)
             onOutputReady(res.content)
+            setWarnings(res.warnings ?? [])
           } catch {
             // surfaced via generateJsonFromFile.error
           }
@@ -592,6 +616,7 @@ function SchemaGenerateJsonFromFile(
         placeholder='Generated JSON response'
         disabled={generateJsonFromFile.isPending}
       />
+      <SchemaGenerationWarnings warnings={warnings} />
       {(error || generateJsonFromFile.error) && <Alert title='Generation failed' message={error ?? (generateJsonFromFile.error as Error).message} />}
     </div>
   )

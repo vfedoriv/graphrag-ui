@@ -1,10 +1,12 @@
+export type ProblemDetailErrors = Record<string, string[] | string> | string[]
+
 export type ProblemDetail = {
   type?: string
   title?: string
   status?: number
   detail?: string
   instance?: string
-  errors?: Record<string, string[]>
+  errors?: ProblemDetailErrors
   [key: string]: unknown
 }
 
@@ -12,18 +14,21 @@ export class ApiError extends Error {
   status: number
   title?: string
   fieldErrors?: Record<string, string[]>
+  details?: string[]
 
   constructor(params: {
     status: number
     message: string
     title?: string
     fieldErrors?: Record<string, string[]>
+    details?: string[]
   }) {
     super(params.message)
     this.name = 'ApiError'
     this.status = params.status
     this.title = params.title
     this.fieldErrors = params.fieldErrors
+    this.details = params.details
   }
 }
 
@@ -114,6 +119,14 @@ export type GenerateSchemaExampleFromFileRequest = {
 
 export type GenerateSchemaResponse = {
   content: string
+  warnings?: SchemaGenerationWarning[]
+}
+
+export type SchemaGenerationWarning = {
+  code?: string
+  message: string
+  suggestion?: string
+  [key: string]: unknown
 }
 
 export type DocumentUpload = {
@@ -187,31 +200,32 @@ export type HybridSearchRequest = {
 
 export type HybridSearchSource = {
   documentId: string
-  filename?: string | null
   originalFilename?: string | null
   contentType?: string | null
   sizeBytes?: number | null
-  metadata?: Record<string, unknown>
   chunkMetadata?: string | Record<string, unknown> | null
+  filename?: string | null
+  metadata?: Record<string, unknown>
 }
 
 export type HybridSearchGraphEntity = {
-  id?: string
   elementId?: string
-  type?: string | null
   labels?: string[]
   properties: Record<string, unknown>
+  id?: string
 }
 
 export type HybridSearchGraphRelationship = {
-  id?: string
   elementId?: string
   type: string
+  startNodeElementId?: string
+  endNodeElementId?: string
+  properties: Record<string, unknown>
+  id?: string
   startEntityId?: string
   endEntityId?: string
   startElementId?: string
   endElementId?: string
-  properties: Record<string, unknown>
 }
 
 export type HybridSearchGraphContext = {
@@ -226,8 +240,8 @@ export type HybridSearchHit = {
   score: number
   text?: string | null
   source: HybridSearchSource
-  graphContext?: HybridSearchGraphContext | null
   graph?: HybridSearchGraphContext | null
+  graphContext?: HybridSearchGraphContext | null
 }
 
 export type HybridSearchResponse = {

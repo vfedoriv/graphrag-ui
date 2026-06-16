@@ -54,16 +54,16 @@ describe('queries api', () => {
               text: 'chunk text',
               source: {
                 documentId: 'doc-1',
-                filename: 'source.pdf',
+                originalFilename: 'source.pdf',
                 contentType: 'application/pdf',
-                metadata: { page: 2 },
+                chunkMetadata: { page: 2 },
               },
-              graphContext: {
+              graph: {
                 entities: [
-                  { id: 'entity-1', type: 'Person', labels: ['Person'], properties: { name: 'Ada' } },
+                  { elementId: 'entity-1', labels: ['Person'], properties: { name: 'Ada' } },
                 ],
                 relationships: [
-                  { id: 'rel-1', type: 'MENTIONS', startEntityId: 'entity-1', endEntityId: 'entity-2', properties: { weight: 1 } },
+                  { elementId: 'rel-1', type: 'MENTIONS', startNodeElementId: 'entity-1', endNodeElementId: 'entity-2', properties: { weight: 1 } },
                 ],
               },
             },
@@ -92,9 +92,9 @@ describe('queries api', () => {
         }),
       }),
     )
-    expect(response.hits[0].source.metadata).toEqual({ page: 2 })
-    expect(response.hits[0].graphContext.entities[0].properties).toEqual({ name: 'Ada' })
-    expect(response.hits[0].graphContext.relationships[0].type).toBe('MENTIONS')
+    expect(response.hits[0].source.chunkMetadata).toEqual({ page: 2 })
+    expect(response.hits[0].graph?.entities[0].properties).toEqual({ name: 'Ada' })
+    expect(response.hits[0].graph?.relationships[0].startNodeElementId).toBe('entity-1')
   })
 
   it('propagates normalized API errors on failures', async () => {

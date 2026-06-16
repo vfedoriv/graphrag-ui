@@ -20,6 +20,28 @@ describe('api client', () => {
     expect(err.fieldErrors?.name[0]).toContain('must not be blank')
   })
 
+  it('normalizes string-valued problem detail field errors', () => {
+    const err = normalizeProblemDetail(400, {
+      title: 'Validation failed',
+      detail: 'Invalid request',
+      errors: { name: 'must not be blank' },
+    })
+
+    expect(err.fieldErrors).toEqual({ name: ['must not be blank'] })
+    expect(err.details).toBeUndefined()
+  })
+
+  it('preserves request-level problem detail error arrays', () => {
+    const err = normalizeProblemDetail(400, {
+      title: 'Validation failed',
+      detail: 'Invalid request',
+      errors: ['query is required', 'topK must be positive'],
+    })
+
+    expect(err.fieldErrors).toBeUndefined()
+    expect(err.details).toEqual(['query is required', 'topK must be positive'])
+  })
+
   it('sends multipart body without content-type override', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

@@ -64,10 +64,16 @@ describe('schemas workflows', () => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
       if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
-        return jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
+        return jsonResponse(200, {
+          content: '{"name":"generated-schema","version":1}',
+          warnings: [{ code: 'LOW_CONFIDENCE', message: 'Generated schema may need review.', suggestion: 'Check extracted fields.' }],
+        })
       }
       if (url.endsWith('/schemas/generate/from-file') && init?.method === 'POST') {
-        return jsonResponse(200, { content: '{"name":"generated-schema","version":1}' })
+        return jsonResponse(200, {
+          content: '{"name":"generated-schema","version":1}',
+          warnings: [{ code: 'FILE_TRUNCATED', message: 'Only part of the file was used.' }],
+        })
       }
       if (url.endsWith('/schemas/schema-1')) {
         getByIdCount += 1
@@ -94,6 +100,9 @@ describe('schemas workflows', () => {
     await waitFor(() => {
       expect(within(generateJsonPanel).getByLabelText('Mock structured JSON data')).toHaveValue('{\n  "name": "generated-schema",\n  "version": 1\n}')
     })
+    expect(within(generateJsonPanel).getByText('Schema generation warnings')).toBeInTheDocument()
+    expect(within(generateJsonPanel).getByText(/LOW_CONFIDENCE/)).toBeInTheDocument()
+    expect(within(generateJsonPanel).getByText(/Check extracted fields/)).toBeInTheDocument()
 
     await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
     const generateJsonFilePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-json-file')
@@ -103,6 +112,8 @@ describe('schemas workflows', () => {
     await waitFor(() => {
       expect(within(generateJsonFilePanel).getByLabelText('Mock structured JSON data')).toHaveValue('{\n  "name": "generated-schema",\n  "version": 1\n}')
     })
+    expect(within(generateJsonFilePanel).getByText('Schema generation warnings')).toBeInTheDocument()
+    expect(within(generateJsonFilePanel).getByText(/FILE_TRUNCATED/)).toBeInTheDocument()
 
     await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-get-schema-by-id'))
     const getByIdPanel = screen.getByTestId('schemas-endpoint-tabs-panel-get-schema-by-id')

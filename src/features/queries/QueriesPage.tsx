@@ -33,11 +33,11 @@ function relationshipIdentifier(relationship: HybridSearchGraphRelationship) {
 }
 
 function relationshipStartIdentifier(relationship: HybridSearchGraphRelationship) {
-  return relationship.startEntityId ?? relationship.startElementId ?? ''
+  return relationship.startNodeElementId ?? relationship.startEntityId ?? relationship.startElementId ?? ''
 }
 
 function relationshipEndIdentifier(relationship: HybridSearchGraphRelationship) {
-  return relationship.endEntityId ?? relationship.endElementId ?? ''
+  return relationship.endNodeElementId ?? relationship.endEntityId ?? relationship.endElementId ?? ''
 }
 
 function renderSourceMetadata(hit: HybridSearchHit) {
@@ -86,11 +86,10 @@ function renderEntities(entities: HybridSearchGraphEntity[]) {
 
   return (
     <Table
-      headers={['Identifier', 'Type', 'Labels', 'Properties']}
+      headers={['Identifier', 'Labels', 'Properties']}
       rowKeys={entities.map((entity, index) => entityIdentifier(entity) || index)}
       rows={entities.map((entity) => [
         entityIdentifier(entity),
-        entity.type ?? '',
         entity.labels?.join(', ') ?? '',
         <OutputPreview label={`Entity ${entityIdentifier(entity)} properties JSON`} format='json'>{formatJson(entity.properties)}</OutputPreview>,
       ])}
@@ -119,7 +118,7 @@ function renderRelationships(relationships: HybridSearchGraphRelationship[]) {
 }
 
 function getGraphContext(hit: HybridSearchHit) {
-  const graph = hit.graphContext ?? hit.graph
+  const graph = hit.graph ?? hit.graphContext
 
   return {
     entities: graph?.entities ?? [],

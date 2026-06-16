@@ -2,15 +2,36 @@ import { ApiError, type ProblemDetail } from './types'
 
 const API_BASE = '/api/v1'
 
+function normalizeErrors(errors: ProblemDetail['errors']): { fieldErrors?: Record<string, string[]>, details?: string[] } {
+  if (!errors) return {}
+
+  if (Array.isArray(errors)) {
+    return { details: errors.map(String) }
+  }
+
+  if (typeof errors !== 'object') return {}
+
+  const fieldErrors: Record<string, string[]> = {}
+  for (const [field, value] of Object.entries(errors)) {
+    if (Array.isArray(value)) {
+      fieldErrors[field] = value.map(String)
+    } else if (typeof value === 'string') {
+      fieldErrors[field] = [value]
+    }
+  }
+
+  return Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}
+}
+
 export function normalizeProblemDetail(status: number, problem: ProblemDetail | null): ApiError {
+  const { fieldErrors, details } = normalizeErrors(problem?.errors)
+
   return new ApiError({
     status,
     title: problem?.title ? String(problem.title) : undefined,
     message: (problem?.detail ? String(problem.detail) : problem?.title ? String(problem.title) : 'Request failed'),
-    fieldErrors:
-      problem?.errors && typeof problem.errors === 'object'
-        ? (problem.errors as Record<string, string[]>)
-        : undefined,
+    fieldErrors,
+    details,
   })
 }
 

@@ -80,16 +80,16 @@ describe('queries workflows', () => {
               text: 'Hybrid chunk evidence text',
               source: {
                 documentId: 'doc-3',
-                filename: 'evidence.md',
+                originalFilename: 'evidence.md',
                 contentType: 'text/markdown',
-                metadata: { section: 'intro' },
+                chunkMetadata: { section: 'intro' },
               },
-              graphContext: {
+              graph: {
                 entities: [
-                  { id: 'entity-a', type: 'Concept', labels: ['Concept', 'Topic'], properties: { name: 'GraphRAG' } },
+                  { elementId: 'entity-a', labels: ['Concept', 'Topic'], properties: { name: 'GraphRAG' } },
                 ],
                 relationships: [
-                  { id: 'rel-a', type: 'RELATED_TO', startEntityId: 'entity-a', endEntityId: 'entity-b', properties: { confidence: 0.7 } },
+                  { elementId: 'rel-a', type: 'RELATED_TO', startNodeElementId: 'entity-a', endNodeElementId: 'entity-b', properties: { confidence: 0.7 } },
                 ],
               },
             },
@@ -137,6 +137,7 @@ describe('queries workflows', () => {
     expect(within(hybridPanel).getByText('Concept, Topic')).toBeInTheDocument()
     expect(within(hybridPanel).getByText('rel-a')).toBeInTheDocument()
     expect(within(hybridPanel).getByText('RELATED_TO')).toBeInTheDocument()
+    expect(within(hybridPanel).getAllByText('entity-b').length).toBeGreaterThan(0)
   })
 
   it('shows hybrid search pending state and disables endpoint tab switching', async () => {
