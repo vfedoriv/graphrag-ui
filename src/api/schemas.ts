@@ -119,8 +119,13 @@ export function useValidateSchemaMutation() {
 export function useCreateSchemaMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: schemasApi.create,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schemas() }),
+    mutationFn: ({ payload }: { payload: CreateSchemaRequest; knowledgeBaseId?: string | null }) => schemasApi.create(payload),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemas() })
+      if (vars.knowledgeBaseId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.schemasByKnowledgeBase(vars.knowledgeBaseId) })
+      }
+    },
   })
 }
 

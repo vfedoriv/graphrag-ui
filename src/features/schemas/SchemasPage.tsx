@@ -306,7 +306,15 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             placeholder='Paste JSON schema content'
             disabled={createMutation.isPending}
           />
-          <Button type='button' className='bg-emerald-700' isPending={createMutation.isPending} pendingText='Creating...' onClick={() => createMutation.mutate({ content: schemaJson, sourceType: 'PREDEFINED' })}>Create</Button>
+          <Button
+            type='button'
+            className='bg-emerald-700'
+            isPending={createMutation.isPending}
+            pendingText='Creating...'
+            onClick={() => createMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { content: schemaJson, sourceType: 'PREDEFINED' } })}
+          >
+            Create
+          </Button>
           {createMutation.error && <Alert title='Create failed' message={(createMutation.error as Error).message} />}
         </div>
       ),

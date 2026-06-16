@@ -104,7 +104,7 @@ describe('schemas api', () => {
     )
 
     const { result: createResult } = renderHook(() => useCreateSchemaMutation(), { wrapper })
-    await createResult.current.mutateAsync({ content: 'x' })
+    await createResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', payload: { content: 'x' } })
 
     const { result: activateResult } = renderHook(() => useActivateSchemaMutation(), { wrapper })
     await activateResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', schemaId: 'schema-1' })
@@ -116,6 +116,7 @@ describe('schemas api', () => {
     await deleteResult.current.mutateAsync({ knowledgeBaseId: 'kb-a', schemaId: 'schema-1' })
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'knowledge-base', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schemas', 'knowledge-base', 'kb-a'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['knowledge-bases'] })

@@ -58,6 +58,92 @@ describe('schemas workflows', () => {
     })
   })
 
+  it('refreshes the selected knowledge base schema list after creating a schema', async () => {
+    let createCompleted = false
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(
+          200,
+          createCompleted
+            ? [
+                {
+                  id: 'created-schema',
+                  name: 'generated-schema-7',
+                  version: 1,
+                  sourceType: 'PREDEFINED',
+                  format: 'JSON',
+                  contentHash: 'hash',
+                  status: 'INACTIVE',
+                  createdAt: '2026-06-16T18:35:41Z',
+                },
+              ]
+            : [],
+        )
+      }
+      if (url.endsWith('/schemas') && init?.method === 'POST') {
+        createCompleted = true
+        return jsonResponse(200, { id: 'created-schema' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('No Schemas for selected knowledge base')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-create-schema'))
+    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    fireEvent.change(within(createPanel).getByLabelText('Mock structured JSON data'), {
+      target: { value: '{"name":"generated-schema-7","version":1}' },
+    })
+    await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
+
+    expect(await screen.findByText('generated-schema-7')).toBeInTheDocument()
+    expect(screen.getByText('created-schema')).toBeInTheDocument()
+
+    const createCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/api/v1/schemas') && (init as RequestInit | undefined)?.method === 'POST',
+    )
+    const createPayload = JSON.parse(String((createCall?.[1] as RequestInit | undefined)?.body)) as {
+      content: string
+      sourceType: string
+    }
+    expect(JSON.parse(createPayload.content)).toEqual({ name: 'generated-schema-7', version: 1 })
+    expect(createPayload).toEqual({
+      content: expect.any(String),
+      sourceType: 'PREDEFINED',
+    })
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/knowledge-bases/kb-a/schemas')).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('shows create conflict errors without reporting success', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/schemas') && init?.method === 'POST') {
+        return jsonResponse(409, { detail: 'Schema version is immutable and already exists for name=generated-schema-7, version=1' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-create-schema'))
+    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    fireEvent.change(within(createPanel).getByLabelText('Mock structured JSON data'), {
+      target: { value: '{"name":"generated-schema-7","version":1}' },
+    })
+    await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
+
+    expect(await within(createPanel).findByText('Create failed')).toBeInTheDocument()
+    expect(
+      within(createPanel).getByText('Schema version is immutable and already exists for name=generated-schema-7, version=1'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('generated-schema-7')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/knowledge-bases/kb-a/schemas')).length).toBe(1)
+  })
+
   it('shows response outputs for schema JSON generation tabs and replaces get-by-id output with latest response', async () => {
     let getByIdCount = 0
     stubFetch((url, init) => {
