@@ -108,11 +108,13 @@ describe('schemas workflows', () => {
     const createPayload = JSON.parse(String((createCall?.[1] as RequestInit | undefined)?.body)) as {
       content: string
       sourceType: string
+      knowledgeBaseId: string
     }
     expect(JSON.parse(createPayload.content)).toEqual({ name: 'generated-schema-7', version: 1 })
     expect(createPayload).toEqual({
       content: expect.any(String),
       sourceType: 'PREDEFINED',
+      knowledgeBaseId: 'kb-a',
     })
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/knowledge-bases/kb-a/schemas')).length).toBeGreaterThanOrEqual(2)
   })

@@ -40,7 +40,7 @@ describe('schemas api', () => {
     await schemasApi.listForKnowledgeBase('kb-a')
     await schemasApi.get('abc')
     await schemasApi.validate({ content: 'x' })
-    await schemasApi.create({ content: 'x' })
+    await schemasApi.create({ content: 'x', sourceType: 'PREDEFINED', knowledgeBaseId: 'kb-a' })
     await schemasApi.update('abc', { content: '{"name":"updated"}', sourceType: 'PREDEFINED' })
     await schemasApi.delete('abc')
     await schemasApi.generateExample({ text: 'input' })
@@ -64,6 +64,16 @@ describe('schemas api', () => {
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/schemas/generate/from-file'))).toBe(true)
     expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/schemas/sc-1/activate'))).toBe(true)
+
+    const createCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/api/v1/schemas') && (init as RequestInit | undefined)?.method === 'POST',
+    )
+    expect(createCall?.[1]).toEqual(expect.objectContaining({ method: 'POST' }))
+    expect(JSON.parse(String((createCall?.[1] as RequestInit | undefined)?.body))).toEqual({
+      content: 'x',
+      sourceType: 'PREDEFINED',
+      knowledgeBaseId: 'kb-a',
+    })
 
     const updateCall = fetchMock.mock.calls.find(
       ([url, init]) => String(url).endsWith('/api/v1/schemas/abc') && (init as RequestInit | undefined)?.method === 'PUT',

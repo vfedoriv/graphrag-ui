@@ -69,6 +69,7 @@ export type SchemaDetails = Schema & {
 export type CreateSchemaRequest = {
   content: string
   sourceType?: SchemaSourceType
+  knowledgeBaseId?: string
 }
 
 export type UpdateSchemaRequest = {

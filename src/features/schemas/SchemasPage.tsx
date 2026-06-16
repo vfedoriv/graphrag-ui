@@ -311,7 +311,16 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             className='bg-emerald-700'
             isPending={createMutation.isPending}
             pendingText='Creating...'
-            onClick={() => createMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, payload: { content: schemaJson, sourceType: 'PREDEFINED' } })}
+            onClick={() =>
+              createMutation.mutate({
+                knowledgeBaseId: selectedKnowledgeBaseId,
+                payload: {
+                  content: schemaJson,
+                  sourceType: 'PREDEFINED',
+                  ...(selectedKnowledgeBaseId ? { knowledgeBaseId: selectedKnowledgeBaseId } : {}),
+                },
+              })
+            }
           >
             Create
           </Button>

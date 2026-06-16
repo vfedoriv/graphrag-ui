@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemasPage } from './SchemasPage'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
@@ -137,6 +137,50 @@ describe('schemas page', () => {
     expect(within(createPanel).getByRole('button', { name: 'Tree View' })).toBeInTheDocument()
     expect(within(createPanel).getByRole('button', { name: 'Raw View' })).toBeInTheDocument()
     expect(within(createPanel).getByTestId('visual-json-editor')).toBeInTheDocument()
+  })
+
+  it('includes selected knowledge base id when creating a schema', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
+        return jsonResponse(200, [])
+      }
+      if (url === '/api/v1/schemas' && init?.method === 'POST') {
+        return jsonResponse(200, {
+          id: 'schema-a',
+          name: 'Schema A',
+          version: 1,
+          sourceType: 'PREDEFINED',
+          format: 'JSON',
+          contentHash: 'hash',
+          status: 'INACTIVE',
+          createdAt: '2026-01-01T00:00:00Z',
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-create-schema'))
+    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(within(createPanel).getByRole('button', { name: 'Raw View' }))
+    fireEvent.change(within(createPanel).getByLabelText('Schema JSON content'), {
+      target: { value: '{"name":"Schema A","version":1}' },
+    })
+    await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(
+        ([url, init]) => String(url) === '/api/v1/schemas' && (init as RequestInit | undefined)?.method === 'POST',
+      )
+      expect(createCall).toBeDefined()
+      expect(JSON.parse(String((createCall?.[1] as RequestInit | undefined)?.body))).toEqual({
+        content: '{"name":"Schema A","version":1}',
+        sourceType: 'PREDEFINED',
+        knowledgeBaseId: 'kb-a',
+      })
+    })
   })
 
   it('renders schema tabs in required workflow order', async () => {
