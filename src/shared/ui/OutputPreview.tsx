@@ -8,12 +8,14 @@ type OutputPreviewProps = {
 
 export function OutputPreview({ label, children, format = 'plain' }: OutputPreviewProps) {
   return (
-    <div className='min-w-0 space-y-1'>
-      <p className='text-sm font-medium text-slate-700'>{label}</p>
-      {format !== 'plain' ? <p className='text-xs uppercase tracking-wide text-slate-500'>Format: {format.toUpperCase()}</p> : null}
+    <div className='stack'>
+      <div>
+        <p className='field-label'>{label}</p>
+        {format !== 'plain' ? <p className='eyebrow'>Format: {format.toUpperCase()}</p> : null}
+      </div>
       <pre
         data-testid='output-preview-content'
-        className='block max-h-72 w-full min-w-0 max-w-full overflow-x-auto overflow-y-auto whitespace-pre rounded-md border border-slate-300 bg-white p-3 font-mono text-xs'
+        className='output'
       >
         {children}
       </pre>

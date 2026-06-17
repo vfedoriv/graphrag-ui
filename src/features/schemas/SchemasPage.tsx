@@ -23,7 +23,9 @@ import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
+import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
 import { SchemaJsonEditor } from '../../shared/ui/SchemaJsonEditor'
+import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
@@ -152,14 +154,18 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
         <Table
           headers={['Name', 'Version', 'Source Type', 'Status', 'Actions']}
           rowKeys={data.map((schema) => schema.id)}
+          rowClassNames={data.map((schema) => (schema.status === 'ACTIVE' ? 'is-selected' : ''))}
           rows={data.map((schema) => [
-            schema.name,
+            <div>
+              <strong>{schema.name}</strong>
+            </div>,
             String(schema.version),
-            formatSchemaSourceTypeLabel(schema.sourceType),
-            schema.status,
-            <div className='flex min-w-80 flex-wrap justify-end gap-2'>
+            <StatusBadge label={formatSchemaSourceTypeLabel(schema.sourceType)} tone={isSupportedSchemaSourceType(schema.sourceType) ? 'neutral' : 'warning'} />,
+            <StatusBadge label={schema.status} tone={schema.status === 'ACTIVE' ? 'success' : 'neutral'} />,
+            <div className='toolbar'>
               <Button
                 type='button'
+                variant='ghost'
                 disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
                 isPending={activateMutation.isPending && activeActivateSchemaId === schema.id}
                 pendingText='Activating...'
@@ -169,7 +175,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               </Button>
               <Button
                 type='button'
-                className='bg-slate-700'
+                variant='ghost'
                 isPending={getSchemaMutation.isPending && getSchemaMutation.variables === schema.id}
                 pendingText='Loading...'
                 onClick={() => {
@@ -180,7 +186,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               </Button>
               <Button
                 type='button'
-                className='bg-slate-700'
+                variant='ghost'
                 isPending={getSchemaForUpdateMutation.isPending && getSchemaForUpdateMutation.variables === schema.id}
                 pendingText='Loading...'
                 onClick={() => {
@@ -191,7 +197,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               </Button>
               <Button
                 type='button'
-                className='bg-red-700'
+                variant='danger'
                 isPending={deleteMutation.isPending && activeDeleteSchemaId === schema.id}
                 pendingText='Deleting...'
                 onClick={() => {
@@ -205,10 +211,10 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
         />
       )}
       {(schemaDetailsOutput || getSchemaMutation.error || getSchemaMutation.isPending) && (
-        <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
+        <div className='flow-card'>
           <div>
-            <h3 className='text-sm font-semibold text-slate-900'>Schema details</h3>
-            {schemaDetailsLabel && <p className='text-sm text-slate-600'>{schemaDetailsLabel}</p>}
+            <h3>Schema details</h3>
+            {schemaDetailsLabel && <p>{schemaDetailsLabel}</p>}
           </div>
           <FieldLabel htmlFor='schema-row-details-output'>Schema details JSON</FieldLabel>
           <Textarea
@@ -222,10 +228,10 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
         </div>
       )}
       {editingSchema && (
-        <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
+        <div className='flow-card'>
           <div>
-            <h3 className='text-sm font-semibold text-slate-900'>Update schema</h3>
-            <p className='text-sm text-slate-600'>
+            <h3>Update schema</h3>
+            <p>
               {editingSchema.name} v{editingSchema.version} ({editingSchema.id})
             </p>
           </div>
@@ -238,15 +244,15 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             placeholder='Schema JSON content'
             disabled={updateMutation.isPending}
           />
-          <div className='flex flex-wrap gap-2'>
-            <Button type='button' className='bg-emerald-700' isPending={updateMutation.isPending} pendingText='Saving...' onClick={() => void saveUpdate()}>
+          <div className='toolbar'>
+            <Button type='button' variant='primary' isPending={updateMutation.isPending} pendingText='Saving...' onClick={() => void saveUpdate()}>
               Save
             </Button>
-            <Button type='button' className='bg-white text-slate-900' disabled={updateMutation.isPending} onClick={cancelUpdate}>
+            <Button type='button' disabled={updateMutation.isPending} onClick={cancelUpdate}>
               Cancel
             </Button>
           </div>
-          {updateSuccess && <p className='text-sm text-emerald-700'>{updateSuccess}</p>}
+          {updateSuccess && <StatusBadge label={updateSuccess} tone='success' />}
           {updateMutation.error && <Alert title='Update failed' message={(updateMutation.error as Error).message} />}
         </div>
       )}
@@ -259,7 +265,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       {!selectedKnowledgeBaseId && <Alert title='No knowledge base selected' message='Activation requires selecting a knowledge base in the header or KB page.' tone='info' />}
       {activateMutation.error && <Alert title='Activate failed' message={(activateMutation.error as Error).message} />}
       {getSchemaForUpdateMutation.error && <Alert title='Load schema for update failed' message={(getSchemaForUpdateMutation.error as Error).message} />}
-      {deleteSuccess && <p className='text-sm text-emerald-700'>{deleteSuccess}</p>}
+      {deleteSuccess && <StatusBadge label={deleteSuccess} tone='success' />}
       {deleteMutation.error && <Alert title='Delete failed' message={`Schema ${deleteTargetLabel}: ${(deleteMutation.error as Error).message}`} />}
       {isAnyPending ? <ProgressBanner message='Waiting for schema workflow response...' /> : null}
     </>
@@ -294,7 +300,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       id: 'schema-validation',
       label: 'Schema validation',
       content: (
-        <div className='space-y-2' data-testid='schema-validation-section'>
+        <div className='stack' data-testid='schema-validation-section'>
           <FieldLabel htmlFor='validate-schema-json-input'>Schema JSON content</FieldLabel>
           <SchemaJsonEditor
             id='validate-schema-json-input'
@@ -306,6 +312,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
           />
           <Button
             type='button'
+            variant='primary'
             isPending={validateMutation.isPending}
             pendingText='Validating...'
             onClick={() => validateMutation.mutate({ content: schemaJson })}
@@ -313,7 +320,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             Validate schema JSON
           </Button>
           {validateMutation.error && <Alert title='Validate failed' message={(validateMutation.error as Error).message} />}
-          {validateMutation.data && (validateMutation.data.errors.length === 0 ? <p className='text-sm text-emerald-700'>Schema is valid.</p> : <Alert title='Schema validation errors' message={validateMutation.data.errors.join('; ')} />)}
+          {validateMutation.data && (validateMutation.data.errors.length === 0 ? <StatusBadge label='Schema is valid.' tone='success' /> : <Alert title='Schema validation errors' message={validateMutation.data.errors.join('; ')} />)}
         </div>
       ),
     },
@@ -321,7 +328,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       id: 'schema-creation',
       label: 'Schema creation',
       content: (
-        <div className='space-y-2' data-testid='schema-creation-section'>
+        <div className='stack' data-testid='schema-creation-section'>
           <FieldLabel htmlFor='create-schema-json'>Schema JSON content</FieldLabel>
           <SchemaJsonEditor
             id='create-schema-json'
@@ -333,7 +340,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
           />
           <Button
             type='button'
-            className='bg-emerald-700'
+            variant='primary'
             isPending={createMutation.isPending}
             pendingText='Creating...'
             onClick={() =>
@@ -358,9 +365,38 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
   return (
     <ControllerPage
       title='Schemas'
+      eyebrow='Schema control plane'
+      description='Manage the active schema for the selected workspace, then generate examples, draft schema JSON, validate payloads, or create a schema without losing scope.'
+      workspaceStrip={
+        <WorkspaceStrip
+          items={[
+            { label: 'Workspace', value: selectedKnowledgeBaseId ?? 'None selected' },
+            { label: 'Schemas', value: String(data.length) },
+            { label: 'Active schema', value: data.find((schema) => schema.status === 'ACTIVE')?.name ?? 'None active', tone: data.some((schema) => schema.status === 'ACTIVE') ? 'success' : 'warning' },
+          ]}
+        />
+      }
       topSectionTitle='Schemas list'
+      topSectionDescription='Readable metadata first; lifecycle controls stay attached to each schema row.'
+      topSectionStatus={<StatusBadge label={data.some((schema) => schema.status === 'ACTIVE') ? 'Active schema present' : 'No active schema'} tone={data.some((schema) => schema.status === 'ACTIVE') ? 'success' : 'warning'} />}
       topSection={topSection}
-      tabs={<EndpointTabs tabs={workflowTabs} testId='schemas-purpose-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />}
+      tabs={
+        <div className='stack'>
+          <OperationSpine
+            className='schema-spine'
+            ariaLabel='Schema operating model'
+            items={[
+              { eyebrow: 'Active schema', title: data.find((schema) => schema.status === 'ACTIVE')?.name ?? 'None active', body: 'Used by document and query workflows.' },
+              { eyebrow: 'Schema register', title: `${data.length} schemas`, body: 'View, edit, activate, or delete workspace-scoped schemas.' },
+              { eyebrow: 'Draft policy', title: 'Editable before create', body: 'Generated and validated JSON remains reviewable before persistence.' },
+              { eyebrow: 'Input sources', title: 'Text or file', body: 'Generation flows support typed examples and multipart upload.' },
+            ]}
+          />
+          <EndpointTabs tabs={workflowTabs} testId='schemas-purpose-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />
+        </div>
+      }
+      tabsTitle='Purpose workflow console'
+      tabsDescription='Four schema paths stay separate so generated examples do not look like persisted schemas.'
       testId='schemas-controller-page'
     />
   )
@@ -376,21 +412,20 @@ function SourceModeSelector({
   name: string
 }) {
   return (
-    <fieldset className='space-y-2'>
-      <legend className='text-sm font-medium text-slate-700'>Source</legend>
-      <div className='flex flex-wrap gap-3'>
+    <fieldset className='stack'>
+      <legend className='field-label'>Source</legend>
+      <div className='toolbar'>
         {[
           ['text', 'From text'],
           ['file', 'From file'],
         ].map(([optionValue, label]) => (
-          <label key={optionValue} className='inline-flex items-center gap-2 text-sm text-slate-700'>
+          <label key={optionValue} className='check-row'>
             <input
               type='radio'
               name={name}
               value={optionValue}
               checked={value === optionValue}
               onChange={() => onChange(optionValue as 'text' | 'file')}
-              className='h-4 w-4 accent-emerald-700'
             />
             {label}
           </label>
@@ -412,9 +447,9 @@ function SchemaGenerationWarnings({ warnings }: { warnings?: SchemaGenerationWar
   if (!warnings || warnings.length === 0) return null
 
   return (
-    <div className='rounded-md border border-amber-300 bg-amber-50 p-3'>
-      <h4 className='text-sm font-semibold text-amber-950'>Schema generation warnings</h4>
-      <ul className='mt-2 space-y-2 text-sm text-amber-950'>
+    <div className='notice warning'>
+      <h4>Schema generation warnings</h4>
+      <ul className='stack'>
         {warnings.map((warning, index) => (
           <li key={`${warning.code ?? 'warning'}-${index}`}>
             {warning.code ? <span className='font-semibold'>{warning.code}: </span> : null}
@@ -431,14 +466,14 @@ function SchemaExampleGenerationWorkflow({ onPendingChange }: { onPendingChange:
   const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text')
 
   return (
-    <div className='min-w-0 space-y-3' data-testid='schema-example-generation-section'>
+    <div className='stack' data-testid='schema-example-generation-section'>
       <SourceModeSelector value={sourceMode} onChange={setSourceMode} name='schema-example-source-mode' />
       {sourceMode === 'text' ? (
-        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-example-text'>
+        <div className='flow-card' data-testid='schemas-workflow-generate-schema-example-text'>
           <SchemaGenerateExampleFromText onPendingChange={onPendingChange} />
         </div>
       ) : (
-        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-example-file'>
+        <div className='flow-card' data-testid='schemas-workflow-generate-schema-example-file'>
           <SchemaGenerateExampleFromFile onPendingChange={onPendingChange} />
         </div>
       )}
@@ -460,10 +495,10 @@ function SchemaJsonGenerationWorkflow(
   const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text')
 
   return (
-    <div className='min-w-0 space-y-3' data-testid='schema-json-generation-section'>
+    <div className='stack' data-testid='schema-json-generation-section'>
       <SourceModeSelector value={sourceMode} onChange={setSourceMode} name='schema-json-source-mode' />
       {sourceMode === 'text' ? (
-        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-json'>
+        <div className='flow-card' data-testid='schemas-workflow-generate-schema-json'>
           <SchemaGenerateJsonFromText
             onJsonReady={onTextOutputReady}
             output={textOutput}
@@ -472,7 +507,7 @@ function SchemaJsonGenerationWorkflow(
           />
         </div>
       ) : (
-        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-json-file'>
+        <div className='flow-card' data-testid='schemas-workflow-generate-schema-json-file'>
           <SchemaGenerateJsonFromFile
             onJsonReady={onFileOutputReady}
             output={fileOutput}
@@ -496,7 +531,7 @@ function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (
   }, [generateExample.isPending, onPendingChange])
 
   return (
-    <div className='space-y-2'>
+    <div className='stack'>
       {generateExample.isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
       <FieldLabel htmlFor='generate-example-text-source'>Source text</FieldLabel>
       <Textarea id='generate-example-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
@@ -504,6 +539,7 @@ function SchemaGenerateExampleFromText({ onPendingChange }: { onPendingChange: (
       <Textarea id='generate-example-text-guidance' rows={3} value={userPrompt} onChange={(e) => setUserPrompt(e.target.value)} placeholder='Optional generation guidance' />
       <Button
         type='button'
+        variant='primary'
         isPending={generateExample.isPending}
         pendingText='Generating...'
         onClick={async () => {
@@ -536,7 +572,7 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
   }, [generateExampleFromFile.isPending, onPendingChange])
 
   return (
-    <div className='space-y-2'>
+    <div className='stack'>
       {generateExampleFromFile.isPending ? <ProgressBanner message='Waiting for schema example generation...' /> : null}
       <FileSelectButton
         buttonLabel='Select source file'
@@ -546,9 +582,10 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
           setSelectedFilename(file.name)
         }}
       />
-      {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
+      {selectedFilename && <p>Selected file: {selectedFilename}</p>}
       <Button
         type='button'
+        variant='primary'
         isPending={generateExampleFromFile.isPending}
         pendingText='Generating...'
         onClick={async () => {
@@ -592,12 +629,12 @@ function SchemaGenerateJsonFromText(
   }, [generateJson.isPending, onPendingChange])
 
   return (
-    <div className='space-y-2'>
+    <div className='stack'>
       {generateJson.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-text-name'>Schema name</FieldLabel>
-      <Input id='generate-json-text-name' className='max-w-full sm:max-w-sm' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <Input id='generate-json-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-text-version'>Schema version</FieldLabel>
-      <Input id='generate-json-text-version' className='max-w-full sm:max-w-32' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <Input id='generate-json-text-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FieldLabel htmlFor='generate-json-text-source'>Source text</FieldLabel>
       <Textarea id='generate-json-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
       <FieldLabel htmlFor='generate-json-text-example'>Schema example JSON</FieldLabel>
@@ -613,7 +650,7 @@ function SchemaGenerateJsonFromText(
       />
       <Button
         type='button'
-        className='bg-emerald-700'
+        variant='primary'
         isPending={generateJson.isPending}
         pendingText='Generating...'
         onClick={async () => {
@@ -664,12 +701,12 @@ function SchemaGenerateJsonFromFile(
   }, [generateJsonFromFile.isPending, onPendingChange])
 
   return (
-    <div className='space-y-2'>
+    <div className='stack'>
       {generateJsonFromFile.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-file-name'>Schema name</FieldLabel>
-      <Input id='generate-json-file-name' className='max-w-full sm:max-w-sm' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <Input id='generate-json-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-file-version'>Schema version</FieldLabel>
-      <Input id='generate-json-file-version' className='max-w-full sm:max-w-32' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <Input id='generate-json-file-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FileSelectButton
         buttonLabel='Select source text file'
         testId='schemas-json-file-select'
@@ -678,7 +715,7 @@ function SchemaGenerateJsonFromFile(
           setSelectedFilename(file.name)
         }}
       />
-      {selectedFilename && <p className='text-sm text-slate-600'>Selected file: {selectedFilename}</p>}
+      {selectedFilename && <p>Selected file: {selectedFilename}</p>}
       <FieldLabel htmlFor='generate-json-file-example'>Schema example JSON</FieldLabel>
       <StructuredPayloadEditor
         id='generate-json-file-example'
@@ -692,7 +729,7 @@ function SchemaGenerateJsonFromFile(
       />
       <Button
         type='button'
-        className='bg-emerald-700'
+        variant='primary'
         isPending={generateJsonFromFile.isPending}
         pendingText='Generating...'
         onClick={async () => {

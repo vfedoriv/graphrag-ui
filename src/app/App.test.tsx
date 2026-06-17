@@ -62,7 +62,7 @@ describe('app shell', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('KB A (kb-a)', { selector: 'p' })).toBeInTheDocument()
+    expect((await screen.findAllByText('KB A (kb-a)')).length).toBeGreaterThan(0)
     expect(localStorage.getItem('graphrag.selectedKnowledgeBase')).toBe('kb-a')
   })
 

@@ -36,7 +36,7 @@ describe('documents workflows', () => {
     await user.click(await screen.findByRole('button', { name: 'View chunks' }))
 
     expect(await screen.findByText(/Selected document: doc-1/i)).toBeInTheDocument()
-    expect(await screen.findByTestId('document-chunks-readable-view')).toHaveClass('overflow-y-auto')
+    expect(await screen.findByTestId('document-chunks-readable-view')).toHaveClass('stack')
     expect(screen.getByRole('button', { name: 'Readable view' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Chunk 0')).toBeInTheDocument()
     expect(screen.getByText('Source')).toBeInTheDocument()

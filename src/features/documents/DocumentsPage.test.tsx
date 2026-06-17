@@ -182,8 +182,7 @@ describe('documents page', () => {
 
     await user.click(screen.getByRole('button', { name: 'Raw JSON' }))
     expect(screen.getByRole('button', { name: 'Raw JSON' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-x-auto')
-    expect(screen.getByTestId('output-preview-content')).toHaveClass('overflow-y-auto')
+    expect(screen.getByTestId('output-preview-content')).toHaveClass('output')
     expect(screen.getByTestId('output-preview-content')).toHaveTextContent('"text": "raw mode text"')
 
     await user.click(screen.getByRole('button', { name: 'Readable view' }))

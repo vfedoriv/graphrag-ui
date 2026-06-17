@@ -9,7 +9,7 @@ type FieldLabelProps = {
 
 export function FieldLabel({ htmlFor, children, className }: FieldLabelProps) {
   return (
-    <label htmlFor={htmlFor} className={cn('block text-sm font-medium text-slate-700', className)}>
+    <label htmlFor={htmlFor} className={cn('field-label', className)}>
       {children}
     </label>
   )

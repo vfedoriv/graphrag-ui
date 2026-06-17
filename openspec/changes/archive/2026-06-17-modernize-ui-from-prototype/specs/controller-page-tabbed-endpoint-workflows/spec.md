@@ -1,8 +1,4 @@
-## Purpose
-
-This specification defines required controller-page workflow structure, including tabbed endpoint workflows and explicit field labeling.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Controller pages provide top context plus endpoint tabs
 The system SHALL render controller pages with prototype-aligned page headers, workspace status strips, panels, and top context/list sections, and MAY omit endpoint tabs when the controller workflow is better represented with direct inline sections. Standalone fields and outputs in workflow sections SHALL include explicit purpose labels. The Documents page SHALL omit endpoint tabs and present upload plus action-driven document operations inline. The Schemas page SHALL omit endpoint tabs and present schema operations as purpose-based workflow tabs beneath the schema list. Controller pages that retain endpoint tabs SHALL use prototype-aligned tab and output styling.
@@ -45,19 +41,3 @@ The system SHALL display visible prototype-aligned progress feedback in the work
 - **WHEN** a controller workflow action triggers a backend request that has not completed
 - **THEN** the page SHALL show an in-context progress indicator until completion or failure
 - **AND** the triggering action SHALL expose a pending state that matches the shared prototype-aligned button treatment
-
-### Requirement: Queries controller includes hybrid search endpoint tab
-The system SHALL expose hybrid search as a dedicated endpoint workflow tab on the Queries controller page.
-
-#### Scenario: Queries tabs include hybrid search
-- **WHEN** a user opens the Queries controller page with a selected knowledge base
-- **THEN** the tab list SHALL include a Hybrid search tab alongside the existing Ask query, Generate Cypher, Validate Cypher, and Execute Cypher tabs
-
-#### Scenario: Hybrid search request is in flight
-- **WHEN** a hybrid search request has not completed
-- **THEN** the Queries controller page SHALL show the same in-context request progress treatment used by other query endpoint workflows
-- **AND** endpoint tab switching SHALL be disabled while the request is pending
-
-#### Scenario: Existing query endpoint tabs remain available
-- **WHEN** the Hybrid search tab is added
-- **THEN** the existing Ask query, Generate Cypher, Validate Cypher, and Execute Cypher endpoint tabs SHALL remain available from the Queries controller page

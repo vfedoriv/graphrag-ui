@@ -4,20 +4,26 @@ import { cn } from '../lib/cn'
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   isPending?: boolean
   pendingText?: string
+  variant?: 'standard' | 'primary' | 'danger' | 'ghost'
 }
 
-export function Button({ className, isPending = false, pendingText = 'Working...', disabled, children, ...props }: ButtonProps) {
+export function Button({
+  className,
+  isPending = false,
+  pendingText = 'Working...',
+  disabled,
+  children,
+  variant = 'standard',
+  ...props
+}: ButtonProps) {
   return (
     <button
       disabled={disabled || isPending}
       aria-busy={isPending}
+      data-pending={isPending ? 'true' : undefined}
       className={cn(
-        'rounded-md border border-slate-300 bg-slate-900 px-3 py-2 text-sm font-semibold text-white',
-        'transition duration-150 ease-out',
-        'hover:brightness-110 hover:shadow-sm',
-        'active:translate-y-px active:scale-[0.99]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-1',
-        'disabled:pointer-events-none disabled:opacity-60 disabled:shadow-none',
+        'button',
+        variant !== 'standard' && variant,
         className,
       )}
       {...props}

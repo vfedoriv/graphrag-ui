@@ -33,7 +33,7 @@ export function FileSelectButton({
   }
 
   return (
-    <div className='space-y-2'>
+    <div className='file-picker'>
       <input
         id={inputId}
         ref={inputRef}
@@ -43,9 +43,11 @@ export function FileSelectButton({
         className='sr-only'
         data-testid={testId ? `${testId}-input` : undefined}
       />
+      <span>{buttonLabel}</span>
       <Button
         type='button'
         className={className}
+        variant='standard'
         disabled={disabled}
         isPending={isPending}
         pendingText={pendingText}

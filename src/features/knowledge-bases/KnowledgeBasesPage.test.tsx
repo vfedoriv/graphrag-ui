@@ -34,6 +34,36 @@ describe('knowledge bases page', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/knowledge-bases', expect.anything()))
   })
 
+  it('shows active schema name instead of schema id', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases' && !init?.method) {
+        return jsonResponse(200, [
+          { id: 'kb-a', name: 'KB A', activeSchemaId: 'schema-a', createdAt: '2026-01-01T00:00:00Z' },
+        ])
+      }
+      if (url === '/api/v1/schemas' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Claim event',
+            version: 3,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'ACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('Claim event')).toBeInTheDocument()
+    expect(screen.queryByText('schema-a')).not.toBeInTheDocument()
+  })
+
   it('shows update error alert when inline rename fails', async () => {
     const user = userEvent.setup()
     stubFetch((url, init) => {
@@ -153,11 +183,11 @@ describe('knowledge bases page', () => {
 
     renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    expect(await screen.findByText('Yes')).toBeInTheDocument()
+    expect(await screen.findByText('Selected', { selector: 'span' })).toBeInTheDocument()
     await user.click((await screen.findAllByRole('button', { name: 'Delete' }))[0])
 
     await waitFor(() => {
-      expect(screen.queryByText('Yes')).not.toBeInTheDocument()
+      expect(screen.queryByText('Selected', { selector: 'span' })).not.toBeInTheDocument()
       expect(screen.queryByLabelText('name-kb-a')).not.toBeInTheDocument()
     })
   })

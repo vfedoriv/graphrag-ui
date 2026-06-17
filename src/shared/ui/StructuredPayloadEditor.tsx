@@ -33,10 +33,10 @@ export function StructuredPayloadEditor({
   }
 
   return (
-    <div className='space-y-2'>
-      <div className='flex items-center justify-between gap-3'>
-        <p className='text-xs font-medium uppercase tracking-wide text-slate-600'>Expected format: {formatLabel}</p>
-        <Button type='button' className='bg-slate-700 px-2 py-1 text-xs' onClick={formatValue}>
+    <div className='stack'>
+      <div className='split-stack'>
+        <p className='eyebrow'>Expected format: {formatLabel}</p>
+        <Button type='button' variant='ghost' onClick={formatValue}>
           Format {formatLabel}
         </Button>
       </div>
@@ -49,9 +49,9 @@ export function StructuredPayloadEditor({
             onErrorChange?.(null)
           }
         }}
-        className='font-mono text-xs'
+        className='mono'
       />
-      {error ? <p className='text-xs text-rose-700'>{error}</p> : null}
+      {error ? <p className='text-xs text-red-700'>{error}</p> : null}
     </div>
   )
 }

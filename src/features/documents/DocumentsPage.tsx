@@ -16,6 +16,8 @@ import { EmptyState } from '../../shared/ui/EmptyState'
 import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
+import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
+import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { Table } from '../../shared/ui/Table'
 import { isCompletedOrSuccessfullyProcessed, isDocumentProcessingStatus } from './documentStatus'
 
@@ -206,8 +208,11 @@ export function DocumentsPage() {
     <Table
       headers={['Filename', 'Status', 'Source path', 'Error', 'Actions']}
       rows={documents.map((doc) => [
-        doc.originalFilename,
-        doc.status,
+        <div>
+          <strong>{doc.originalFilename}</strong>
+          <small>{doc.sizeBytes} bytes</small>
+        </div>,
+        <StatusBadge label={doc.status} tone={isDocumentProcessingStatus(doc.status) ? 'warning' : doc.status === 'COMPLETED' ? 'success' : 'neutral'} />,
         <DocumentSourceContext
           doc={doc}
           wasCopied={copiedPathDocumentId === doc.id}
@@ -217,7 +222,7 @@ export function DocumentsPage() {
             void handleCopyPath(doc)
           }}
         />,
-        doc.errorMessage ?? '-',
+        doc.errorMessage ? <span className='text-red-700'>{doc.errorMessage}</span> : '-',
         <DocumentRowActions
           isProcessing={processingDocumentIds.has(doc.id) || isDocumentProcessingStatus(doc.status)}
           isLoadingChunks={chunksQuery.isLoading && selectedDocumentId === doc.id}
@@ -246,12 +251,36 @@ export function DocumentsPage() {
   return (
     <ControllerPage
       title='Documents'
-      topSectionTitle='Documents list'
+      eyebrow='Inline workflow'
+      description='Upload, process, inspect chunks, open source context, replace, and delete documents without endpoint tabs.'
+      workspaceStrip={
+        <WorkspaceStrip
+          items={[
+            { label: 'Workspace', value: selectedKnowledgeBaseId },
+            { label: 'Documents', value: String(documents.length) },
+          ]}
+        />
+      }
+      topSectionTitle='Document intake and operations'
+      topSectionDescription='Multipart upload and row actions are scoped to the selected knowledge base.'
+      topSectionStatus={<StatusBadge label={`${documents.length} documents`} tone='neutral' />}
       topSection={
-        <div className='space-y-4'>
+        <div className='stack-lg'>
+          <OperationSpine
+            ariaLabel='Document workflow status'
+            items={[
+              { eyebrow: 'Workspace', title: selectedKnowledgeBaseId, body: 'Uploads and list queries use this knowledge-base scope.' },
+              { eyebrow: 'Upload', title: uploadMutation.isPending ? 'Uploading' : 'Ready', body: 'Files are submitted as multipart requests.' },
+              { eyebrow: 'Processing', title: hasBackendProcessingDocument ? 'Active' : 'Idle', body: 'Processing rows stay locked while backend work is active.' },
+              { eyebrow: 'Inspection', title: selectedDocumentId ?? 'No document selected', body: 'Choose a row to load chunks.' },
+            ]}
+          />
           {isAnyPending ? <ProgressBanner message='Waiting for document workflow response...' /> : null}
-          <section className='space-y-2'>
-            <h3 className='text-sm font-semibold uppercase tracking-wide text-slate-700'>Upload document</h3>
+          <section className='stack'>
+            <div>
+              <span className='eyebrow'>Upload document</span>
+              <h3>Select and upload file</h3>
+            </div>
             <FileSelectButton
               buttonLabel='Select file to upload'
               testId='documents-upload-select-file'
@@ -260,7 +289,7 @@ export function DocumentsPage() {
                 uploadMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, file })
               }}
             />
-            {selectedUploadFilename ? <p className='text-sm text-slate-600'>Selected file: {selectedUploadFilename}</p> : null}
+            {selectedUploadFilename ? <p>Selected file: {selectedUploadFilename}</p> : null}
             {uploadMutation.error ? <Alert title='Upload failed' message={(uploadMutation.error as Error).message} /> : null}
             {processErrorMessage ? <Alert title='Process failed' message={processErrorMessage} /> : null}
             {openSuccessMessage ? <Alert title='Open requested' message={openSuccessMessage} tone='success' /> : null}
@@ -269,13 +298,16 @@ export function DocumentsPage() {
             {deleteMutation.error ? <Alert title='Delete failed' message={(deleteMutation.error as Error).message} /> : null}
           </section>
           {topSection}
-          <section className='space-y-2'>
-            <h3 className='text-sm font-semibold uppercase tracking-wide text-slate-700'>Inspect document chunks</h3>
+          <section className='stack'>
+            <div>
+              <span className='eyebrow'>Inspect document chunks</span>
+              <h3>Chunk inspector</h3>
+            </div>
             {selectedDocumentId ? (
               <>
-                <p className='text-sm text-slate-600'>Selected document: {selectedDocumentId}</p>
+                <p>Selected document: {selectedDocumentId}</p>
                 {chunksQuery.isLoading ? (
-                  <p className='text-sm text-slate-600'>Loading chunks...</p>
+                  <p>Loading chunks...</p>
                 ) : chunksQuery.error ? (
                   <Alert title='Load chunks failed' message={(chunksQuery.error as Error).message} />
                 ) : (
@@ -283,7 +315,7 @@ export function DocumentsPage() {
                 )}
               </>
             ) : (
-              <p className='text-sm text-slate-700'>Choose a document in the table above and click View chunks.</p>
+              <p>Choose a document in the table above and click View chunks.</p>
             )}
           </section>
         </div>
@@ -315,20 +347,19 @@ function DocumentRowActions({
   replaceTestId: string
 }) {
   return (
-    <div className='grid w-[28rem] grid-cols-[7rem_7rem_9rem] gap-2'>
+    <div className='toolbar'>
       <Button
         type='button'
         isPending={isProcessing}
         pendingText='Processing...'
         onClick={onProcess}
-        className='w-full bg-slate-700'
+        variant='ghost'
       >
         Process
       </Button>
       <FileSelectButton
         buttonLabel='Replace'
         testId={replaceTestId}
-        className='w-full bg-amber-700'
         isPending={isReplacing}
         pendingText='Replacing...'
         disabled={isDeleting}
@@ -339,13 +370,13 @@ function DocumentRowActions({
         isPending={isLoadingChunks}
         pendingText='Loading...'
         onClick={onViewChunks}
-        className='w-full'
+        variant='ghost'
       >
         View chunks
       </Button>
       <Button
         type='button'
-        className='col-start-1 w-full bg-red-700'
+        variant='danger'
         isPending={isDeleting}
         pendingText='Deleting...'
         disabled={isReplacing}
@@ -374,12 +405,12 @@ function DocumentSourceContext({
   const hasActions = Boolean(openTarget || doc.localPath)
 
   return (
-    <div className='w-56'>
+    <div className='stack'>
       {hasActions ? (
-        <div className='grid grid-cols-2 gap-2'>
+        <div className='toolbar'>
           <Button
             type='button'
-            className='w-full bg-emerald-700 px-2 py-1.5 text-xs'
+            variant='ghost'
             isPending={isOpening}
             pendingText='Opening...'
             disabled={!openTarget}
@@ -391,7 +422,7 @@ function DocumentSourceContext({
           </Button>
           <Button
             type='button'
-            className='w-full bg-slate-600 px-2 py-1.5 text-xs'
+            variant='ghost'
             disabled={!doc.localPath}
             onClick={onCopy}
           >
@@ -399,7 +430,7 @@ function DocumentSourceContext({
           </Button>
         </div>
       ) : (
-        <span className='text-sm text-slate-500'>-</span>
+        <span className='muted'>-</span>
       )}
     </div>
   )
@@ -458,10 +489,10 @@ function DocumentChunksInspector({
   onModeChange: (mode: ChunkViewMode) => void
 }) {
   return (
-    <div className='space-y-3'>
-      <div className='flex flex-wrap items-center justify-between gap-3'>
-        <p className='text-sm font-medium text-slate-700'>Document chunks</p>
-        <div className='flex rounded-md border border-slate-300 bg-white p-1' aria-label='Document chunk view mode'>
+    <div className='stack'>
+      <div className='split-stack'>
+        <p className='field-label'>Document chunks</p>
+        <div className='view-toggle' aria-label='Document chunk view mode'>
           <ChunkModeButton isActive={mode === 'readable'} onClick={() => onModeChange('readable')}>
             Readable view
           </ChunkModeButton>
@@ -476,10 +507,10 @@ function DocumentChunksInspector({
       ) : (
         <div
           data-testid='document-chunks-readable-view'
-          className='max-h-96 space-y-3 overflow-y-auto rounded-md border border-slate-300 bg-slate-50 p-3'
+          className='stack'
         >
           {chunks.length === 0 ? (
-            <p className='text-sm text-slate-600'>No chunks returned for this document.</p>
+            <p>No chunks returned for this document.</p>
           ) : (
             chunks.map((chunk) => <DocumentChunkCard key={chunk.id} chunk={chunk} />)
           )}
@@ -503,9 +534,7 @@ function ChunkModeButton({
       type='button'
       aria-pressed={isActive}
       onClick={onClick}
-      className={`rounded px-3 py-1.5 text-sm font-semibold transition ${
-        isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
-      }`}
+      className={`tab ${isActive ? 'active' : ''}`}
     >
       {children}
     </button>
@@ -516,27 +545,25 @@ function DocumentChunkCard({ chunk }: { chunk: DocumentChunk }) {
   const source = getChunkSource(chunk.metadata)
 
   return (
-    <article className='space-y-3 rounded-md border border-slate-300 bg-white p-4 shadow-sm'>
-      <div className='flex flex-wrap items-start justify-between gap-3'>
+    <article className='flow-card'>
+      <div className='split-stack'>
         <div>
-          <h4 className='text-base font-semibold text-slate-900'>Chunk {chunk.chunkIndex}</h4>
-          <p className='break-all text-xs text-slate-500'>ID: {chunk.id}</p>
+          <h4>Chunk {chunk.chunkIndex}</h4>
+          <p className='break-anywhere'>ID: {chunk.id}</p>
         </div>
-        <div className='rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700'>
-          {chunk.tokenEstimate} tokens
-        </div>
+        <StatusBadge label={`${chunk.tokenEstimate} tokens`} tone='neutral' />
       </div>
 
       {source ? (
-        <dl className='grid gap-1 text-sm sm:grid-cols-[auto_1fr]'>
-          <dt className='font-semibold text-slate-700'>Source</dt>
-          <dd className='break-words text-slate-600'>{source}</dd>
+        <dl className='grid gap-1 sm:grid-cols-[auto_1fr]'>
+          <dt className='font-semibold'>Source</dt>
+          <dd className='break-anywhere muted'>{source}</dd>
         </dl>
       ) : null}
 
-      <div className='space-y-1'>
-        <p className='text-sm font-semibold text-slate-700'>Text</p>
-        <div className='max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-100'>
+      <div className='stack'>
+        <p className='field-label'>Text</p>
+        <div className='output compact'>
           {chunk.text}
         </div>
       </div>

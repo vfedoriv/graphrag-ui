@@ -16,6 +16,8 @@ import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { Input } from '../../shared/ui/Input'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
+import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
+import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
@@ -46,31 +48,31 @@ function renderSourceMetadata(hit: HybridSearchHit) {
   const metadata = source.metadata ?? source.chunkMetadata
 
   return (
-    <dl className='grid gap-2 text-sm sm:grid-cols-2'>
+    <dl className='grid two'>
       <div>
-        <dt className='font-semibold text-slate-800'>Source document</dt>
-        <dd className='text-slate-700'>{source.documentId}</dd>
+        <dt className='font-semibold'>Source document</dt>
+        <dd>{source.documentId}</dd>
       </div>
       {filename ? (
         <div>
-          <dt className='font-semibold text-slate-800'>Filename</dt>
-          <dd className='text-slate-700'>{filename}</dd>
+          <dt className='font-semibold'>Filename</dt>
+          <dd>{filename}</dd>
         </div>
       ) : null}
       {source.contentType ? (
         <div>
-          <dt className='font-semibold text-slate-800'>Content type</dt>
-          <dd className='text-slate-700'>{source.contentType}</dd>
+          <dt className='font-semibold'>Content type</dt>
+          <dd>{source.contentType}</dd>
         </div>
       ) : null}
       {source.sizeBytes ? (
         <div>
-          <dt className='font-semibold text-slate-800'>Size</dt>
-          <dd className='text-slate-700'>{source.sizeBytes} bytes</dd>
+          <dt className='font-semibold'>Size</dt>
+          <dd>{source.sizeBytes} bytes</dd>
         </div>
       ) : null}
-      <div className='sm:col-span-2'>
-        <dt className='font-semibold text-slate-800'>Source metadata</dt>
+      <div>
+        <dt className='font-semibold'>Source metadata</dt>
         <dd>
           <OutputPreview label='Source metadata JSON' format='json'>{formatJson(metadata)}</OutputPreview>
         </dd>
@@ -81,7 +83,7 @@ function renderSourceMetadata(hit: HybridSearchHit) {
 
 function renderEntities(entities: HybridSearchGraphEntity[]) {
   if (entities.length === 0) {
-    return <p className='text-sm text-slate-600'>No graph entities returned for this hit.</p>
+    return <p>No graph entities returned for this hit.</p>
   }
 
   return (
@@ -99,7 +101,7 @@ function renderEntities(entities: HybridSearchGraphEntity[]) {
 
 function renderRelationships(relationships: HybridSearchGraphRelationship[]) {
   if (relationships.length === 0) {
-    return <p className='text-sm text-slate-600'>No graph relationships returned for this hit.</p>
+    return <p>No graph relationships returned for this hit.</p>
   }
 
   return (
@@ -187,8 +189,17 @@ export function QueriesPage() {
   }
 
   const topSection = (
-    <div className='space-y-2'>
-      <p className='text-sm text-slate-700'>Use tabs below to run endpoint workflows for query generation, validation, execution, one-shot ask, and hybrid search.</p>
+    <div className='stack'>
+      <OperationSpine
+        ariaLabel='Query workflow status'
+        items={[
+          { eyebrow: 'Workspace', title: selectedKnowledgeBaseId, body: 'All query operations run against this knowledge base.' },
+          { eyebrow: 'Ask', title: ask.isPending ? 'Running' : 'Ready', body: 'One-shot natural language answer and evidence.' },
+          { eyebrow: 'Cypher', title: generate.isPending || validate.isPending || execute.isPending ? 'Active' : 'Ready', body: 'Generate, validate, and execute editable Cypher.' },
+          { eyebrow: 'Hybrid', title: hybridSearch.isPending ? 'Searching' : 'Ready', body: 'Vector hits with source and graph context.' },
+        ]}
+      />
+      <p>Use tabs below to run endpoint workflows for query generation, validation, execution, one-shot ask, and hybrid search.</p>
       {isAnyPending ? <ProgressBanner message='Waiting for backend query response...' /> : null}
     </div>
   )
@@ -198,10 +209,10 @@ export function QueriesPage() {
       id: 'ask-query',
       label: 'Ask query',
       content: (
-        <div className='space-y-2'>
+        <div className='stack'>
           <FieldLabel htmlFor='ask-query-prompt'>Question prompt</FieldLabel>
           <Textarea id='ask-query-prompt' rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
-          <Button type='button' className='bg-slate-700' isPending={ask.isPending} pendingText='Asking...' onClick={() => ask.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })}>Ask</Button>
+          <Button type='button' variant='primary' isPending={ask.isPending} pendingText='Asking...' onClick={() => ask.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, prompt })}>Ask</Button>
           {ask.error && <Alert title='Ask failed' message={(ask.error as Error).message} />}
           {ask.data && <OutputPreview label='Ask query result JSON' format='json'>{JSON.stringify(ask.data, null, 2)}</OutputPreview>}
         </div>
@@ -211,100 +222,99 @@ export function QueriesPage() {
       id: 'hybrid-search',
       label: 'Hybrid search',
       content: (
-        <div className='space-y-3'>
+        <div className='stack'>
           <FieldLabel htmlFor='hybrid-search-query'>Search query</FieldLabel>
           <Textarea id='hybrid-search-query' rows={3} value={hybridQuery} onChange={(e) => setHybridQuery(e.target.value)} placeholder='Search in natural language' />
-          <div className='grid gap-3 sm:grid-cols-2'>
-            <div className='space-y-2'>
+          <div className='grid two'>
+            <div className='stack'>
               <FieldLabel htmlFor='hybrid-search-top-k'>Hit limit</FieldLabel>
               <Input id='hybrid-search-top-k' type='number' min={1} value={hybridTopK} onChange={(e) => setHybridTopK(e.target.value)} />
             </div>
-            <div className='space-y-2'>
+            <div className='stack'>
               <FieldLabel htmlFor='hybrid-search-graph-depth'>Graph depth</FieldLabel>
               <Input id='hybrid-search-graph-depth' type='number' min={0} value={hybridGraphDepth} onChange={(e) => setHybridGraphDepth(e.target.value)} />
             </div>
           </div>
-          <label htmlFor='hybrid-search-include-text' className='flex items-center gap-2 text-sm font-medium text-slate-800'>
+          <label htmlFor='hybrid-search-include-text' className='check-row'>
             <input
               id='hybrid-search-include-text'
               type='checkbox'
               checked={hybridIncludeChunkText}
               onChange={(e) => setHybridIncludeChunkText(e.target.checked)}
-              className='h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500'
             />
             Include chunk text
           </label>
-          <Button type='button' className='bg-emerald-700' isPending={hybridSearch.isPending} pendingText='Searching...' onClick={submitHybridSearch}>Search</Button>
+          <Button type='button' variant='primary' isPending={hybridSearch.isPending} pendingText='Searching...' onClick={submitHybridSearch}>Search</Button>
           {hybridValidationError ? <Alert title='Hybrid search options invalid' message={hybridValidationError} /> : null}
           {hybridSearch.error ? <Alert title='Hybrid search failed' message={(hybridSearch.error as Error).message} /> : null}
           {hybridSearch.data ? (
-            <div className='space-y-4'>
-              <div className='rounded-md border border-slate-300 bg-white p-3'>
-                <h3 className='mb-3 text-sm font-semibold text-slate-900'>Hybrid search summary</h3>
-                <dl className='grid gap-2 text-sm sm:grid-cols-3'>
+            <div className='stack-lg'>
+              <div className='flow-card'>
+                <h3>Hybrid search summary</h3>
+                <dl className='grid three'>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Query</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.query}</dd>
+                    <dt className='font-semibold'>Query</dt>
+                    <dd>{hybridSearch.data.query}</dd>
                   </div>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Applied topK</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.topK}</dd>
+                    <dt className='font-semibold'>Applied topK</dt>
+                    <dd>{hybridSearch.data.topK}</dd>
                   </div>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Applied graphDepth</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.graphDepth}</dd>
+                    <dt className='font-semibold'>Applied graphDepth</dt>
+                    <dd>{hybridSearch.data.graphDepth}</dd>
                   </div>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Include chunk text</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.includeChunkText ? 'Yes' : 'No'}</dd>
+                    <dt className='font-semibold'>Include chunk text</dt>
+                    <dd>{hybridSearch.data.includeChunkText ? 'Yes' : 'No'}</dd>
                   </div>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Hit count</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.hitCount}</dd>
+                    <dt className='font-semibold'>Hit count</dt>
+                    <dd>{hybridSearch.data.hitCount}</dd>
                   </div>
                   <div>
-                    <dt className='font-semibold text-slate-800'>Execution time</dt>
-                    <dd className='text-slate-700'>{hybridSearch.data.executionTimeMs} ms</dd>
+                    <dt className='font-semibold'>Execution time</dt>
+                    <dd>{hybridSearch.data.executionTimeMs} ms</dd>
                   </div>
                 </dl>
               </div>
               {hybridSearch.data.hits.length === 0 ? (
                 <Alert title='No hybrid search hits' message='The search completed but returned no ranked chunk evidence.' tone='info' />
               ) : (
-                <div className='space-y-3'>
+                <div className='stack'>
                   {hybridSearch.data.hits.map((hit, index) => {
                     const graphContext = getGraphContext(hit)
 
                     return (
-                      <section key={hit.chunkId} className='rounded-md border border-slate-300 bg-white p-3'>
-                        <h3 className='text-sm font-semibold text-slate-900'>Rank {index + 1}: {hit.chunkId}</h3>
-                        <dl className='mt-3 grid gap-2 text-sm sm:grid-cols-4'>
+                      <section key={hit.chunkId} className='flow-card'>
+                        <h3>Rank {index + 1}: {hit.chunkId}</h3>
+                        <dl className='grid three'>
                           <div>
-                            <dt className='font-semibold text-slate-800'>Chunk id</dt>
-                            <dd className='text-slate-700'>{hit.chunkId}</dd>
+                            <dt className='font-semibold'>Chunk id</dt>
+                            <dd>{hit.chunkId}</dd>
                           </div>
                           <div>
-                            <dt className='font-semibold text-slate-800'>Document id</dt>
-                            <dd className='text-slate-700'>{hit.documentId}</dd>
+                            <dt className='font-semibold'>Document id</dt>
+                            <dd>{hit.documentId}</dd>
                           </div>
                           <div>
-                            <dt className='font-semibold text-slate-800'>Chunk index</dt>
-                            <dd className='text-slate-700'>{hit.chunkIndex}</dd>
+                            <dt className='font-semibold'>Chunk index</dt>
+                            <dd>{hit.chunkIndex}</dd>
                           </div>
                           <div>
-                            <dt className='font-semibold text-slate-800'>Score</dt>
-                            <dd className='text-slate-700'>{hit.score}</dd>
+                            <dt className='font-semibold'>Score</dt>
+                            <dd>{hit.score}</dd>
                           </div>
                         </dl>
-                        <div className='mt-3 space-y-3'>
+                        <div className='stack'>
                           {renderSourceMetadata(hit)}
                           {hit.text ? <OutputPreview label='Chunk text'>{hit.text}</OutputPreview> : null}
-                          <div className='space-y-2'>
-                            <h4 className='text-sm font-semibold text-slate-900'>Graph entities</h4>
+                          <div className='stack'>
+                            <h4>Graph entities</h4>
                             {renderEntities(graphContext.entities)}
                           </div>
-                          <div className='space-y-2'>
-                            <h4 className='text-sm font-semibold text-slate-900'>Graph relationships</h4>
+                          <div className='stack'>
+                            <h4>Graph relationships</h4>
                             {renderRelationships(graphContext.relationships)}
                           </div>
                         </div>
@@ -322,11 +332,12 @@ export function QueriesPage() {
       id: 'generate-cypher',
       label: 'Generate Cypher',
       content: (
-        <div className='space-y-2'>
+        <div className='stack'>
           <FieldLabel htmlFor='generate-cypher-prompt'>Question prompt</FieldLabel>
           <Textarea id='generate-cypher-prompt' rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='Ask in natural language' />
           <Button
             type='button'
+            variant='primary'
             isPending={generate.isPending}
             pendingText='Generating...'
             onClick={async () => {
@@ -362,7 +373,7 @@ export function QueriesPage() {
       id: 'validate-cypher',
       label: 'Validate Cypher',
       content: (
-        <div className='space-y-2'>
+        <div className='stack'>
           <FieldLabel htmlFor='validate-cypher-text'>Cypher query</FieldLabel>
           <Textarea id='validate-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
           <FieldLabel htmlFor='validate-cypher-params'>Query parameters JSON</FieldLabel>
@@ -378,6 +389,7 @@ export function QueriesPage() {
           />
           <Button
             type='button'
+            variant='primary'
             isPending={validate.isPending}
             pendingText='Validating...'
             onClick={() => {
@@ -397,7 +409,7 @@ export function QueriesPage() {
       id: 'execute-cypher',
       label: 'Execute Cypher',
       content: (
-        <div className='space-y-2'>
+        <div className='stack'>
           <FieldLabel htmlFor='execute-cypher-text'>Cypher query</FieldLabel>
           <Textarea id='execute-cypher-text' rows={6} value={cypher} onChange={(e) => setCypher(e.target.value)} placeholder='Cypher query' />
           <FieldLabel htmlFor='execute-cypher-params'>Query parameters JSON</FieldLabel>
@@ -413,7 +425,7 @@ export function QueriesPage() {
           />
           <Button
             type='button'
-            className='bg-emerald-700'
+            variant='primary'
             isPending={execute.isPending}
             pendingText='Executing...'
             onClick={() => {
@@ -435,13 +447,27 @@ export function QueriesPage() {
       ),
     },
   ]
+  const orderedTabs = [tabs[0], tabs[2], tabs[3], tabs[4], tabs[1]].filter(Boolean)
 
   return (
     <ControllerPage
       title='Queries'
+      eyebrow='Endpoint tabs'
+      description='Query workflows stay tabbed because each workflow maps to a distinct endpoint operation.'
+      workspaceStrip={
+        <WorkspaceStrip
+          items={[
+            { label: 'Workspace', value: selectedKnowledgeBaseId },
+            { label: 'Pending', value: isAnyPending ? 'Request running' : 'Idle', tone: isAnyPending ? 'warning' : 'neutral' },
+          ]}
+        />
+      }
       topSectionTitle='Query controller overview'
       topSection={topSection}
-      tabs={<EndpointTabs tabs={tabs} testId='queries-endpoint-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />}
+      tabs={<EndpointTabs tabs={orderedTabs} testId='queries-endpoint-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />}
+      tabsTitle='Endpoint workflow console'
+      tabsDescription='Ask, generate Cypher, validate Cypher, execute Cypher, and hybrid search remain separate request flows.'
+      tabsStatus={<StatusBadge label={isAnyPending ? 'Request running' : 'Idle'} tone={isAnyPending ? 'warning' : 'neutral'} />}
       testId='queries-controller-page'
     />
   )

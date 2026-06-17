@@ -1,10 +1,4 @@
-# interactive-button-state-feedback Specification
-
-## Purpose
-
-This specification defines required visual and accessibility feedback for interactive buttons and async action controls.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Buttons provide visible hover and press feedback
 The system SHALL render prototype-aligned visible visual feedback when users hover over and press interactive buttons, including bordered standard buttons, accent primary buttons, danger buttons, and compact ghost buttons.
