@@ -79,9 +79,16 @@ describe('schemas page', () => {
     const topSection = await screen.findByTestId('schemas-controller-page-top-section')
     expect(within(topSection).queryByRole('columnheader', { name: 'ID' })).not.toBeInTheDocument()
     expect(within(topSection).queryByText('schema-a')).not.toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Update' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Details' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    const updateButton = await screen.findByRole('button', { name: 'Update' })
+    const detailsButton = screen.getByRole('button', { name: 'Details' })
+    const deleteButton = screen.getByRole('button', { name: 'Delete' })
+    const activateButton = await screen.findByRole('button', { name: 'Activate' })
+    const rowActions = activateButton.closest('.schema-row-actions')
+    expect(rowActions).toHaveClass('row-actions')
+    for (const button of [activateButton, detailsButton, updateButton, deleteButton]) {
+      expect(button).toHaveClass('table-action-button')
+      expect(button).toHaveClass('schema-action-button')
+    }
     await user.click(await screen.findByRole('button', { name: 'Activate' }))
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

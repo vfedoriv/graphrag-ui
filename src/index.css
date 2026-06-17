@@ -500,6 +500,15 @@ textarea:focus-visible,
   min-height: 34px;
 }
 
+.schema-row-actions {
+  align-items: stretch;
+}
+
+.schema-action-button {
+  min-width: 92px;
+  min-height: 36px;
+}
+
 .row-edit-control {
   display: grid;
   min-width: 220px;

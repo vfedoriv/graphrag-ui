@@ -162,10 +162,11 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             String(schema.version),
             <StatusBadge label={formatSchemaSourceTypeLabel(schema.sourceType)} tone={isSupportedSchemaSourceType(schema.sourceType) ? 'neutral' : 'warning'} />,
             <StatusBadge label={schema.status} tone={schema.status === 'ACTIVE' ? 'success' : 'neutral'} />,
-            <div className='toolbar'>
+            <div className='row-actions schema-row-actions'>
               <Button
                 type='button'
                 variant='ghost'
+                className='table-action-button schema-action-button'
                 disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
                 isPending={activateMutation.isPending && activeActivateSchemaId === schema.id}
                 pendingText='Activating...'
@@ -176,6 +177,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               <Button
                 type='button'
                 variant='ghost'
+                className='table-action-button schema-action-button'
                 isPending={getSchemaMutation.isPending && getSchemaMutation.variables === schema.id}
                 pendingText='Loading...'
                 onClick={() => {
@@ -187,6 +189,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               <Button
                 type='button'
                 variant='ghost'
+                className='table-action-button schema-action-button'
                 isPending={getSchemaForUpdateMutation.isPending && getSchemaForUpdateMutation.variables === schema.id}
                 pendingText='Loading...'
                 onClick={() => {
@@ -198,6 +201,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
               <Button
                 type='button'
                 variant='danger'
+                className='table-action-button schema-action-button'
                 isPending={deleteMutation.isPending && activeDeleteSchemaId === schema.id}
                 pendingText='Deleting...'
                 onClick={() => {
