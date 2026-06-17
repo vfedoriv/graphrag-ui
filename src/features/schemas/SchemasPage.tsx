@@ -37,8 +37,8 @@ export function SchemasPage() {
 function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBaseId: string | null }) {
   const { data = [] } = useSchemasByKnowledgeBaseQuery(selectedKnowledgeBaseId)
   const [schemaJson, setSchemaJson] = useState('')
-  const [schemaId, setSchemaId] = useState('')
-  const [schemaByIdOutput, setSchemaByIdOutput] = useState('')
+  const [schemaDetailsLabel, setSchemaDetailsLabel] = useState('')
+  const [schemaDetailsOutput, setSchemaDetailsOutput] = useState('')
   const [generatedJsonOutput, setGeneratedJsonOutput] = useState('')
   const [generatedJsonFromFileOutput, setGeneratedJsonFromFileOutput] = useState('')
   const [editingSchema, setEditingSchema] = useState<SchemaDetails | null>(null)
@@ -66,6 +66,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
 
   const unsupportedSourceTypeSchemas = data.filter((schema) => !isSupportedSchemaSourceType(schema.sourceType))
   const activeDeleteSchemaId = deleteMutation.variables?.schemaId
+  const activeActivateSchemaId = activateMutation.variables?.schemaId
 
   const openUpdateEditor = async (schema: Schema) => {
     setUpdateSuccess('')
@@ -80,6 +81,19 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       setUpdateDraft(details.content)
     } catch {
       // surfaced via getSchemaForUpdateMutation.error
+    }
+  }
+
+  const loadSchemaDetails = async (schema: Schema) => {
+    const label = `${schema.name} v${schema.version}`
+    setSchemaDetailsLabel(label)
+    setSchemaDetailsOutput('')
+    getSchemaMutation.reset()
+    try {
+      const details = await getSchemaMutation.mutateAsync(schema.id)
+      setSchemaDetailsOutput(JSON.stringify(details, null, 2))
+    } catch {
+      // surfaced via getSchemaMutation.error
     }
   }
 
@@ -136,23 +150,33 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
         <EmptyState title='No Schemas for selected knowledge base' body='Create or generate one, then activate it for the selected knowledge base.' />
       ) : (
         <Table
-          headers={['ID', 'Name', 'Version', 'Source Type', 'Status', 'Actions']}
+          headers={['Name', 'Version', 'Source Type', 'Status', 'Actions']}
           rowKeys={data.map((schema) => schema.id)}
           rows={data.map((schema) => [
-            schema.id,
             schema.name,
             String(schema.version),
             formatSchemaSourceTypeLabel(schema.sourceType),
             schema.status,
-            <div className='flex flex-wrap gap-2'>
+            <div className='flex min-w-80 flex-wrap justify-end gap-2'>
               <Button
                 type='button'
                 disabled={!selectedKnowledgeBaseId || schema.status === 'ACTIVE'}
-                isPending={activateMutation.isPending}
+                isPending={activateMutation.isPending && activeActivateSchemaId === schema.id}
                 pendingText='Activating...'
                 onClick={() => selectedKnowledgeBaseId && activateMutation.mutate({ knowledgeBaseId: selectedKnowledgeBaseId, schemaId: schema.id })}
               >
                 {schema.status === 'ACTIVE' ? 'Active' : 'Activate'}
+              </Button>
+              <Button
+                type='button'
+                className='bg-slate-700'
+                isPending={getSchemaMutation.isPending && getSchemaMutation.variables === schema.id}
+                pendingText='Loading...'
+                onClick={() => {
+                  void loadSchemaDetails(schema)
+                }}
+              >
+                Details
               </Button>
               <Button
                 type='button'
@@ -179,6 +203,23 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             </div>,
           ])}
         />
+      )}
+      {(schemaDetailsOutput || getSchemaMutation.error || getSchemaMutation.isPending) && (
+        <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
+          <div>
+            <h3 className='text-sm font-semibold text-slate-900'>Schema details</h3>
+            {schemaDetailsLabel && <p className='text-sm text-slate-600'>{schemaDetailsLabel}</p>}
+          </div>
+          <FieldLabel htmlFor='schema-row-details-output'>Schema details JSON</FieldLabel>
+          <Textarea
+            id='schema-row-details-output'
+            rows={8}
+            value={schemaDetailsOutput}
+            onChange={(e) => setSchemaDetailsOutput(e.target.value)}
+            placeholder='Schema details response'
+          />
+          {getSchemaMutation.error && <Alert title='Get schema failed' message={(getSchemaMutation.error as Error).message} />}
+        </div>
       )}
       {editingSchema && (
         <div className='space-y-2 rounded-md border border-slate-300 bg-white p-4'>
@@ -224,40 +265,24 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
     </>
   )
 
-  const tabs: EndpointTab[] = [
+  const workflowTabs: EndpointTab[] = [
     {
-      id: 'generate-schema-example-text',
-      label: 'Generate schema example from text',
-      content: <SchemaGenerateExampleFromText onPendingChange={setIsGeneratePending} />,
+      id: 'schema-example-generation',
+      label: 'Schema example generation',
+      content: <SchemaExampleGenerationWorkflow onPendingChange={setIsGeneratePending} />,
     },
     {
-      id: 'generate-schema-example-file',
-      label: 'Generate schema example from file',
-      content: <SchemaGenerateExampleFromFile onPendingChange={setIsGeneratePending} />,
-    },
-    {
-      id: 'generate-schema-json',
-      label: 'Generate schema JSON',
+      id: 'schema-json-generation',
+      label: 'Schema JSON generation',
       content: (
-        <SchemaGenerateJsonFromText
-          onJsonReady={setSchemaJson}
-          output={generatedJsonOutput}
-          onOutputReady={(json) => {
+        <SchemaJsonGenerationWorkflow
+          textOutput={generatedJsonOutput}
+          fileOutput={generatedJsonFromFileOutput}
+          onTextOutputReady={(json) => {
             setGeneratedJsonOutput(json)
             setSchemaJson(json)
           }}
-          onPendingChange={setIsGeneratePending}
-        />
-      ),
-    },
-    {
-      id: 'generate-schema-json-file',
-      label: 'Generate schema JSON from file',
-      content: (
-        <SchemaGenerateJsonFromFile
-          onJsonReady={setSchemaJson}
-          output={generatedJsonFromFileOutput}
-          onOutputReady={(json) => {
+          onFileOutputReady={(json) => {
             setGeneratedJsonFromFileOutput(json)
             setSchemaJson(json)
           }}
@@ -266,10 +291,10 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       ),
     },
     {
-      id: 'validate-schema-json',
-      label: 'Validate schema JSON',
+      id: 'schema-validation',
+      label: 'Schema validation',
       content: (
-        <div className='space-y-2'>
+        <div className='space-y-2' data-testid='schema-validation-section'>
           <FieldLabel htmlFor='validate-schema-json-input'>Schema JSON content</FieldLabel>
           <SchemaJsonEditor
             id='validate-schema-json-input'
@@ -293,10 +318,10 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       ),
     },
     {
-      id: 'create-schema',
-      label: 'Create schema',
+      id: 'schema-creation',
+      label: 'Schema creation',
       content: (
-        <div className='space-y-2'>
+        <div className='space-y-2' data-testid='schema-creation-section'>
           <FieldLabel htmlFor='create-schema-json'>Schema JSON content</FieldLabel>
           <SchemaJsonEditor
             id='create-schema-json'
@@ -328,34 +353,6 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
         </div>
       ),
     },
-    {
-      id: 'get-schema-by-id',
-      label: 'Get schema by ID',
-      content: (
-        <div className='space-y-2'>
-          <FieldLabel htmlFor='get-schema-id'>Schema ID</FieldLabel>
-          <Input id='get-schema-id' value={schemaId} onChange={(e) => setSchemaId(e.target.value)} placeholder='Schema ID' />
-          <Button
-            type='button'
-            isPending={getSchemaMutation.isPending}
-            pendingText='Loading...'
-            onClick={async () => {
-              try {
-                const schema = await getSchemaMutation.mutateAsync(schemaId)
-                setSchemaByIdOutput(JSON.stringify(schema, null, 2))
-              } catch {
-                // surfaced via getSchemaMutation.error
-              }
-            }}
-          >
-            Get schema by ID
-          </Button>
-          <FieldLabel htmlFor='get-schema-by-id-output'>Schema details JSON</FieldLabel>
-          <Textarea id='get-schema-by-id-output' rows={8} value={schemaByIdOutput} onChange={(e) => setSchemaByIdOutput(e.target.value)} placeholder='Schema details response' />
-          {getSchemaMutation.error && <Alert title='Get schema failed' message={(getSchemaMutation.error as Error).message} />}
-        </div>
-      ),
-    },
   ]
 
   return (
@@ -363,9 +360,43 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
       title='Schemas'
       topSectionTitle='Schemas list'
       topSection={topSection}
-      tabs={<EndpointTabs tabs={tabs} testId='schemas-endpoint-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />}
+      tabs={<EndpointTabs tabs={workflowTabs} testId='schemas-purpose-tabs' disableTabSwitch={isAnyPending} keepPanelsMounted />}
       testId='schemas-controller-page'
     />
+  )
+}
+
+function SourceModeSelector({
+  value,
+  onChange,
+  name,
+}: {
+  value: 'text' | 'file'
+  onChange: (value: 'text' | 'file') => void
+  name: string
+}) {
+  return (
+    <fieldset className='space-y-2'>
+      <legend className='text-sm font-medium text-slate-700'>Source</legend>
+      <div className='flex flex-wrap gap-3'>
+        {[
+          ['text', 'From text'],
+          ['file', 'From file'],
+        ].map(([optionValue, label]) => (
+          <label key={optionValue} className='inline-flex items-center gap-2 text-sm text-slate-700'>
+            <input
+              type='radio'
+              name={name}
+              value={optionValue}
+              checked={value === optionValue}
+              onChange={() => onChange(optionValue as 'text' | 'file')}
+              className='h-4 w-4 accent-emerald-700'
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 
@@ -392,6 +423,64 @@ function SchemaGenerationWarnings({ warnings }: { warnings?: SchemaGenerationWar
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function SchemaExampleGenerationWorkflow({ onPendingChange }: { onPendingChange: (isPending: boolean) => void }) {
+  const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text')
+
+  return (
+    <div className='min-w-0 space-y-3' data-testid='schema-example-generation-section'>
+      <SourceModeSelector value={sourceMode} onChange={setSourceMode} name='schema-example-source-mode' />
+      {sourceMode === 'text' ? (
+        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-example-text'>
+          <SchemaGenerateExampleFromText onPendingChange={onPendingChange} />
+        </div>
+      ) : (
+        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-example-file'>
+          <SchemaGenerateExampleFromFile onPendingChange={onPendingChange} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SchemaJsonGenerationWorkflow(
+  {
+    textOutput, fileOutput, onTextOutputReady, onFileOutputReady, onPendingChange,
+  }: {
+    textOutput: string
+    fileOutput: string
+    onTextOutputReady: (json: string) => void
+    onFileOutputReady: (json: string) => void
+    onPendingChange: (isPending: boolean) => void
+  },
+) {
+  const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text')
+
+  return (
+    <div className='min-w-0 space-y-3' data-testid='schema-json-generation-section'>
+      <SourceModeSelector value={sourceMode} onChange={setSourceMode} name='schema-json-source-mode' />
+      {sourceMode === 'text' ? (
+        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-json'>
+          <SchemaGenerateJsonFromText
+            onJsonReady={onTextOutputReady}
+            output={textOutput}
+            onOutputReady={onTextOutputReady}
+            onPendingChange={onPendingChange}
+          />
+        </div>
+      ) : (
+        <div className='min-w-0 space-y-2' data-testid='schemas-workflow-generate-schema-json-file'>
+          <SchemaGenerateJsonFromFile
+            onJsonReady={onFileOutputReady}
+            output={fileOutput}
+            onOutputReady={onFileOutputReady}
+            onPendingChange={onPendingChange}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -506,9 +595,9 @@ function SchemaGenerateJsonFromText(
     <div className='space-y-2'>
       {generateJson.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-text-name'>Schema name</FieldLabel>
-      <Input id='generate-json-text-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <Input id='generate-json-text-name' className='max-w-full sm:max-w-sm' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-text-version'>Schema version</FieldLabel>
-      <Input id='generate-json-text-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <Input id='generate-json-text-version' className='max-w-full sm:max-w-32' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FieldLabel htmlFor='generate-json-text-source'>Source text</FieldLabel>
       <Textarea id='generate-json-text-source' rows={5} value={text} onChange={(e) => setText(e.target.value)} placeholder='Source text' />
       <FieldLabel htmlFor='generate-json-text-example'>Schema example JSON</FieldLabel>
@@ -578,9 +667,9 @@ function SchemaGenerateJsonFromFile(
     <div className='space-y-2'>
       {generateJsonFromFile.isPending ? <ProgressBanner message='Waiting for schema JSON generation...' /> : null}
       <FieldLabel htmlFor='generate-json-file-name'>Schema name</FieldLabel>
-      <Input id='generate-json-file-name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
+      <Input id='generate-json-file-name' className='max-w-full sm:max-w-sm' value={name} onChange={(e) => setName(e.target.value)} placeholder='Schema name' />
       <FieldLabel htmlFor='generate-json-file-version'>Schema version</FieldLabel>
-      <Input id='generate-json-file-version' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
+      <Input id='generate-json-file-version' className='max-w-full sm:max-w-32' type='number' value={version} onChange={(e) => setVersion(Number(e.target.value))} placeholder='Version' />
       <FileSelectButton
         buttonLabel='Select source text file'
         testId='schemas-json-file-select'

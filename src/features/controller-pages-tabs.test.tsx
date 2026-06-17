@@ -36,16 +36,19 @@ describe('controller pages tabs', () => {
     localStorage.clear()
   })
 
-  it('renders schemas endpoint tabs and switches active tab', async () => {
+  it('renders schemas purpose tabs', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />)
 
-    expect(await screen.findByRole('button', { name: 'Create schema' })).toBeInTheDocument()
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
+    const tabs = await screen.findByTestId('schemas-purpose-tabs')
+    expect(within(tabs).getByRole('button', { name: 'Schema example generation' })).toBeInTheDocument()
+    expect(within(tabs).getByRole('button', { name: 'Schema JSON generation' })).toBeInTheDocument()
+    expect(within(tabs).getByRole('button', { name: 'Schema validation' })).toBeInTheDocument()
+    expect(within(tabs).getByRole('button', { name: 'Schema creation' })).toBeInTheDocument()
 
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
-    expect(validatePanel).toBeInTheDocument()
-    expect(within(validatePanel).getByLabelText('Schema JSON content')).toBeInTheDocument()
+    await user.click(within(tabs).getByRole('button', { name: 'Schema validation' }))
+    const validateSection = within(tabs).getByTestId('schema-validation-section')
+    expect(within(validateSection).getByLabelText('Schema JSON content')).toBeInTheDocument()
   })
 
   it('renders knowledge base inline create section without endpoint tabs', async () => {
@@ -78,10 +81,14 @@ describe('controller pages tabs', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />)
 
-    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-generate-schema-example-file'))
+    const tabs = await screen.findByTestId('schemas-purpose-tabs')
+    const exampleSection = within(tabs).getByTestId('schema-example-generation-section')
+    await user.click(within(exampleSection).getByLabelText('From file', { selector: 'input' }))
     expect(screen.getByRole('button', { name: 'Select source file' })).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
+    await user.click(within(tabs).getByRole('button', { name: 'Schema JSON generation' }))
+    const jsonSection = within(tabs).getByTestId('schema-json-generation-section')
+    await user.click(within(jsonSection).getByLabelText('From file', { selector: 'input' }))
     expect(screen.getByRole('button', { name: 'Select source text file' })).toBeInTheDocument()
   })
 })

@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines required controller-page workflow structure, including tabbed endpoint workflows and explicit field labeling.
-## Requirements
 ### Requirement: Controller pages provide top context plus endpoint tabs
 The system SHALL render controller pages with top context/list sections and MAY omit endpoint tabs when the controller workflow is better represented with direct inline sections, and standalone fields/outputs in workflow sections SHALL include explicit purpose labels. The Documents page SHALL omit endpoint tabs and present upload plus action-driven document operations inline. The Schemas page SHALL omit endpoint tabs and present schema operations as purpose-based workflow tabs beneath the schema list.
 
@@ -27,27 +25,3 @@ The system SHALL provide one tab per endpoint workflow only for controller pages
 - **THEN** the page SHALL display purpose-based workflow tabs for schema example generation, schema JSON generation, schema validation, and schema creation
 - **AND** the page SHALL keep source-text and source-file variants as source-mode options within the relevant generation tabs
 - **AND** the page SHALL NOT require navigating a fixed sequence of endpoint tabs
-
-### Requirement: Controller workflows MUST show in-flight progress indicators
-The system SHALL display a visible progress indicator in the workflow context while endpoint requests are in flight, so users can tell the app is waiting for backend response.
-
-#### Scenario: Endpoint request is running
-- **WHEN** a controller workflow action triggers a backend request that has not completed
-- **THEN** the page SHALL show an in-context progress indicator (spinner/progress banner/overlay) until completion or failure
-
-### Requirement: Queries controller includes hybrid search endpoint tab
-The system SHALL expose hybrid search as a dedicated endpoint workflow tab on the Queries controller page.
-
-#### Scenario: Queries tabs include hybrid search
-- **WHEN** a user opens the Queries controller page with a selected knowledge base
-- **THEN** the tab list SHALL include a Hybrid search tab alongside the existing Ask query, Generate Cypher, Validate Cypher, and Execute Cypher tabs
-
-#### Scenario: Hybrid search request is in flight
-- **WHEN** a hybrid search request has not completed
-- **THEN** the Queries controller page SHALL show the same in-context request progress treatment used by other query endpoint workflows
-- **AND** endpoint tab switching SHALL be disabled while the request is pending
-
-#### Scenario: Existing query endpoint tabs remain available
-- **WHEN** the Hybrid search tab is added
-- **THEN** the existing Ask query, Generate Cypher, Validate Cypher, and Execute Cypher endpoint tabs SHALL remain available from the Queries controller page
-

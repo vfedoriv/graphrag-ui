@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-This specification defines the required behavior for schema management and activation in the GraphRAG admin UI.
-## Requirements
 ### Requirement: Users can inspect and create schemas
 The system SHALL support listing schemas related to the currently selected knowledge base in a top section and expose schema operations as purpose-based workflow tabs on the Schemas page, including schema validation and schema creation. The schema list SHALL prioritize human-readable metadata and SHALL NOT show schema ID as a primary table column. Schema detail retrieval SHALL be available from each schema row without requiring the user to copy or enter the schema ID manually. Schema creation launched from the Schemas page with an active knowledge base selected SHALL include that knowledge base id in the create request payload. After a successful schema creation launched from the Schemas page with an active knowledge base selected, the system SHALL refresh the selected knowledge base's schema list and render the newly listed backend result when that scoped list includes the created schema.
 
@@ -83,43 +81,6 @@ The system SHALL show explicit error feedback when schema activation requests fa
 - **WHEN** schema validation endpoint request fails
 - **THEN** the system SHALL render a visible validation failure alert in the schema validation workflow section
 
-### Requirement: Schema activation table action is workflow tested
-The system SHALL include workflow tests verifying schema activation can be triggered from the schemas table row action and calls the expected endpoint.
-
-#### Scenario: Activate schema from list row
-- **WHEN** a user clicks Activate for a schema row with a selected knowledge base
-- **THEN** tests SHALL verify the activation endpoint call and related query invalidation effects
-
-### Requirement: Schema YAML authoring areas are format-aware
-The system SHALL treat schema JSON input and output areas as structured JSON editors with explicit JSON format indication, visible parse or validation feedback, and support for adding, removing, moving, and editing JSON schema nodes.
-
-#### Scenario: Edit schema YAML input
-- **WHEN** a user edits schema JSON content in create/validate/generate workflows
-- **THEN** the field SHALL present a structured JSON editing interface with explicit JSON format indication and controls for editing schema nodes
-
-#### Scenario: Submit structured schema JSON for validation
-- **WHEN** a user validates schema JSON that was edited through the structured editor
-- **THEN** the system SHALL submit the edited JSON content to the schema validation endpoint without changing the backend contract
-
-#### Scenario: Submit structured schema JSON for creation
-- **WHEN** a user creates a schema from JSON that was edited through the structured editor
-- **THEN** the system SHALL submit the edited JSON content to the schema creation endpoint without changing the backend contract
-
-### Requirement: Schema source types match backend contract
-The system SHALL expose and process only backend-supported schema source types: `PREDEFINED` and `GENERATED`.
-
-#### Scenario: Source type options exclude unsupported values
-- **WHEN** a user views schema source type fields, filters, or labels in schema workflows
-- **THEN** the system SHALL present only `PREDEFINED` and `GENERATED` and SHALL NOT expose `USER_DEFINED`
-
-#### Scenario: Schema payloads use supported source types only
-- **WHEN** the frontend submits schema-related requests that include source type
-- **THEN** the system SHALL send only `PREDEFINED` or `GENERATED` values
-
-#### Scenario: Unsupported source type from API is visibly handled
-- **WHEN** the backend response contains a source type outside `PREDEFINED` and `GENERATED`
-- **THEN** the system SHALL show a visible unsupported-source-type fallback state without remapping it to a supported value
-
 ### Requirement: Schema retrieval and validation use standardized async state
 The system SHALL run schema row detail retrieval and schema validation workflows through typed TanStack Query or mutation hooks and SHALL present pending, success, and error state from those hooks.
 
@@ -131,15 +92,3 @@ The system SHALL run schema row detail retrieval and schema validation workflows
 - **WHEN** a user requests schema details from a schema row
 - **THEN** the system SHALL run the retrieval through an API-module query or mutation hook using the row's schema ID
 - **AND** the system SHALL render the latest successful result or error state from that hook
-
-### Requirement: Schema workflow results remain stable across failed retries
-The system SHALL preserve existing user-editable schema draft content when a schema validation, creation, or retrieval request fails, including schema JSON content edited through the structured editor.
-
-#### Scenario: Schema validation fails after draft edit
-- **WHEN** a user edits schema JSON and a validation request fails
-- **THEN** the system SHALL keep the edited schema JSON visible and render an inline validation failure alert
-
-#### Scenario: Schema creation fails after structured draft edit
-- **WHEN** a user edits schema JSON through the structured editor and a create request fails
-- **THEN** the system SHALL keep the edited schema JSON draft visible and render an inline creation failure alert
-

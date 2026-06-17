@@ -11,11 +11,15 @@ describe('schemas workflows', () => {
     localStorage.clear()
   })
 
-  it('runs validate and get-by-id flows from tabs', async () => {
+  it('runs validate, create, and row details flows from purpose sections', async () => {
     const fetchMock = stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
       if (url.endsWith('/schemas') && init?.method === 'POST') return jsonResponse(200, { id: 'created-schema' })
-      if (url.endsWith('/schemas')) return jsonResponse(200, [])
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' },
+        ])
+      }
       if (url.endsWith('/schemas/validate')) return jsonResponse(200, { valid: true, errors: [] })
       if (url.endsWith('/schemas/schema-1')) return jsonResponse(200, { id: 'schema-1', name: 'S', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' })
       return jsonResponse(200, {})
@@ -24,18 +28,15 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    await user.click(await screen.findByTestId('schemas-purpose-tabs-tab-schema-validation'))
+    const validatePanel = await screen.findByTestId('schema-validation-section')
     fireEvent.change(within(validatePanel).getByLabelText('Mock structured JSON data'), { target: { value: '{"type":"object"}' } })
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
 
     expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-get-schema-by-id'))
-    const getByIdPanel = screen.getByTestId('schemas-endpoint-tabs-panel-get-schema-by-id')
-    await user.type(within(getByIdPanel).getByLabelText('Schema ID'), 'schema-1')
-    await user.click(within(getByIdPanel).getByRole('button', { name: 'Get schema by ID' }))
-    expect(await within(getByIdPanel).findByDisplayValue(/"id": "schema-1"/)).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Details' }))
+    expect(await screen.findByDisplayValue(/"id": "schema-1"/)).toBeInTheDocument()
 
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map((c) => String(c[0]))
@@ -47,8 +48,8 @@ describe('schemas workflows', () => {
     const validatePayload = JSON.parse(String((validateCall?.[1] as RequestInit | undefined)?.body)) as { content: string }
     expect(JSON.parse(validatePayload.content)).toEqual({ type: 'object' })
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-create-schema'))
-    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(screen.getByTestId('schemas-purpose-tabs-tab-schema-creation'))
+    const createPanel = screen.getByTestId('schema-creation-section')
     await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
     await waitFor(() => {
       const createCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/api/v1/schemas') && (init as RequestInit | undefined)?.method === 'POST')
@@ -92,15 +93,15 @@ describe('schemas workflows', () => {
 
     expect(await screen.findByText('No Schemas for selected knowledge base')).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-create-schema'))
-    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(screen.getByTestId('schemas-purpose-tabs-tab-schema-creation'))
+    const createPanel = screen.getByTestId('schema-creation-section')
     fireEvent.change(within(createPanel).getByLabelText('Mock structured JSON data'), {
       target: { value: '{"name":"generated-schema-7","version":1}' },
     })
     await user.click(within(createPanel).getByRole('button', { name: 'Create' }))
 
     expect(await screen.findByText('generated-schema-7')).toBeInTheDocument()
-    expect(screen.getByText('created-schema')).toBeInTheDocument()
+    expect(screen.queryByText('created-schema')).not.toBeInTheDocument()
 
     const createCall = fetchMock.mock.calls.find(
       ([url, init]) => String(url).endsWith('/api/v1/schemas') && (init as RequestInit | undefined)?.method === 'POST',
@@ -131,8 +132,8 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-create-schema'))
-    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(await screen.findByTestId('schemas-purpose-tabs-tab-schema-creation'))
+    const createPanel = await screen.findByTestId('schema-creation-section')
     fireEvent.change(within(createPanel).getByLabelText('Mock structured JSON data'), {
       target: { value: '{"name":"generated-schema-7","version":1}' },
     })
@@ -146,11 +147,15 @@ describe('schemas workflows', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/v1/knowledge-bases/kb-a/schemas')).length).toBe(1)
   })
 
-  it('shows response outputs for schema JSON generation tabs and replaces get-by-id output with latest response', async () => {
+  it('shows response outputs for schema JSON generation sections and replaces row details output with latest response', async () => {
     let getByIdCount = 0
     stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '' }])
-      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          { id: 'schema-1', name: 'Schema One', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' },
+        ])
+      }
       if (url.endsWith('/schemas/generate') && init?.method === 'POST') {
         return jsonResponse(200, {
           content: '{"name":"generated-schema","version":1}',
@@ -182,7 +187,8 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const generateJsonPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-json')
+    await user.click(await screen.findByTestId('schemas-purpose-tabs-tab-schema-json-generation'))
+    const generateJsonPanel = await screen.findByTestId('schemas-workflow-generate-schema-json')
     await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
     await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
     await waitFor(() => {
@@ -192,8 +198,9 @@ describe('schemas workflows', () => {
     expect(within(generateJsonPanel).getByText(/LOW_CONFIDENCE/)).toBeInTheDocument()
     expect(within(generateJsonPanel).getByText(/Check extracted fields/)).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-json-file'))
-    const generateJsonFilePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-json-file')
+    const jsonSection = screen.getByTestId('schema-json-generation-section')
+    await user.click(within(jsonSection).getByLabelText('From file', { selector: 'input' }))
+    const generateJsonFilePanel = screen.getByTestId('schemas-workflow-generate-schema-json-file')
     const sourceFileInput = within(generateJsonFilePanel).getByTestId('schemas-json-file-select-input')
     await user.upload(sourceFileInput, new File(['customer record'], 'customer.txt', { type: 'text/plain' }))
     await user.click(within(generateJsonFilePanel).getByRole('button', { name: 'Generate schema JSON from file' }))
@@ -203,14 +210,47 @@ describe('schemas workflows', () => {
     expect(within(generateJsonFilePanel).getByText('Schema generation warnings')).toBeInTheDocument()
     expect(within(generateJsonFilePanel).getByText(/FILE_TRUNCATED/)).toBeInTheDocument()
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-get-schema-by-id'))
-    const getByIdPanel = screen.getByTestId('schemas-endpoint-tabs-panel-get-schema-by-id')
-    await user.type(within(getByIdPanel).getByLabelText('Schema ID'), 'schema-1')
-    await user.click(within(getByIdPanel).getByRole('button', { name: 'Get schema by ID' }))
-    expect(await within(getByIdPanel).findByDisplayValue(/"name": "first"/)).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Details' }))
+    expect(await screen.findByDisplayValue(/"name": "first"/)).toBeInTheDocument()
 
-    await user.click(within(getByIdPanel).getByRole('button', { name: 'Get schema by ID' }))
-    expect(await within(getByIdPanel).findByDisplayValue(/"name": "second"/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Details' }))
+    expect(await screen.findByDisplayValue(/"name": "second"/)).toBeInTheDocument()
+  })
+
+  it('shows row details error feedback without manual schema id entry', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) {
+        return jsonResponse(200, [
+          { id: 'schema-ok', name: 'Schema OK', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'INACTIVE', createdAt: '' },
+          { id: 'schema-fail', name: 'Schema Fail', version: 2, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'INACTIVE', createdAt: '' },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-ok') && !init?.method) {
+        return jsonResponse(200, { id: 'schema-ok', name: 'Schema OK', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'INACTIVE', createdAt: '' })
+      }
+      if (url.endsWith('/schemas/schema-fail') && !init?.method) {
+        return jsonResponse(404, { detail: 'Schema detail lookup failed from server' })
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method ?? 'GET'}`)
+    })
+
+    const user = userEvent.setup()
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    const detailButtons = await screen.findAllByRole('button', { name: 'Details' })
+    await user.click(detailButtons[0])
+    expect(await screen.findByDisplayValue(/"id": "schema-ok"/)).toBeInTheDocument()
+
+    await user.click(detailButtons[1])
+    expect(await screen.findByText('Get schema failed')).toBeInTheDocument()
+    expect(screen.getByText('Schema detail lookup failed from server')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Schema ID')).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([url]) => String(url))
+      expect(urls.some((url) => url.endsWith('/api/v1/schemas/schema-ok'))).toBe(true)
+      expect(urls.some((url) => url.endsWith('/api/v1/schemas/schema-fail'))).toBe(true)
+    })
   })
 
   it('keeps edited generated schema draft when a later generation request fails', async () => {
@@ -232,7 +272,8 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const generateJsonPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-json')
+    await user.click(await screen.findByTestId('schemas-purpose-tabs-tab-schema-json-generation'))
+    const generateJsonPanel = await screen.findByTestId('schemas-workflow-generate-schema-json')
     await user.type(within(generateJsonPanel).getByLabelText('Source text'), 'customer record')
     await user.click(within(generateJsonPanel).getByRole('button', { name: 'Generate schema JSON' }))
 
@@ -243,8 +284,8 @@ describe('schemas workflows', () => {
     expect(await within(generateJsonPanel).findByText('Generation failed from server')).toBeInTheDocument()
     expect(output).toHaveValue('{\n  "name": "edited"\n}')
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    await user.click(screen.getByTestId('schemas-purpose-tabs-tab-schema-validation'))
+    const validatePanel = screen.getByTestId('schema-validation-section')
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
     expect(await screen.findByText('Schema is valid.')).toBeInTheDocument()
 
@@ -253,7 +294,7 @@ describe('schemas workflows', () => {
     expect(JSON.parse(validatePayload.content)).toEqual({ name: 'edited' })
   })
 
-  it('renders normalized schema example output for text and file tabs', async () => {
+  it('renders normalized schema example output for text and file sections', async () => {
     stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases/kb-a/schemas') && !init?.method) return jsonResponse(200, [])
       if (url.endsWith('/schemas/generate/example') && init?.method === 'POST') return jsonResponse(200, '[{"from":"text"}]')
@@ -264,15 +305,16 @@ describe('schemas workflows', () => {
     const user = userEvent.setup()
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const textPanel = await screen.findByTestId('schemas-endpoint-tabs-panel-generate-schema-example-text')
+    const textPanel = await screen.findByTestId('schemas-workflow-generate-schema-example-text')
     await user.type(within(textPanel).getByLabelText('Source text'), 'bio')
     await user.click(within(textPanel).getByRole('button', { name: 'Generate schema example' }))
     await waitFor(() => {
       expect(within(textPanel).getByLabelText('Generated schema example')).toHaveValue('[{"from":"text"}]')
     })
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-generate-schema-example-file'))
-    const filePanel = screen.getByTestId('schemas-endpoint-tabs-panel-generate-schema-example-file')
+    const exampleSection = screen.getByTestId('schema-example-generation-section')
+    await user.click(within(exampleSection).getByLabelText('From file', { selector: 'input' }))
+    const filePanel = screen.getByTestId('schemas-workflow-generate-schema-example-file')
     const sourceFileInput = within(filePanel).getByTestId('schemas-example-file-select-input')
     await user.upload(sourceFileInput, new File(['bio'], 'bio.txt', { type: 'text/plain' }))
     await user.click(within(filePanel).getByRole('button', { name: 'Generate schema example from file' }))
@@ -493,7 +535,8 @@ describe('schemas workflows', () => {
 
     await user.click(screen.getByRole('button', { name: 'Switch knowledge base' }))
 
-    expect(await screen.findByText('schema-b')).toBeInTheDocument()
+    expect(await screen.findByText('Schema B')).toBeInTheDocument()
+    expect(screen.queryByText('schema-b')).not.toBeInTheDocument()
     expect(screen.queryByText('Update failed')).not.toBeInTheDocument()
     expect(screen.queryByText('Delete failed')).not.toBeInTheDocument()
     expect(screen.queryByText(/Cannot update active schema/)).not.toBeInTheDocument()

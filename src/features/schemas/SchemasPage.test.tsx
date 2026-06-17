@@ -42,8 +42,8 @@ describe('schemas page', () => {
       expect(screen.getByText('Activate failed from server')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json'))
-    const validatePanel = screen.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+    await user.click(screen.getByTestId('schemas-purpose-tabs-tab-schema-validation'))
+    const validatePanel = screen.getByTestId('schema-validation-section')
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate schema JSON' }))
     await waitFor(() => {
       expect(screen.getByText('Validate failed')).toBeInTheDocument()
@@ -76,7 +76,11 @@ describe('schemas page', () => {
 
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
+    const topSection = await screen.findByTestId('schemas-controller-page-top-section')
+    expect(within(topSection).queryByRole('columnheader', { name: 'ID' })).not.toBeInTheDocument()
+    expect(within(topSection).queryByText('schema-a')).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Update' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Details' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Activate' }))
     await waitFor(() => {
@@ -120,6 +124,7 @@ describe('schemas page', () => {
   })
 
   it('shows structured JSON editor guidance for schema content', async () => {
+    const user = userEvent.setup()
     stubFetch((url, init) => {
       if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [])
@@ -129,10 +134,11 @@ describe('schemas page', () => {
 
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
+    await user.click(screen.getByTestId('schemas-purpose-tabs-tab-schema-creation'))
     await waitFor(() => {
       expect(screen.getAllByText('Expected format: JSON').length).toBeGreaterThan(0)
     })
-    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    const createPanel = screen.getByTestId('schema-creation-section')
 
     expect(within(createPanel).getByRole('button', { name: 'Tree View' })).toBeInTheDocument()
     expect(within(createPanel).getByRole('button', { name: 'Raw View' })).toBeInTheDocument()
@@ -162,8 +168,8 @@ describe('schemas page', () => {
 
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    await user.click(await screen.findByTestId('schemas-endpoint-tabs-tab-create-schema'))
-    const createPanel = screen.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+    await user.click(await screen.findByTestId('schemas-purpose-tabs-tab-schema-creation'))
+    const createPanel = await screen.findByTestId('schema-creation-section')
     await user.click(within(createPanel).getByRole('button', { name: 'Raw View' }))
     fireEvent.change(within(createPanel).getByLabelText('Schema JSON content'), {
       target: { value: '{"name":"Schema A","version":1}' },
@@ -183,7 +189,7 @@ describe('schemas page', () => {
     })
   })
 
-  it('renders schema tabs in required workflow order', async () => {
+  it('renders schema workflow tabs in required order', async () => {
     stubFetch((url, init) => {
       if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
         return jsonResponse(200, [])
@@ -193,20 +199,13 @@ describe('schemas page', () => {
 
     renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const tabsContainer = await screen.findByTestId('schemas-endpoint-tabs')
-    const tabLabels = Array.from(tabsContainer.querySelectorAll('[data-testid^="schemas-endpoint-tabs-tab-"]')).map(
+    const tabsContainer = await screen.findByTestId('schemas-purpose-tabs')
+    const tabLabels = Array.from(tabsContainer.querySelectorAll('[data-testid^="schemas-purpose-tabs-tab-"]')).map(
       (button) => button.textContent?.trim() ?? '',
     )
 
-    expect(tabLabels).toEqual([
-      'Generate schema example from text',
-      'Generate schema example from file',
-      'Generate schema JSON',
-      'Generate schema JSON from file',
-      'Validate schema JSON',
-      'Create schema',
-      'Get schema by ID',
-    ])
+    expect(tabLabels).toEqual(['Schema example generation', 'Schema JSON generation', 'Schema validation', 'Schema creation'])
+    expect(screen.queryByTestId('schemas-endpoint-tabs')).not.toBeInTheDocument()
   })
 
   it('shows pending indicator and prevents duplicate activate clicks while request is in flight', async () => {
