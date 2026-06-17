@@ -5,6 +5,7 @@ import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers
 
 describe('knowledge bases page', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
@@ -64,7 +65,7 @@ describe('knowledge bases page', () => {
     expect(screen.queryByText('schema-a')).not.toBeInTheDocument()
   })
 
-  it('shows update error alert when inline rename fails', async () => {
+  it('shows update error alert when explicit rename fails', async () => {
     const user = userEvent.setup()
     stubFetch((url, init) => {
       if (url === '/api/v1/knowledge-bases' && !init?.method) {
@@ -78,10 +79,11 @@ describe('knowledge bases page', () => {
 
     renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const nameInput = await screen.findByLabelText('name-kb-a')
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const nameInput = screen.getByLabelText('Rename KB A')
     await user.clear(nameInput)
     await user.type(nameInput, 'Renamed KB')
-    nameInput.blur()
+    await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(screen.getByText('Update failed')).toBeInTheDocument()
@@ -91,6 +93,7 @@ describe('knowledge bases page', () => {
 
   it('shows delete error alert when delete mutation fails', async () => {
     const user = userEvent.setup()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     stubFetch((url, init) => {
       if (url === '/api/v1/knowledge-bases' && !init?.method) {
         return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }])
@@ -106,12 +109,27 @@ describe('knowledge bases page', () => {
     await user.click(await screen.findByRole('button', { name: 'Delete' }))
 
     await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('All data related to this knowledge base will be deleted.'))
       expect(screen.getByText('Delete failed')).toBeInTheDocument()
       expect(screen.getByText('Delete failed from server')).toBeInTheDocument()
     })
   })
 
-  it('does not send update request when inline name is unchanged on blur', async () => {
+  it('does not render editable name inputs until editing starts', async () => {
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases' && !init?.method) {
+        return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('KB A')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Rename KB A')).not.toBeInTheDocument()
+  })
+
+  it('does not send update request when explicit rename is unchanged', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch((url, init) => {
       if (url === '/api/v1/knowledge-bases' && !init?.method) {
@@ -125,16 +143,73 @@ describe('knowledge bases page', () => {
 
     renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
-    const nameInput = await screen.findByLabelText('name-kb-a')
-    expect((nameInput as HTMLInputElement).value).toBe('KB A')
-    await user.click(nameInput)
-    nameInput.blur()
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    expect(screen.getByLabelText('Rename KB A')).toHaveValue('KB A')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/knowledge-bases/kb-a', expect.objectContaining({ method: 'PUT' }))
+    expect(screen.queryByLabelText('Rename KB A')).not.toBeInTheDocument()
   })
 
-  it('keeps row input identity stable after deleting another row', async () => {
+  it('does not send update request when explicit rename is canceled', async () => {
     const user = userEvent.setup()
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases' && !init?.method) {
+        return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }])
+      }
+      if (url === '/api/v1/knowledge-bases/kb-a' && init?.method === 'PUT') {
+        return jsonResponse(200, { id: 'kb-a', name: 'Renamed KB', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const nameInput = screen.getByLabelText('Rename KB A')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Renamed KB')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/knowledge-bases/kb-a', expect.objectContaining({ method: 'PUT' }))
+    expect(screen.queryByLabelText('Rename KB A')).not.toBeInTheDocument()
+    expect(screen.getByText('KB A')).toBeInTheDocument()
+  })
+
+  it('renames a knowledge base from explicit row controls', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases' && !init?.method) {
+        return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }])
+      }
+      if (url === '/api/v1/knowledge-bases/kb-a' && init?.method === 'PUT') {
+        return jsonResponse(200, { id: 'kb-a', name: 'Renamed KB', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    const nameInput = screen.getByLabelText('Rename KB A')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Renamed KB')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/knowledge-bases/kb-a',
+        expect.objectContaining({
+          body: JSON.stringify({ name: 'Renamed KB' }),
+          method: 'PUT',
+        }),
+      )
+    })
+  })
+
+  it('keeps row identity stable after deleting another row', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     let knowledgeBases = [
       { id: 'kb-a', name: 'Alpha', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' },
       { id: 'kb-b', name: 'Beta', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' },
@@ -153,18 +228,18 @@ describe('knowledge bases page', () => {
 
     renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-b' })
 
-    expect((await screen.findByLabelText('name-kb-b')).getAttribute('value')).toBe('Beta')
+    expect(await screen.findByText('Beta')).toBeInTheDocument()
     await user.click((await screen.findAllByRole('button', { name: 'Delete' }))[0])
 
     await waitFor(() => {
-      const remainingInput = screen.getByLabelText('name-kb-b') as HTMLInputElement
-      expect(remainingInput.value).toBe('Beta')
-      expect(screen.queryByLabelText('name-kb-a')).not.toBeInTheDocument()
+      expect(screen.getByText('Beta')).toBeInTheDocument()
+      expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
     })
   })
 
   it('clears selected knowledge base after deleting the selected row', async () => {
     const user = userEvent.setup()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     let knowledgeBases = [
       { id: 'kb-a', name: 'Alpha', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' },
       { id: 'kb-b', name: 'Beta', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' },
@@ -188,7 +263,30 @@ describe('knowledge bases page', () => {
 
     await waitFor(() => {
       expect(screen.queryByText('Selected', { selector: 'span' })).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('name-kb-a')).not.toBeInTheDocument()
+      expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
     })
+  })
+
+  it('does not delete when confirmation is declined', async () => {
+    const user = userEvent.setup()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases' && !init?.method) {
+        return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }])
+      }
+      if (url === '/api/v1/knowledge-bases/kb-a' && init?.method === 'DELETE') {
+        return jsonResponse(204, {})
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<KnowledgeBasesPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('All data related to this knowledge base will be deleted.'))
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/v1/knowledge-bases/kb-a', expect.objectContaining({ method: 'DELETE' }))
+    expect(screen.getByText('KB A')).toBeInTheDocument()
+    expect(screen.getByText('Selected', { selector: 'span' })).toBeInTheDocument()
   })
 })

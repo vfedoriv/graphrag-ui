@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -32,6 +33,8 @@ export function KnowledgeBasesPage() {
   const { data = [], isLoading } = useKnowledgeBasesQuery()
   const { data: schemas = [] } = useSchemasQuery()
   const { selectedKnowledgeBaseId, setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+  const [editingKnowledgeBaseId, setEditingKnowledgeBaseId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
   const createMutation = useCreateKnowledgeBaseMutation()
   const updateMutation = useUpdateKnowledgeBaseMutation()
   const deleteMutation = useDeleteKnowledgeBaseMutation()
@@ -48,6 +51,50 @@ export function KnowledgeBasesPage() {
       // surfaced via createMutation.error
     }
   })
+
+  const startRename = (kb: KnowledgeBase) => {
+    setEditingKnowledgeBaseId(kb.id)
+    setEditName(kb.name)
+  }
+
+  const cancelRename = () => {
+    setEditingKnowledgeBaseId(null)
+    setEditName('')
+  }
+
+  const saveRename = async (kb: KnowledgeBase) => {
+    const nextName = editName.trim()
+    if (!nextName || nextName === kb.name) {
+      cancelRename()
+      return
+    }
+
+    try {
+      await updateMutation.mutateAsync({ id: kb.id, payload: { name: nextName } })
+      cancelRename()
+    } catch {
+      // surfaced via updateMutation.error
+    }
+  }
+
+  const deleteKnowledgeBase = async (kb: KnowledgeBase) => {
+    const confirmed = window.confirm(
+      `Delete knowledge base "${kb.name}"? All data related to this knowledge base will be deleted.`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await deleteMutation.mutateAsync(kb.id)
+      if (selectedKnowledgeBaseId === kb.id) {
+        setSelectedKnowledgeBaseId(null)
+      }
+    } catch {
+      // surfaced via deleteMutation.error
+    }
+  }
 
   const createSection = (
     <div className='stack' data-testid='knowledge-bases-create-section'>
@@ -79,48 +126,80 @@ export function KnowledgeBasesPage() {
       headers={['Selected', 'ID', 'Name', 'Active schema', 'Actions']}
       rowKeys={data.map((kb) => kb.id)}
       rowClassNames={data.map((kb) => (kb.id === selectedKnowledgeBaseId ? 'is-selected' : ''))}
-      rows={data.map((kb) => [
-        <StatusBadge label={kb.id === selectedKnowledgeBaseId ? 'Selected' : 'Available'} tone={kb.id === selectedKnowledgeBaseId ? 'success' : 'neutral'} />,
-        <code>{kb.id}</code>,
-        <Input
-          defaultValue={kb.name}
-          onBlur={(e) => {
-            if (e.target.value !== kb.name) {
-              updateMutation.mutate({ id: kb.id, payload: { name: e.target.value } })
-            }
-          }}
-          aria-label={`name-${kb.id}`}
-        />,
-        <StatusBadge label={getActiveSchemaName(kb, schemas)} tone={kb.activeSchemaId ? 'success' : 'warning'} />,
-        <div className='toolbar'>
-          <Button
-            type='button'
-            variant='ghost'
-            disabled={kb.id === selectedKnowledgeBaseId}
-            onClick={() => setSelectedKnowledgeBaseId(kb.id)}
-          >
-            {kb.id === selectedKnowledgeBaseId ? 'Current' : 'Use'}
-          </Button>
-          <Button
-            type='button'
-            variant='danger'
-            isPending={deleteMutation.isPending && deleteMutation.variables === kb.id}
-            pendingText='Deleting...'
-            onClick={async () => {
-              try {
-                await deleteMutation.mutateAsync(kb.id)
-                if (selectedKnowledgeBaseId === kb.id) {
-                  setSelectedKnowledgeBaseId(null)
-                }
-              } catch {
-                // surfaced via deleteMutation.error
-              }
-            }}
-          >
-            Delete
-          </Button>
-        </div>,
-      ])}
+      rows={data.map((kb) => {
+        const isEditing = editingKnowledgeBaseId === kb.id
+        const isUpdatingRow = updateMutation.isPending && updateMutation.variables?.id === kb.id
+
+        return [
+          <StatusBadge label={kb.id === selectedKnowledgeBaseId ? 'Selected' : 'Available'} tone={kb.id === selectedKnowledgeBaseId ? 'success' : 'neutral'} />,
+          <code>{kb.id}</code>,
+          isEditing ? (
+            <div className='row-edit-control'>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                aria-label={`Rename ${kb.name}`}
+                disabled={isUpdatingRow}
+              />
+              <div className='row-actions'>
+                <Button
+                  type='button'
+                  variant='primary'
+                  className='table-action-button'
+                  isPending={isUpdatingRow}
+                  pendingText='Saving...'
+                  onClick={() => void saveRename(kb)}
+                >
+                  Save
+                </Button>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  className='table-action-button'
+                  disabled={isUpdatingRow}
+                  onClick={cancelRename}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <span>{kb.name}</span>
+          ),
+          <StatusBadge label={getActiveSchemaName(kb, schemas)} tone={kb.activeSchemaId ? 'success' : 'warning'} />,
+          <div className='row-actions'>
+            <Button
+              type='button'
+              variant='ghost'
+              className='table-action-button'
+              disabled={kb.id === selectedKnowledgeBaseId}
+              onClick={() => setSelectedKnowledgeBaseId(kb.id)}
+            >
+              {kb.id === selectedKnowledgeBaseId ? 'Current' : 'Use'}
+            </Button>
+            {!isEditing ? (
+              <Button
+                type='button'
+                variant='ghost'
+                className='table-action-button'
+                onClick={() => startRename(kb)}
+              >
+                Edit
+              </Button>
+            ) : null}
+            <Button
+              type='button'
+              variant='danger'
+              className='table-action-button'
+              isPending={deleteMutation.isPending && deleteMutation.variables === kb.id}
+              pendingText='Deleting...'
+              onClick={() => void deleteKnowledgeBase(kb)}
+            >
+              Delete
+            </Button>
+          </div>,
+        ]
+      })}
     />
   )
 
@@ -128,7 +207,7 @@ export function KnowledgeBasesPage() {
     <ControllerPage
       title='Knowledge Bases'
       eyebrow='Controller page'
-      description='Create, rename, select, and delete knowledge bases from one workspace. Mutations update the visible list and keep selection state honest.'
+      description='Create, rename, select, and delete knowledge bases from one workspace.'
       workspaceStrip={
         <WorkspaceStrip
           items={[

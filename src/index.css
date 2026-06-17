@@ -488,6 +488,24 @@ textarea:focus-visible,
   color: var(--muted);
 }
 
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-action-button {
+  min-width: 76px;
+  min-height: 34px;
+}
+
+.row-edit-control {
+  display: grid;
+  min-width: 220px;
+  gap: 8px;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
