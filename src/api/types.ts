@@ -36,6 +36,7 @@ export type KnowledgeBase = {
   id: string
   name: string
   activeSchemaId: string | null
+  activeAiProfileId?: string | null
   createdAt: string
 }
 
@@ -46,6 +47,73 @@ export type CreateKnowledgeBaseRequest = {
 
 export type UpdateKnowledgeBaseRequest = {
   name: string
+}
+
+export type RuntimeSettingValueType = 'BOOLEAN' | 'NUMBER' | 'INTEGER' | 'STRING' | 'JSON' | 'OBJECT' | 'ARRAY' | string
+
+export type RuntimeSetting = {
+  key: string
+  category: string
+  valueType: RuntimeSettingValueType
+  currentValue: unknown
+  defaultValue: unknown
+  source: string
+  mutable: boolean
+  liveApplied: boolean
+  sensitive: boolean
+  constraints?: Record<string, unknown> | null
+  updateMode: string
+  reason?: string | null
+  label?: string | null
+  description?: string | null
+}
+
+export type UpdateRuntimeSettingRequest = {
+  value: unknown
+}
+
+export type AiProfile = {
+  id: string
+  name: string
+  baseUrl: string
+  chatModel: string
+  embeddingModel: string
+  embeddingDimensions: number
+  timeoutSeconds: number
+  retryCount: number
+  defaultProfile: boolean
+  revision?: number | null
+  apiKeyConfigured: boolean
+  apiKeyMask?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export type CreateAiProfileRequest = {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey?: string
+  chatModel: string
+  embeddingModel: string
+  embeddingDimensions: number
+  timeoutSeconds: number
+  retryCount: number
+  defaultProfile: boolean
+}
+
+export type UpdateAiProfileRequest = Partial<Omit<CreateAiProfileRequest, 'id'>> & {
+  clearApiKey?: boolean
+}
+
+export type KnowledgeBaseAiProfileAssignment = {
+  knowledgeBaseId?: string
+  profileId: string | null
+  profile?: AiProfile | null
+}
+
+export type UpdateKnowledgeBaseAiProfileRequest = {
+  profileId: string | null
 }
 
 export type Schema = {

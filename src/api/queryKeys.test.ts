@@ -4,6 +4,10 @@ describe('query keys', () => {
   it('produces stable keys', () => {
     expect(queryKeys.knowledgeBases()).toEqual(['knowledge-bases'])
     expect(queryKeys.knowledgeBase('kb')).toEqual(['knowledge-bases', 'kb'])
+    expect(queryKeys.knowledgeBaseActiveAiProfile('kb')).toEqual(['knowledge-bases', 'kb', 'active-ai-profile'])
+    expect(queryKeys.runtimeSettings()).toEqual(['runtime-settings'])
+    expect(queryKeys.aiProfiles()).toEqual(['ai-profiles'])
+    expect(queryKeys.aiProfile('profile-1')).toEqual(['ai-profiles', 'profile-1'])
     expect(queryKeys.schemasByKnowledgeBase('kb-1')).toEqual(['schemas', 'knowledge-base', 'kb-1'])
     expect(queryKeys.schemasByKnowledgeBaseMaybe('kb-1')).toEqual(['schemas', 'knowledge-base', 'kb-1'])
     expect(queryKeys.schemasByKnowledgeBaseMaybe(null)).toEqual(['schemas', 'knowledge-base', 'none'])

@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
-import type { CreateKnowledgeBaseRequest, KnowledgeBase, UpdateKnowledgeBaseRequest } from './types'
+import type {
+  CreateKnowledgeBaseRequest,
+  KnowledgeBase,
+  KnowledgeBaseAiProfileAssignment,
+  UpdateKnowledgeBaseAiProfileRequest,
+  UpdateKnowledgeBaseRequest,
+} from './types'
 
 export const knowledgeBaseApi = {
   list: () => apiFetch<KnowledgeBase[]>('/knowledge-bases'),
@@ -11,6 +17,13 @@ export const knowledgeBaseApi = {
   update: (id: string, payload: UpdateKnowledgeBaseRequest) =>
     apiFetch<KnowledgeBase>(`/knowledge-bases/${id}`, { method: 'PUT', body: toJsonBody(payload) }),
   delete: (id: string) => apiFetch<void>(`/knowledge-bases/${id}`, { method: 'DELETE' }),
+  getActiveAiProfile: (id: string) =>
+    apiFetch<KnowledgeBaseAiProfileAssignment>(`/knowledge-bases/${id}/ai-profile`),
+  updateActiveAiProfile: (id: string, payload: UpdateKnowledgeBaseAiProfileRequest) =>
+    apiFetch<KnowledgeBaseAiProfileAssignment>(`/knowledge-bases/${id}/ai-profile`, {
+      method: 'PUT',
+      body: toJsonBody(payload),
+    }),
 }
 
 export function useKnowledgeBasesQuery() {
@@ -42,5 +55,27 @@ export function useDeleteKnowledgeBaseMutation() {
   return useMutation({
     mutationFn: knowledgeBaseApi.delete,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() }),
+  })
+}
+
+export function useKnowledgeBaseActiveAiProfileQuery(id: string | null) {
+  return useQuery({
+    queryKey: id ? queryKeys.knowledgeBaseActiveAiProfile(id) : ['knowledge-bases', 'none', 'active-ai-profile'],
+    queryFn: () => knowledgeBaseApi.getActiveAiProfile(id ?? ''),
+    enabled: Boolean(id),
+  })
+}
+
+export function useUpdateKnowledgeBaseActiveAiProfileMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, profileId }: { id: string; profileId: string | null }) =>
+      knowledgeBaseApi.updateActiveAiProfile(id, { profileId }),
+    onSuccess: (_assignment, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase(variables.id) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBaseActiveAiProfile(variables.id) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.aiProfiles() })
+    },
   })
 }

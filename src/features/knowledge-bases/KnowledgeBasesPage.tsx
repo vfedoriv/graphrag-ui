@@ -6,8 +6,10 @@ import {
   useCreateKnowledgeBaseMutation,
   useDeleteKnowledgeBaseMutation,
   useKnowledgeBasesQuery,
+  useUpdateKnowledgeBaseActiveAiProfileMutation,
   useUpdateKnowledgeBaseMutation,
 } from '../../api/knowledgeBases'
+import { useAiProfilesQuery } from '../../api/aiProfiles'
 import { useSchemasQuery } from '../../api/schemas'
 import type { KnowledgeBase, Schema } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
@@ -32,13 +34,15 @@ type FormData = z.infer<typeof schema>
 export function KnowledgeBasesPage() {
   const { data = [], isLoading } = useKnowledgeBasesQuery()
   const { data: schemas = [] } = useSchemasQuery()
+  const { data: aiProfiles = [] } = useAiProfilesQuery()
   const { selectedKnowledgeBaseId, setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const [editingKnowledgeBaseId, setEditingKnowledgeBaseId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const createMutation = useCreateKnowledgeBaseMutation()
   const updateMutation = useUpdateKnowledgeBaseMutation()
   const deleteMutation = useDeleteKnowledgeBaseMutation()
-  const isAnyPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending
+  const assignProfileMutation = useUpdateKnowledgeBaseActiveAiProfileMutation()
+  const isAnyPending = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending || assignProfileMutation.isPending
 
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { id: '', name: '' } })
 
@@ -123,7 +127,7 @@ export function KnowledgeBasesPage() {
     <EmptyState title='No Knowledge Bases' body='Create one to begin GraphRAG workflows.' />
   ) : (
     <Table
-      headers={['Selected', 'ID', 'Name', 'Active schema', 'Actions']}
+      headers={['Selected', 'ID', 'Name', 'Active schema', 'Active AI profile', 'Actions']}
       rowKeys={data.map((kb) => kb.id)}
       rowClassNames={data.map((kb) => (kb.id === selectedKnowledgeBaseId ? 'is-selected' : ''))}
       rows={data.map((kb) => {
@@ -167,6 +171,12 @@ export function KnowledgeBasesPage() {
             <span>{kb.name}</span>
           ),
           <StatusBadge label={getActiveSchemaName(kb, schemas)} tone={kb.activeSchemaId ? 'success' : 'warning'} />,
+          <AiProfileAssignment
+            knowledgeBase={kb}
+            profiles={aiProfiles}
+            isPending={assignProfileMutation.isPending && assignProfileMutation.variables?.id === kb.id}
+            onAssign={(profileId) => assignProfileMutation.mutateAsync({ id: kb.id, profileId })}
+          />,
           <div className='row-actions'>
             <Button
               type='button'
@@ -225,11 +235,55 @@ export function KnowledgeBasesPage() {
           {createSection}
           {updateMutation.error && <Alert title='Update failed' message={(updateMutation.error as Error).message} />}
           {deleteMutation.error && <Alert title='Delete failed' message={(deleteMutation.error as Error).message} />}
+          {assignProfileMutation.error && <Alert title='AI profile assignment failed' message={(assignProfileMutation.error as Error).message} />}
           {listSection}
         </div>
       }
       testId='knowledge-bases-controller-page'
     />
+  )
+}
+
+function AiProfileAssignment({
+  knowledgeBase,
+  profiles,
+  isPending,
+  onAssign,
+}: {
+  knowledgeBase: KnowledgeBase
+  profiles: Array<{ id: string; name: string }>
+  isPending: boolean
+  onAssign: (profileId: string | null) => Promise<unknown>
+}) {
+  const [selectedProfileId, setSelectedProfileId] = useState(knowledgeBase.activeAiProfileId ?? '')
+  const activeLabel = knowledgeBase.activeAiProfileId ?? 'None assigned'
+
+  return (
+    <div className='stack'>
+      <StatusBadge label={activeLabel} tone={knowledgeBase.activeAiProfileId ? 'success' : 'warning'} />
+      <div className='row-edit-control'>
+        <select
+          value={selectedProfileId}
+          onChange={(event) => setSelectedProfileId(event.target.value)}
+          aria-label={`AI profile for ${knowledgeBase.name}`}
+        >
+          <option value=''>No active profile</option>
+          {profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>{profile.name} ({profile.id})</option>
+          ))}
+        </select>
+        <Button
+          type='button'
+          variant='ghost'
+          className='table-action-button'
+          isPending={isPending}
+          pendingText='Assigning...'
+          onClick={() => void onAssign(selectedProfileId || null)}
+        >
+          Assign
+        </Button>
+      </div>
+    </div>
   )
 }
 

@@ -1,0 +1,160 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { SettingsPage } from './SettingsPage'
+import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
+
+const runtimeSettings = [
+  {
+    key: 'query.topK',
+    category: 'query',
+    valueType: 'INTEGER',
+    currentValue: 5,
+    defaultValue: 10,
+    source: 'PERSISTED',
+    mutable: true,
+    liveApplied: true,
+    sensitive: false,
+    constraints: { min: 1, max: 20 },
+    updateMode: 'LIVE',
+    label: 'Query top K',
+    description: 'Hybrid search hit count.',
+  },
+  {
+    key: 'openai.api-key',
+    category: 'provider',
+    valueType: 'STRING',
+    currentValue: 'Configured',
+    defaultValue: 'Not configured',
+    source: 'ENV',
+    mutable: false,
+    liveApplied: false,
+    sensitive: true,
+    constraints: null,
+    updateMode: 'PROFILE_MANAGED',
+    reason: 'Managed through AI profiles.',
+    label: 'OpenAI API key',
+  },
+]
+
+const profile = {
+  id: 'default',
+  name: 'Default profile',
+  baseUrl: 'https://api.openai.com/v1',
+  chatModel: 'gpt-4.1-mini',
+  embeddingModel: 'text-embedding-3-small',
+  embeddingDimensions: 1536,
+  timeoutSeconds: 60,
+  retryCount: 3,
+  defaultProfile: true,
+  revision: 1,
+  apiKeyConfigured: true,
+  apiKeyMask: 'sk-...1234',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-02T00:00:00Z',
+}
+
+describe('settings page', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('renders and filters runtime settings while protecting sensitive values', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases')) {
+        return jsonResponse(200, [{ id: 'kb-a', name: 'KB A', activeSchemaId: null, activeAiProfileId: 'default', createdAt: '' }])
+      }
+      if (url.endsWith('/runtime-settings')) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [profile])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    expect(await screen.findByText('Query top K')).toBeInTheDocument()
+    expect(screen.getByText('OpenAI API key')).toBeInTheDocument()
+    expect(screen.getByText(/Managed through AI profiles/i)).toBeInTheDocument()
+    expect(within(screen.getByTestId('runtime-settings-section')).getByText('Configured')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'top k' } })
+    expect(screen.getByText('Query top K')).toBeInTheDocument()
+    expect(screen.queryByText('OpenAI API key')).not.toBeInTheDocument()
+  })
+
+  it('updates and clears mutable live runtime settings with row feedback', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings') && !init?.method) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/runtime-settings/query.topK')) {
+        return jsonResponse(200, { ...runtimeSettings[0], currentValue: 12 })
+      }
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />)
+
+    const section = await screen.findByTestId('runtime-settings-section')
+    const input = await within(section).findByLabelText('Value for query.topK')
+    fireEvent.change(input, { target: { value: '12' } })
+    await userEvent.click(within(section).getByRole('button', { name: 'Update' }))
+    expect(await within(section).findByText('Updated')).toBeInTheDocument()
+
+    await userEvent.click(within(section).getByRole('button', { name: 'Clear' }))
+    expect(await within(section).findByText('Override cleared')).toBeInTheDocument()
+
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/query.topK') && (call[1] as RequestInit).method === 'PUT')).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/query.topK') && (call[1] as RequestInit).method === 'DELETE')).toBe(true)
+  })
+
+  it('creates, edits, replaces key, clears key, and deletes AI profiles', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings')) return jsonResponse(200, [])
+      if (url.endsWith('/ai-profiles') && !init?.method) return jsonResponse(200, [profile])
+      if (url.endsWith('/ai-profiles') && init?.method === 'POST') return jsonResponse(200, { ...profile, id: 'created' })
+      if (url.endsWith('/ai-profiles/default') && init?.method === 'PUT') return jsonResponse(200, profile)
+      if (url.endsWith('/ai-profiles/default') && init?.method === 'DELETE') {
+        return { ok: true, status: 204, text: async () => '', json: async () => undefined }
+      }
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderWithProviders(<SettingsPage />)
+
+    const profilesSection = await screen.findByTestId('ai-profiles-section')
+    await within(profilesSection).findByRole('button', { name: 'Edit' })
+    await user.type(within(profilesSection).getByLabelText('Profile ID'), 'created')
+    await user.type(within(profilesSection).getByLabelText('Name'), 'Created')
+    await user.type(within(profilesSection).getByLabelText('Base URL'), 'https://example.test/v1')
+    await user.type(within(profilesSection).getByLabelText('API key'), 'secret')
+    await user.type(within(profilesSection).getByLabelText('Chat model'), 'chat')
+    await user.type(within(profilesSection).getByLabelText('Embedding model'), 'embed')
+    await user.click(within(profilesSection).getByRole('button', { name: 'Create profile' }))
+    await waitFor(() => expect(fetchMock.mock.calls.some((call) => (call[1] as RequestInit | undefined)?.method === 'POST')).toBe(true))
+
+    await user.click(within(profilesSection).getByRole('button', { name: 'Edit' }))
+    const rowNameInput = within(profilesSection).getAllByLabelText('Name').find((input) => (input as HTMLInputElement).value === 'Default profile') as HTMLInputElement
+    await user.clear(rowNameInput)
+    await user.type(rowNameInput, 'Updated')
+    await user.click(within(profilesSection).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(within(profilesSection).getByRole('button', { name: 'Edit' })).toBeInTheDocument())
+
+    await user.click(within(profilesSection).getByRole('button', { name: 'Edit' }))
+    const replacementInput = within(profilesSection).getByLabelText('Replacement API key for Default profile')
+    await user.type(replacementInput, 'replacement')
+    await user.click(within(profilesSection).getByRole('button', { name: 'Replace key' }))
+    await waitFor(() => expect(within(profilesSection).getByRole('button', { name: 'Edit' })).toBeInTheDocument())
+
+    await user.click(within(profilesSection).getByRole('button', { name: 'Edit' }))
+    await user.click(within(profilesSection).getByRole('button', { name: 'Clear key' }))
+    await waitFor(() => expect(within(profilesSection).getByRole('button', { name: 'Edit' })).toBeInTheDocument())
+    await user.click(within(profilesSection).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(fetchMock.mock.calls.some((call) => (call[1] as RequestInit | undefined)?.method === 'DELETE')).toBe(true))
+    expect(fetchMock.mock.calls.some((call) => String((call[1] as RequestInit | undefined)?.body).includes('"apiKey":"secret"'))).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String((call[1] as RequestInit | undefined)?.body).includes('"apiKey":"replacement"'))).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String((call[1] as RequestInit | undefined)?.body).includes('"clearApiKey":true'))).toBe(true)
+  })
+})

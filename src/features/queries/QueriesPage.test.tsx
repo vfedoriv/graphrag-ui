@@ -100,6 +100,9 @@ describe('queries page', () => {
   it('blocks validate and execute requests while parameter JSON is invalid', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases') || url.endsWith('/ai-profiles') || url.endsWith('/runtime-settings')) {
+        return jsonResponse(200, [])
+      }
       throw new Error(`Unexpected request: ${url}`)
     })
 
@@ -112,19 +115,22 @@ describe('queries page', () => {
     await user.click(within(validatePanel).getByRole('button', { name: 'Validate' }))
 
     expect(within(validatePanel).getByText('Cannot submit invalid JSON parameters.')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/queries/validate'))).toBe(false)
 
     await user.click(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher'))
     const executePanel = screen.getByTestId('queries-endpoint-tabs-panel-execute-cypher')
     await user.click(within(executePanel).getByRole('button', { name: 'Execute' }))
 
     expect(within(executePanel).getByText('Cannot submit invalid JSON parameters.')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/queries/execute'))).toBe(false)
   })
 
   it('blocks hybrid search while local option bounds are invalid', async () => {
     const user = userEvent.setup()
     const fetchMock = stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases') || url.endsWith('/ai-profiles') || url.endsWith('/runtime-settings')) {
+        return jsonResponse(200, [])
+      }
       throw new Error(`Unexpected request: ${url}`)
     })
 
@@ -137,14 +143,14 @@ describe('queries page', () => {
     await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
     expect(within(hybridPanel).getByText('Hybrid search options invalid')).toBeInTheDocument()
     expect(within(hybridPanel).getByText('Hit limit must be at least 1.')).toBeInTheDocument()
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/hybrid-search'))).toBe(false)
 
     fireEvent.change(within(hybridPanel).getByLabelText('Hit limit'), { target: { value: '3' } })
     fireEvent.change(within(hybridPanel).getByLabelText('Graph depth'), { target: { value: '-1' } })
     await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
     expect(within(hybridPanel).getByText('Graph depth must be 0 or greater.')).toBeInTheDocument()
     expect((within(hybridPanel).getByLabelText('Graph depth') as HTMLInputElement).value).toBe('-1')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/hybrid-search'))).toBe(false)
   })
 
   it('shows hybrid search failure feedback without clearing inputs', async () => {

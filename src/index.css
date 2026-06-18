@@ -469,6 +469,24 @@ textarea:focus-visible,
   text-transform: uppercase;
 }
 
+[data-testid="runtime-settings-section"] table {
+  table-layout: fixed;
+}
+
+[data-testid="runtime-settings-section"] th:nth-child(2),
+[data-testid="runtime-settings-section"] td:nth-child(2),
+[data-testid="runtime-settings-section"] th:nth-child(3),
+[data-testid="runtime-settings-section"] td:nth-child(3) {
+  width: 192px;
+  max-width: 192px;
+  overflow-wrap: anywhere;
+}
+
+[data-testid="runtime-settings-section"] th:nth-child(1),
+[data-testid="runtime-settings-section"] td:nth-child(1) {
+  width: 24%;
+}
+
 .table-wrap tr:last-child td {
   border-bottom: 0;
 }
@@ -729,6 +747,46 @@ textarea:focus-visible,
   gap: 10px;
 }
 
+.settings-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-filters label,
+.settings-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-filters select,
+.row-edit-control select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.profile-form {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.badge-row,
+.runtime-context-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .check-row {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
@@ -823,6 +881,8 @@ textarea:focus-visible,
   .grid.three,
   .form-grid,
   .settings-form,
+  .settings-filters,
+  .profile-form,
   .ops-spine {
     grid-template-columns: 1fr;
   }

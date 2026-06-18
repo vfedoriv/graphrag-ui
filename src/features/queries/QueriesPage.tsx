@@ -6,6 +6,7 @@ import {
   useHybridSearchMutation,
   useValidateQueryMutation,
 } from '../../api/queries'
+import { useKnowledgeBasesQuery } from '../../api/knowledgeBases'
 import type { HybridSearchGraphEntity, HybridSearchGraphRelationship, HybridSearchHit } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
@@ -17,6 +18,7 @@ import { Input } from '../../shared/ui/Input'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
+import { RuntimeContextSummary } from '../../shared/ui/RuntimeContextSummary'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
@@ -130,6 +132,8 @@ function getGraphContext(hit: HybridSearchHit) {
 
 export function QueriesPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+  const { data: knowledgeBases = [] } = useKnowledgeBasesQuery()
+  const activeKnowledgeBase = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId)
   const [prompt, setPrompt] = useState('')
   const [cypher, setCypher] = useState('')
   const [parameters, setParameters] = useState('{}')
@@ -200,6 +204,11 @@ export function QueriesPage() {
         ]}
       />
       <p>Use tabs below to run endpoint workflows for query generation, validation, execution, one-shot ask, and hybrid search.</p>
+      <RuntimeContextSummary
+        knowledgeBaseId={selectedKnowledgeBaseId}
+        settingHints={['query', 'safety', 'hybrid', 'search']}
+        title='Query runtime context'
+      />
       {isAnyPending ? <ProgressBanner message='Waiting for backend query response...' /> : null}
     </div>
   )
@@ -458,6 +467,7 @@ export function QueriesPage() {
         <WorkspaceStrip
           items={[
             { label: 'Workspace', value: selectedKnowledgeBaseId },
+            { label: 'Active AI profile', value: activeKnowledgeBase?.activeAiProfileId ?? 'None assigned', tone: activeKnowledgeBase?.activeAiProfileId ? 'success' : 'warning' },
             { label: 'Pending', value: isAnyPending ? 'Request running' : 'Idle', tone: isAnyPending ? 'warning' : 'neutral' },
           ]}
         />

@@ -17,6 +17,7 @@ import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { OutputPreview } from '../../shared/ui/OutputPreview'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
+import { RuntimeContextSummary } from '../../shared/ui/RuntimeContextSummary'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { Table } from '../../shared/ui/Table'
 import { isCompletedOrSuccessfullyProcessed, isDocumentProcessingStatus } from './documentStatus'
@@ -274,6 +275,11 @@ export function DocumentsPage() {
               { eyebrow: 'Processing', title: hasBackendProcessingDocument ? 'Active' : 'Idle', body: 'Processing rows stay locked while backend work is active.' },
               { eyebrow: 'Inspection', title: selectedDocumentId ?? 'No document selected', body: 'Choose a row to load chunks.' },
             ]}
+          />
+          <RuntimeContextSummary
+            knowledgeBaseId={selectedKnowledgeBaseId}
+            settingHints={['chunk', 'extract', 'embedding', 'document']}
+            title='Document processing context'
           />
           {isAnyPending ? <ProgressBanner message='Waiting for document workflow response...' /> : null}
           <section className='stack'>

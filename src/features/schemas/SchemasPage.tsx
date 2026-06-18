@@ -12,6 +12,7 @@ import {
   useUpdateSchemaMutation,
   useValidateSchemaMutation,
 } from '../../api/schemas'
+import { useKnowledgeBasesQuery } from '../../api/knowledgeBases'
 import { type Schema, type SchemaDetails, type SchemaGenerationWarning, type SchemaSourceType } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
@@ -24,6 +25,7 @@ import { FileSelectButton } from '../../shared/ui/FileSelectButton'
 import { Input } from '../../shared/ui/Input'
 import { ProgressBanner } from '../../shared/ui/ProgressBanner'
 import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
+import { RuntimeContextSummary } from '../../shared/ui/RuntimeContextSummary'
 import { SchemaJsonEditor } from '../../shared/ui/SchemaJsonEditor'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
@@ -38,6 +40,8 @@ export function SchemasPage() {
 
 function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBaseId: string | null }) {
   const { data = [] } = useSchemasByKnowledgeBaseQuery(selectedKnowledgeBaseId)
+  const { data: knowledgeBases = [] } = useKnowledgeBasesQuery()
+  const activeKnowledgeBase = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId)
   const [schemaJson, setSchemaJson] = useState('')
   const [schemaDetailsLabel, setSchemaDetailsLabel] = useState('')
   const [schemaDetailsOutput, setSchemaDetailsOutput] = useState('')
@@ -231,6 +235,11 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
           {getSchemaMutation.error && <Alert title='Get schema failed' message={(getSchemaMutation.error as Error).message} />}
         </div>
       )}
+      <RuntimeContextSummary
+        knowledgeBaseId={selectedKnowledgeBaseId}
+        settingHints={['schema', 'generation', 'example']}
+        title='Schema generation context'
+      />
       {editingSchema && (
         <div className='flow-card'>
           <div>
@@ -377,6 +386,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             { label: 'Workspace', value: selectedKnowledgeBaseId ?? 'None selected' },
             { label: 'Schemas', value: String(data.length) },
             { label: 'Active schema', value: data.find((schema) => schema.status === 'ACTIVE')?.name ?? 'None active', tone: data.some((schema) => schema.status === 'ACTIVE') ? 'success' : 'warning' },
+            { label: 'Active AI profile', value: activeKnowledgeBase?.activeAiProfileId ?? 'None assigned', tone: activeKnowledgeBase?.activeAiProfileId ? 'success' : 'warning' },
           ]}
         />
       }
