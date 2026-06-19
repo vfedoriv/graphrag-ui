@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
   runtimeSettingsApi,
+  useBulkUpdateRuntimeSettingsMutation,
   useClearRuntimeSettingMutation,
   useUpdateRuntimeSettingMutation,
 } from './runtimeSettings'
@@ -13,7 +14,7 @@ describe('runtime settings api', () => {
     vi.unstubAllGlobals()
   })
 
-  it('calls list, update, and clear endpoints with expected payloads', async () => {
+  it('calls list, update, bulk update, and clear endpoints with expected payloads', async () => {
     const fetchMock = stubFetch((url) => {
       if (url.endsWith('/runtime-settings')) return jsonResponse(200, [])
       return jsonResponse(200, { key: 'query.topK', currentValue: 10 })
@@ -21,12 +22,15 @@ describe('runtime settings api', () => {
 
     await runtimeSettingsApi.list()
     await runtimeSettingsApi.update('query.topK', { value: 10 })
+    await runtimeSettingsApi.updateMany({ updates: [{ key: 'query.topK', value: 12 }] })
     await runtimeSettingsApi.clear('query.topK')
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/runtime-settings')
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/runtime-settings/query.topK')
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ value: 10 }) })
-    expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'DELETE' })
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/v1/runtime-settings')
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ updates: [{ key: 'query.topK', value: 12 }] }) })
+    expect(fetchMock.mock.calls[3][1]).toMatchObject({ method: 'DELETE' })
   })
 
   it('updates cached settings after mutations', async () => {
@@ -42,6 +46,12 @@ describe('runtime settings api', () => {
     const { result: updateResult } = renderHook(() => useUpdateRuntimeSettingMutation(), { wrapper })
     await updateResult.current.mutateAsync({ key: 'query.topK', value: 10 })
 
+    stubFetch(() => jsonResponse(200, [{ key: 'query.topK', currentValue: 12 }]))
+    const { result: bulkUpdateResult } = renderHook(() => useBulkUpdateRuntimeSettingsMutation(), { wrapper })
+    await bulkUpdateResult.current.mutateAsync({ updates: [{ key: 'query.topK', value: 12 }] })
+    expect(queryClient.getQueryData(['runtime-settings'])).toEqual([{ key: 'query.topK', currentValue: 12 }])
+
+    stubFetch(() => jsonResponse(200, { key: 'query.topK', currentValue: 10 }))
     const { result: clearResult } = renderHook(() => useClearRuntimeSettingMutation(), { wrapper })
     await clearResult.current.mutateAsync('query.topK')
 

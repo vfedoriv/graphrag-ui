@@ -7,9 +7,9 @@ import {
 } from '../../api/aiProfiles'
 import { useKnowledgeBasesQuery } from '../../api/knowledgeBases'
 import {
+  useBulkUpdateRuntimeSettingsMutation,
   useClearRuntimeSettingMutation,
   useRuntimeSettingsQuery,
-  useUpdateRuntimeSettingMutation,
 } from '../../api/runtimeSettings'
 import type { AiProfile, CreateAiProfileRequest, RuntimeSetting, UpdateAiProfileRequest } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
@@ -73,7 +73,7 @@ export function SettingsPage() {
         />
       }
       topSectionTitle='Runtime configuration'
-      topSectionDescription='Backend-owned runtime settings are editable only when the API marks them mutable and live-applied.'
+      topSectionDescription='Backend-owned runtime settings are editable when the API marks them mutable; restart-required changes are staged before backend restart.'
       topSectionStatus={<StatusBadge label={runtimeSettingsQuery.isLoading ? 'Loading settings' : 'Live catalog'} tone='neutral' />}
       topSection={
         <div className='stack-lg'>
@@ -118,8 +118,9 @@ function RuntimeSettingsSection({
   const [updateMode, setUpdateMode] = useState('all')
   const [search, setSearch] = useState('')
   const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [rowMessage, setRowMessage] = useState<Record<string, string>>({})
-  const updateMutation = useUpdateRuntimeSettingMutation()
+  const [acceptedPendingValues, setAcceptedPendingValues] = useState<Record<string, unknown>>({})
+  const [sectionMessage, setSectionMessage] = useState('')
+  const bulkUpdateMutation = useBulkUpdateRuntimeSettingsMutation()
   const clearMutation = useClearRuntimeSettingMutation()
 
   const categories = useMemo(() => unique(settings.map((setting) => setting.category)), [settings])
@@ -140,11 +141,38 @@ function RuntimeSettingsSection({
     )
   })
 
-  const updateSetting = async (setting: RuntimeSetting) => {
+  const changedSettings = settings.filter((setting) => {
+    if (!isRuntimeSettingEditable(setting)) return false
+    const draft = drafts[setting.key]
+    return draft !== undefined && draft !== formatEditableValue(setting.currentValue)
+  })
+
+  const applyChanges = async () => {
+    const updates = changedSettings.map((setting) => ({
+      key: setting.key,
+      value: parseRuntimeValue(setting, drafts[setting.key] ?? formatEditableValue(setting.currentValue)),
+    }))
+    if (updates.length === 0) return
     try {
-      const value = parseRuntimeValue(setting, drafts[setting.key] ?? formatEditableValue(setting.currentValue))
-      await updateMutation.mutateAsync({ key: setting.key, value })
-      setRowMessage((current) => ({ ...current, [setting.key]: 'Updated' }))
+      const updatedSettings = await bulkUpdateMutation.mutateAsync({ updates })
+      const submittedValues = new Map(updates.map((update) => [update.key, update.value]))
+      setAcceptedPendingValues((current) => {
+        const next = { ...current }
+        for (const setting of updatedSettings) {
+          if (setting.liveApplied) {
+            delete next[setting.key]
+          } else {
+            next[setting.key] = submittedValues.get(setting.key) ?? setting.currentValue
+          }
+        }
+        return next
+      })
+      setDrafts((current) => {
+        const next = { ...current }
+        for (const setting of updatedSettings) delete next[setting.key]
+        return next
+      })
+      setSectionMessage(`${updatedSettings.length} runtime setting${updatedSettings.length === 1 ? '' : 's'} accepted`)
     } catch {
       // surfaced through mutation error
     }
@@ -152,8 +180,22 @@ function RuntimeSettingsSection({
 
   const clearSetting = async (setting: RuntimeSetting) => {
     try {
-      await clearMutation.mutateAsync(setting.key)
-      setRowMessage((current) => ({ ...current, [setting.key]: 'Override cleared' }))
+      const updated = await clearMutation.mutateAsync(setting.key)
+      setDrafts((current) => {
+        const next = { ...current }
+        delete next[setting.key]
+        return next
+      })
+      setAcceptedPendingValues((current) => {
+        const next = { ...current }
+        if (updated.liveApplied) {
+          delete next[setting.key]
+        } else {
+          next[setting.key] = updated.defaultValue
+        }
+        return next
+      })
+      setSectionMessage('Override clear accepted')
     } catch {
       // surfaced through mutation error
     }
@@ -166,12 +208,27 @@ function RuntimeSettingsSection({
           <p className='eyebrow'>Runtime properties</p>
           <h2>Backend settings catalog</h2>
         </div>
-        <StatusBadge label={isLoading ? 'Loading' : `${settings.length} settings`} tone='neutral' />
+        <div className='row-actions'>
+          <StatusBadge label={isLoading ? 'Loading' : `${settings.length} settings`} tone='neutral' />
+          <Button
+            type='button'
+            variant='primary'
+            isPending={bulkUpdateMutation.isPending}
+            pendingText='Applying...'
+            disabled={changedSettings.length === 0 || bulkUpdateMutation.isPending}
+            onClick={() => void applyChanges()}
+          >
+            Apply changes
+          </Button>
+        </div>
       </div>
 
       {error ? (
         <Alert title='Runtime settings unavailable' message={`${error.message}. Frontend proxy base remains ${apiBasePath}.`} />
       ) : null}
+      {bulkUpdateMutation.error ? <Alert title='Apply failed' message={(bulkUpdateMutation.error as Error).message} /> : null}
+      {clearMutation.error ? <Alert title='Clear failed' message={(clearMutation.error as Error).message} /> : null}
+      {sectionMessage ? <Alert title='Runtime settings updated' message={sectionMessage} tone='success' /> : null}
 
       <div className='settings-filters'>
         <label>
@@ -203,10 +260,11 @@ function RuntimeSettingsSection({
           rowKeys={filteredSettings.map((setting) => setting.key)}
           rows={filteredSettings.map((setting) => {
             const editable = isRuntimeSettingEditable(setting)
-            const rowPending = updateMutation.isPending && updateMutation.variables?.key === setting.key
             const clearPending = clearMutation.isPending && clearMutation.variables === setting.key
-            const rowError = (rowPending || updateMutation.variables?.key === setting.key) ? updateMutation.error as Error | null : null
-            const clearError = (clearPending || clearMutation.variables === setting.key) ? clearMutation.error as Error | null : null
+            const draft = drafts[setting.key]
+            const editableValue = draft ?? formatEditableValue(setting.currentValue)
+            const modified = editable && draft !== undefined && draft !== formatEditableValue(setting.currentValue)
+            const pendingValue = acceptedPendingValues[setting.key]
 
             return [
               <div className='stack'>
@@ -215,7 +273,12 @@ function RuntimeSettingsSection({
                 {setting.description ? <small>{setting.description}</small> : null}
                 {isProfileManaged(setting) ? <a href='#ai-profiles-section'>Manage through AI profiles</a> : null}
               </div>,
-              <ValueDisplay setting={setting} value={setting.currentValue} />,
+              <RuntimeSettingValueCell
+                setting={setting}
+                draft={draft}
+                pendingValue={pendingValue}
+                modified={modified}
+              />,
               <ValueDisplay setting={setting} value={setting.defaultValue} />,
               <div className='stack'>
                 <div className='badge-row'>
@@ -232,8 +295,11 @@ function RuntimeSettingsSection({
                 {editable ? (
                   <RuntimeSettingEditor
                     setting={setting}
-                    value={drafts[setting.key] ?? formatEditableValue(setting.currentValue)}
-                    onChange={(value) => setDrafts((current) => ({ ...current, [setting.key]: value }))}
+                    value={editableValue}
+                    onChange={(value) => {
+                      setSectionMessage('')
+                      setDrafts((current) => ({ ...current, [setting.key]: value }))
+                    }}
                   />
                 ) : (
                   <StatusBadge label={setting.updateMode} tone='warning' />
@@ -243,13 +309,16 @@ function RuntimeSettingsSection({
                     <>
                       <Button
                         type='button'
-                        variant='primary'
+                        variant='ghost'
                         className='table-action-button'
-                        isPending={rowPending}
-                        pendingText='Updating...'
-                        onClick={() => void updateSetting(setting)}
+                        disabled={!modified || bulkUpdateMutation.isPending}
+                        onClick={() => setDrafts((current) => {
+                          const next = { ...current }
+                          delete next[setting.key]
+                          return next
+                        })}
                       >
-                        Update
+                        Reset
                       </Button>
                       <Button
                         type='button'
@@ -257,6 +326,7 @@ function RuntimeSettingsSection({
                         className='table-action-button'
                         isPending={clearPending}
                         pendingText='Clearing...'
+                        disabled={bulkUpdateMutation.isPending || clearPending}
                         onClick={() => void clearSetting(setting)}
                       >
                         Clear
@@ -264,9 +334,8 @@ function RuntimeSettingsSection({
                     </>
                   ) : null}
                 </div>
-                {rowMessage[setting.key] ? <small>{rowMessage[setting.key]}</small> : null}
-                {rowError ? <Alert title='Update failed' message={rowError.message} /> : null}
-                {clearError ? <Alert title='Clear failed' message={clearError.message} /> : null}
+                {modified ? <small>Modified</small> : null}
+                {!editable ? <small>{setting.reason ?? setting.updateMode}</small> : null}
               </div>,
             ]
           })}
@@ -548,8 +617,43 @@ function ValueDisplay({ setting, value }: { setting: RuntimeSetting; value: unkn
   return <code>{formatJson(value) || 'None'}</code>
 }
 
+function RuntimeSettingValueCell({
+  setting,
+  draft,
+  pendingValue,
+  modified,
+}: {
+  setting: RuntimeSetting
+  draft?: string
+  pendingValue?: unknown
+  modified: boolean
+}) {
+  const restartRequired = !setting.liveApplied
+  return (
+    <div className='stack'>
+      <small>Active</small>
+      <ValueDisplay setting={setting} value={setting.currentValue} />
+      {modified ? (
+        <>
+          <small>{restartRequired ? 'Draft pending restart' : 'Draft'}</small>
+          <code>{draft || 'None'}</code>
+        </>
+      ) : null}
+      {!modified && restartRequired && pendingValue !== undefined ? (
+        <>
+          <small>Accepted pending restart</small>
+          <ValueDisplay setting={setting} value={pendingValue} />
+        </>
+      ) : null}
+      {restartRequired && (modified || pendingValue !== undefined) ? (
+        <StatusBadge label='Restart required before active' tone='warning' />
+      ) : null}
+    </div>
+  )
+}
+
 function isRuntimeSettingEditable(setting: RuntimeSetting) {
-  return setting.mutable && setting.liveApplied && !setting.sensitive && !isProfileManaged(setting)
+  return setting.mutable && !setting.sensitive && !isProfileManaged(setting)
 }
 
 function isProfileManaged(setting: RuntimeSetting) {

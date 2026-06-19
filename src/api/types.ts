@@ -72,6 +72,15 @@ export type UpdateRuntimeSettingRequest = {
   value: unknown
 }
 
+export type BulkUpdateRuntimeSettingItem = {
+  key: string
+  value: unknown
+}
+
+export type BulkUpdateRuntimeSettingsRequest = {
+  updates: BulkUpdateRuntimeSettingItem[]
+}
+
 export type AiProfile = {
   id: string
   name: string

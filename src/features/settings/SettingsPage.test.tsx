@@ -20,6 +20,21 @@ const runtimeSettings = [
     description: 'Hybrid search hit count.',
   },
   {
+    key: 'index.batchSize',
+    category: 'indexing',
+    valueType: 'INTEGER',
+    currentValue: 100,
+    defaultValue: 50,
+    source: 'DEFAULT',
+    mutable: true,
+    liveApplied: false,
+    sensitive: false,
+    constraints: { min: 10, max: 500 },
+    updateMode: 'RESTART_REQUIRED',
+    label: 'Index batch size',
+    description: 'Batch size applied on restart.',
+  },
+  {
     key: 'openai.api-key',
     category: 'provider',
     valueType: 'STRING',
@@ -72,7 +87,7 @@ describe('settings page', () => {
 
     expect(await screen.findByText('Query top K')).toBeInTheDocument()
     expect(screen.getByText('OpenAI API key')).toBeInTheDocument()
-    expect(screen.getByText(/Managed through AI profiles/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Managed through AI profiles/i).length).toBeGreaterThan(0)
     expect(within(screen.getByTestId('runtime-settings-section')).getByText('Configured')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'top k' } })
@@ -80,12 +95,12 @@ describe('settings page', () => {
     expect(screen.queryByText('OpenAI API key')).not.toBeInTheDocument()
   })
 
-  it('updates and clears mutable live runtime settings with row feedback', async () => {
+  it('stages mutable settings locally and applies only changed values in one bulk request', async () => {
     const fetchMock = stubFetch((url, init) => {
       if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
       if (url.endsWith('/runtime-settings') && !init?.method) return jsonResponse(200, runtimeSettings)
-      if (url.endsWith('/runtime-settings/query.topK')) {
-        return jsonResponse(200, { ...runtimeSettings[0], currentValue: 12 })
+      if (url.endsWith('/runtime-settings') && init?.method === 'PUT') {
+        return jsonResponse(200, [{ ...runtimeSettings[0], currentValue: 12 }])
       }
       if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
       return jsonResponse(404, { detail: `Unexpected request: ${url}` })
@@ -96,14 +111,106 @@ describe('settings page', () => {
     const section = await screen.findByTestId('runtime-settings-section')
     const input = await within(section).findByLabelText('Value for query.topK')
     fireEvent.change(input, { target: { value: '12' } })
-    await userEvent.click(within(section).getByRole('button', { name: 'Update' }))
-    expect(await within(section).findByText('Updated')).toBeInTheDocument()
+    expect(within(section).getByText('Modified')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/query.topK') && (call[1] as RequestInit | undefined)?.method === 'PUT')).toBe(false)
 
-    await userEvent.click(within(section).getByRole('button', { name: 'Clear' }))
-    expect(await within(section).findByText('Override cleared')).toBeInTheDocument()
+    await userEvent.click(within(section).getByRole('button', { name: 'Apply changes' }))
+    expect(await within(section).findByText('1 runtime setting accepted')).toBeInTheDocument()
 
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/query.topK') && (call[1] as RequestInit).method === 'PUT')).toBe(true)
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/query.topK') && (call[1] as RequestInit).method === 'DELETE')).toBe(true)
+    const bulkCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith('/runtime-settings') && (call[1] as RequestInit | undefined)?.method === 'PUT')
+    expect(bulkCall?.[1]).toMatchObject({ body: JSON.stringify({ updates: [{ key: 'query.topK', value: 12 }] }) })
+  })
+
+  it('edits restart-required settings and shows active, drafted, and accepted pending values separately', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings') && !init?.method) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/runtime-settings') && init?.method === 'PUT') {
+        return jsonResponse(200, [{ ...runtimeSettings[1], currentValue: 100 }])
+      }
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />)
+
+    const section = await screen.findByTestId('runtime-settings-section')
+    fireEvent.change(await within(section).findByLabelText('Value for index.batchSize'), { target: { value: '200' } })
+
+    expect(within(section).getByText('Draft pending restart')).toBeInTheDocument()
+    expect(within(section).getByText('Restart required before active')).toBeInTheDocument()
+    expect(within(section).getByText('100')).toBeInTheDocument()
+
+    await userEvent.click(within(section).getByRole('button', { name: 'Apply changes' }))
+
+    expect(await within(section).findByText('Accepted pending restart')).toBeInTheDocument()
+    expect(within(section).getByText('200')).toBeInTheDocument()
+    const bulkCall = fetchMock.mock.calls.find((call) => String(call[0]).endsWith('/runtime-settings') && (call[1] as RequestInit | undefined)?.method === 'PUT')
+    expect(bulkCall?.[1]).toMatchObject({ body: JSON.stringify({ updates: [{ key: 'index.batchSize', value: 200 }] }) })
+  })
+
+  it('keeps rejected bulk drafts and modified markers after an atomic apply failure', async () => {
+    stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings') && !init?.method) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/runtime-settings') && init?.method === 'PUT') {
+        return jsonResponse(400, { title: 'Invalid setting', detail: 'Batch size is outside allowed range' })
+      }
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />)
+
+    const section = await screen.findByTestId('runtime-settings-section')
+    const input = await within(section).findByLabelText('Value for index.batchSize')
+    fireEvent.change(input, { target: { value: '900' } })
+    await userEvent.click(within(section).getByRole('button', { name: 'Apply changes' }))
+
+    expect(await within(section).findByText('Batch size is outside allowed range')).toBeInTheDocument()
+    expect((within(section).getByLabelText('Value for index.batchSize') as HTMLInputElement).value).toBe('900')
+    expect(within(section).getByText('Modified')).toBeInTheDocument()
+    expect(within(section).getByText('100')).toBeInTheDocument()
+  })
+
+  it('clears mutable restart-required settings while preserving restart messaging', async () => {
+    const fetchMock = stubFetch((url, init) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings') && !init?.method) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/runtime-settings/index.batchSize') && init?.method === 'DELETE') {
+        return jsonResponse(200, { ...runtimeSettings[1], currentValue: 100, defaultValue: 50 })
+      }
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />)
+
+    const section = await screen.findByTestId('runtime-settings-section')
+    const clearButtons = await within(section).findAllByRole('button', { name: 'Clear' })
+    await userEvent.click(clearButtons[1])
+
+    expect(await within(section).findByText('Override clear accepted')).toBeInTheDocument()
+    expect(within(section).getByText('Accepted pending restart')).toBeInTheDocument()
+    expect(within(section).getByText('Restart required before active')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/runtime-settings/index.batchSize') && (call[1] as RequestInit | undefined)?.method === 'DELETE')).toBe(true)
+  })
+
+  it('keeps sensitive and profile-managed runtime settings non-editable', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [])
+      if (url.endsWith('/runtime-settings')) return jsonResponse(200, runtimeSettings)
+      if (url.endsWith('/ai-profiles')) return jsonResponse(200, [])
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    renderWithProviders(<SettingsPage />)
+
+    const section = await screen.findByTestId('runtime-settings-section')
+    await within(section).findByText('OpenAI API key')
+    expect(within(section).queryByLabelText('Value for openai.api-key')).not.toBeInTheDocument()
+    expect(within(section).getAllByText(/Managed through AI profiles/i).length).toBeGreaterThan(0)
+    expect(within(section).getAllByText('PROFILE_MANAGED').length).toBeGreaterThan(0)
   })
 
   it('creates, edits, replaces key, clears key, and deletes AI profiles', async () => {
