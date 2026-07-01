@@ -115,7 +115,7 @@ describe('documents page', () => {
             chunkIndex: 7,
             text: 'First line\nSecond line with extracted document text',
             tokenEstimate: 42,
-            metadata: '{"source":"manual.pdf"}',
+            metadata: '{"source":"manual.pdf","sourcePage":2,"pageCount":12,"parserId":"tika-pdf","fileFormat":"PDF","sectionIndex":3,"processingRunId":"run-9"}',
           },
         ])
       }
@@ -133,8 +133,68 @@ describe('documents page', () => {
     expect(screen.getByText('ID: chunk-a')).toBeInTheDocument()
     expect(screen.getByText('42 tokens')).toBeInTheDocument()
     expect(screen.getByText('manual.pdf')).toBeInTheDocument()
+    expect(screen.getByText('Page')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('Page count')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('Parser')).toBeInTheDocument()
+    expect(screen.getByText('tika-pdf')).toBeInTheDocument()
+    expect(screen.getByText('File format')).toBeInTheDocument()
+    expect(screen.getByText('PDF')).toBeInTheDocument()
+    expect(screen.getByText('Section')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('Processing run')).toBeInTheDocument()
+    expect(screen.getByText('run-9')).toBeInTheDocument()
     expect(screen.getByText(/Second line with extracted document text/)).toBeInTheDocument()
     expect(screen.queryByTestId('output-preview-content')).not.toBeInTheDocument()
+  })
+
+  it('omits page-aware chunk metadata fields when metadata is missing', async () => {
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/documents' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'doc-a',
+            knowledgeBaseId: 'kb-a',
+            originalFilename: 'a.txt',
+            contentType: 'text/plain',
+            sizeBytes: 3,
+            sha256: 'hash',
+            contentUri: 'uri',
+            status: 'COMPLETED',
+            uploadedAt: '2026-01-01T00:00:00Z',
+            processedAt: null,
+            errorMessage: null,
+          },
+        ])
+      }
+      if (url === '/api/v1/documents/doc-a/chunks' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'chunk-a',
+            documentId: 'doc-a',
+            chunkIndex: 0,
+            text: 'No metadata fields',
+            tokenEstimate: 5,
+            metadata: '{}',
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'View chunks' }))
+
+    expect(await screen.findByText('No metadata fields')).toBeInTheDocument()
+    expect(screen.queryByText('Page')).not.toBeInTheDocument()
+    expect(screen.queryByText('Page count')).not.toBeInTheDocument()
+    expect(screen.queryByText('Parser')).not.toBeInTheDocument()
+    expect(screen.queryByText('File format')).not.toBeInTheDocument()
+    expect(screen.queryByText('Section')).not.toBeInTheDocument()
+    expect(screen.queryByText('Processing run')).not.toBeInTheDocument()
   })
 
   it('switches between raw JSON and readable chunk views without refetching chunks', async () => {

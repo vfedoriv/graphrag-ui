@@ -1,7 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from './client'
+import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
-import type { DocumentChunk, DocumentUpload } from './types'
+import type {
+  DocumentChunk,
+  DocumentProcessingOptionsResponse,
+  DocumentUpload,
+  ProcessDocumentWithOptionsRequest,
+  SaveDocumentProcessingDefaultsRequest,
+} from './types'
 
 export const documentsApi = {
   list: (knowledgeBaseId: string) => apiFetch<DocumentUpload[]>(`/knowledge-bases/${knowledgeBaseId}/documents`),
@@ -25,6 +31,22 @@ export const documentsApi = {
     apiFetch<void>(`/knowledge-bases/${knowledgeBaseId}/documents/${documentId}`, { method: 'DELETE' }),
   process: (documentId: string, allowOverwrite = false) =>
     apiFetch<DocumentUpload>(`/documents/${documentId}/process?allowOverwrite=${allowOverwrite}`, { method: 'POST' }),
+  processingOptions: (documentId: string) =>
+    apiFetch<DocumentProcessingOptionsResponse>(`/documents/${documentId}/processing-options`),
+  saveProcessingDefaults: (documentId: string, payload: SaveDocumentProcessingDefaultsRequest) =>
+    apiFetch<DocumentProcessingOptionsResponse>(`/documents/${documentId}/processing-options/defaults`, {
+      method: 'PUT',
+      body: toJsonBody(payload),
+    }),
+  clearProcessingDefaults: (documentId: string) =>
+    apiFetch<DocumentProcessingOptionsResponse>(`/documents/${documentId}/processing-options/defaults`, {
+      method: 'DELETE',
+    }),
+  processWithOptions: (documentId: string, payload: ProcessDocumentWithOptionsRequest) =>
+    apiFetch<DocumentUpload>(`/documents/${documentId}/process`, {
+      method: 'POST',
+      body: toJsonBody(payload),
+    }),
   chunks: (documentId: string) => apiFetch<DocumentChunk[]>(`/documents/${documentId}/chunks`),
 }
 
@@ -54,6 +76,19 @@ export function useDocumentChunksQuery(documentId: string | null) {
   })
 }
 
+export function useDocumentProcessingOptionsQuery(documentId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.documentProcessingOptionsMaybe(documentId),
+    queryFn: () => {
+      if (!documentId) {
+        throw new Error('Cannot load processing options without a selected document')
+      }
+      return documentsApi.processingOptions(documentId)
+    },
+    enabled: Boolean(documentId),
+  })
+}
+
 export function useUploadDocumentMutation() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -71,6 +106,7 @@ export function useReplaceDocumentMutation() {
     onSuccess: (doc) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(doc.id) })
     },
   })
 }
@@ -80,7 +116,45 @@ export function useProcessDocumentMutation() {
   return useMutation({
     mutationFn: ({ documentId, allowOverwrite = false }: { documentId: string; allowOverwrite?: boolean }) =>
       documentsApi.process(documentId, allowOverwrite),
-    onSuccess: (doc) => queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) }),
+    onSuccess: (doc) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
+    },
+  })
+}
+
+export function useSaveDocumentProcessingDefaultsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, options }: { documentId: string; options: SaveDocumentProcessingDefaultsRequest['options'] }) =>
+      documentsApi.saveProcessingDefaults(documentId, { options }),
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(queryKeys.documentProcessingOptions(variables.documentId), result)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(variables.documentId) })
+    },
+  })
+}
+
+export function useClearDocumentProcessingDefaultsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId }: { documentId: string }) => documentsApi.clearProcessingDefaults(documentId),
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(queryKeys.documentProcessingOptions(variables.documentId), result)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(variables.documentId) })
+    },
+  })
+}
+
+export function useProcessDocumentWithOptionsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ documentId, allowOverwrite, options }: { documentId: string } & ProcessDocumentWithOptionsRequest) =>
+      documentsApi.processWithOptions(documentId, { allowOverwrite, options }),
+    onSuccess: (doc) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
+    },
   })
 }
 
@@ -92,6 +166,7 @@ export function useDeleteDocumentMutation() {
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(variables.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(variables.documentId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(variables.documentId) })
     },
   })
 }

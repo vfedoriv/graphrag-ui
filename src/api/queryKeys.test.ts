@@ -18,5 +18,8 @@ describe('query keys', () => {
     expect(queryKeys.chunks('doc-1')).toEqual(['documents', 'chunks', 'doc-1'])
     expect(queryKeys.chunksMaybe('doc-1')).toEqual(['documents', 'chunks', 'doc-1'])
     expect(queryKeys.chunksMaybe(null)).toEqual(['documents', 'chunks', 'none'])
+    expect(queryKeys.documentProcessingOptions('doc-1')).toEqual(['documents', 'processing-options', 'doc-1'])
+    expect(queryKeys.documentProcessingOptionsMaybe('doc-1')).toEqual(['documents', 'processing-options', 'doc-1'])
+    expect(queryKeys.documentProcessingOptionsMaybe(null)).toEqual(['documents', 'processing-options', 'none'])
   })
 })

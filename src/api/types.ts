@@ -231,6 +231,44 @@ export type DocumentChunk = {
   metadata: string
 }
 
+export type DocumentProcessingOptionValueType = 'BOOLEAN' | 'INTEGER' | 'STRING'
+export type DocumentProcessingOptionValue = boolean | number | string | null
+
+export type DocumentProcessingOptionDefinition = {
+  key: string
+  valueType: DocumentProcessingOptionValueType
+  defaultValue: DocumentProcessingOptionValue
+  savedDefaultValue?: DocumentProcessingOptionValue
+  mutable: boolean
+  label?: string | null
+  description?: string | null
+  constraints?: {
+    min?: number | null
+    max?: number | null
+    allowedValues?: string[] | null
+    [key: string]: unknown
+  } | null
+  allowedValues?: string[] | null
+}
+
+export type DocumentProcessingOptionsResponse = {
+  documentId?: string
+  parserId: string
+  fileFormat: string
+  savedDefaults?: Record<string, DocumentProcessingOptionValue> | null
+  savedDefaultsUpdatedAt?: string | null
+  options: DocumentProcessingOptionDefinition[]
+}
+
+export type SaveDocumentProcessingDefaultsRequest = {
+  options: Record<string, DocumentProcessingOptionValue>
+}
+
+export type ProcessDocumentWithOptionsRequest = {
+  allowOverwrite: boolean
+  options: Record<string, DocumentProcessingOptionValue>
+}
+
 export type QueryGenerateRequest = { prompt: string }
 
 export type QueryValidation = {

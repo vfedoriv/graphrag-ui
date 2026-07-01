@@ -17,4 +17,7 @@ export const queryKeys = {
   chunks: (documentId: string) => ['documents', 'chunks', documentId] as const,
   chunksMaybe: (documentId: string | null) =>
     documentId ? queryKeys.chunks(documentId) : (['documents', 'chunks', 'none'] as const),
+  documentProcessingOptions: (documentId: string) => ['documents', 'processing-options', documentId] as const,
+  documentProcessingOptionsMaybe: (documentId: string | null) =>
+    documentId ? queryKeys.documentProcessingOptions(documentId) : (['documents', 'processing-options', 'none'] as const),
 }

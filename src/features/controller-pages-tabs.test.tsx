@@ -61,11 +61,11 @@ describe('controller pages tabs', () => {
     expect(screen.queryByTestId('knowledge-bases-endpoint-tabs')).not.toBeInTheDocument()
   })
 
-  it('renders documents endpoint tabs', async () => {
+  it('renders documents inline workflow without endpoint tabs', async () => {
     renderWithProviders(<DocumentsPage />)
 
     expect(await screen.findByText('Upload document')).toBeInTheDocument()
-    expect(screen.getByText('Inspect document chunks')).toBeInTheDocument()
+    expect(screen.getByText('Selected document workflow')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Select file to upload' })).toBeInTheDocument()
   })
 
