@@ -26,6 +26,15 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Schemas' })).toBeInTheDocument()
   })
 
+  it('navigates to schema builder from the sidebar', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('link', { name: /Schema Builder/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Schema Builder' })).toBeInTheDocument()
+  })
+
   it('does not call dedicated health endpoint', async () => {
     render(<App />)
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())

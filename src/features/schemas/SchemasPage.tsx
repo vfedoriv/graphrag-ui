@@ -31,6 +31,7 @@ import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
+import { SCHEMA_BUILDER_DRAFT_STORAGE_KEY } from '../schema-builder/schemaBuilderStorage'
 
 export function SchemasPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
@@ -73,6 +74,15 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
   const unsupportedSourceTypeSchemas = data.filter((schema) => !isSupportedSchemaSourceType(schema.sourceType))
   const activeDeleteSchemaId = deleteMutation.variables?.schemaId
   const activeActivateSchemaId = activateMutation.variables?.schemaId
+
+  const openSchemaInBuilder = (schema: Schema) => {
+    navigateToSchemaBuilder(`/schema-builder?schemaId=${encodeURIComponent(schema.id)}`)
+  }
+
+  const openDraftInBuilder = (json: string) => {
+    sessionStorage.setItem(SCHEMA_BUILDER_DRAFT_STORAGE_KEY, json)
+    navigateToSchemaBuilder('/schema-builder?draft=session')
+  }
 
   const openUpdateEditor = async (schema: Schema) => {
     setUpdateSuccess('')
@@ -194,6 +204,14 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
                 type='button'
                 variant='ghost'
                 className='table-action-button schema-action-button'
+                onClick={() => openSchemaInBuilder(schema)}
+              >
+                Builder
+              </Button>
+              <Button
+                type='button'
+                variant='ghost'
+                className='table-action-button schema-action-button'
                 isPending={getSchemaForUpdateMutation.isPending && getSchemaForUpdateMutation.variables === schema.id}
                 pendingText='Loading...'
                 onClick={() => {
@@ -305,6 +323,7 @@ function SchemasPageContent({ selectedKnowledgeBaseId }: { selectedKnowledgeBase
             setGeneratedJsonFromFileOutput(json)
             setSchemaJson(json)
           }}
+          onOpenInBuilder={openDraftInBuilder}
           onPendingChange={setIsGeneratePending}
         />
       ),
@@ -457,6 +476,11 @@ function formatSchemaSourceTypeLabel(sourceType: string) {
   return isSupportedSchemaSourceType(sourceType) ? sourceType : `UNSUPPORTED (${sourceType})`
 }
 
+function navigateToSchemaBuilder(url: string) {
+  window.history.pushState({}, '', url)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 function SchemaGenerationWarnings({ warnings }: { warnings?: SchemaGenerationWarning[] }) {
   if (!warnings || warnings.length === 0) return null
 
@@ -497,12 +521,13 @@ function SchemaExampleGenerationWorkflow({ onPendingChange }: { onPendingChange:
 
 function SchemaJsonGenerationWorkflow(
   {
-    textOutput, fileOutput, onTextOutputReady, onFileOutputReady, onPendingChange,
+    textOutput, fileOutput, onTextOutputReady, onFileOutputReady, onOpenInBuilder, onPendingChange,
   }: {
     textOutput: string
     fileOutput: string
     onTextOutputReady: (json: string) => void
     onFileOutputReady: (json: string) => void
+    onOpenInBuilder: (json: string) => void
     onPendingChange: (isPending: boolean) => void
   },
 ) {
@@ -517,6 +542,7 @@ function SchemaJsonGenerationWorkflow(
             onJsonReady={onTextOutputReady}
             output={textOutput}
             onOutputReady={onTextOutputReady}
+            onOpenInBuilder={onOpenInBuilder}
             onPendingChange={onPendingChange}
           />
         </div>
@@ -526,6 +552,7 @@ function SchemaJsonGenerationWorkflow(
             onJsonReady={onFileOutputReady}
             output={fileOutput}
             onOutputReady={onFileOutputReady}
+            onOpenInBuilder={onOpenInBuilder}
             onPendingChange={onPendingChange}
           />
         </div>
@@ -627,8 +654,14 @@ function SchemaGenerateExampleFromFile({ onPendingChange }: { onPendingChange: (
 
 function SchemaGenerateJsonFromText(
   {
-    onJsonReady, output, onOutputReady, onPendingChange,
-  }: { onJsonReady: (json: string) => void, output: string, onOutputReady: (json: string) => void, onPendingChange: (isPending: boolean) => void },
+    onJsonReady, output, onOutputReady, onOpenInBuilder, onPendingChange,
+  }: {
+    onJsonReady: (json: string) => void
+    output: string
+    onOutputReady: (json: string) => void
+    onOpenInBuilder: (json: string) => void
+    onPendingChange: (isPending: boolean) => void
+  },
 ) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
@@ -689,6 +722,11 @@ function SchemaGenerateJsonFromText(
         placeholder='Generated JSON response'
         disabled={generateJson.isPending}
       />
+      {output.trim() ? (
+        <Button type='button' onClick={() => onOpenInBuilder(output)} disabled={generateJson.isPending}>
+          Open in Builder
+        </Button>
+      ) : null}
       <SchemaGenerationWarnings warnings={warnings} />
       {generateJson.error && <Alert title='Generation failed' message={(generateJson.error as Error).message} />}
     </div>
@@ -697,8 +735,14 @@ function SchemaGenerateJsonFromText(
 
 function SchemaGenerateJsonFromFile(
   {
-    onJsonReady, output, onOutputReady, onPendingChange,
-  }: { onJsonReady: (json: string) => void, output: string, onOutputReady: (json: string) => void, onPendingChange: (isPending: boolean) => void },
+    onJsonReady, output, onOutputReady, onOpenInBuilder, onPendingChange,
+  }: {
+    onJsonReady: (json: string) => void
+    output: string
+    onOutputReady: (json: string) => void
+    onOpenInBuilder: (json: string) => void
+    onPendingChange: (isPending: boolean) => void
+  },
 ) {
   const [name, setName] = useState('generated-schema')
   const [version, setVersion] = useState(1)
@@ -773,6 +817,11 @@ function SchemaGenerateJsonFromFile(
         placeholder='Generated JSON response'
         disabled={generateJsonFromFile.isPending}
       />
+      {output.trim() ? (
+        <Button type='button' onClick={() => onOpenInBuilder(output)} disabled={generateJsonFromFile.isPending}>
+          Open in Builder
+        </Button>
+      ) : null}
       <SchemaGenerationWarnings warnings={warnings} />
       {(error || generateJsonFromFile.error) && <Alert title='Generation failed' message={error ?? (generateJsonFromFile.error as Error).message} />}
     </div>

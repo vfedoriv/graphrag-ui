@@ -9,6 +9,8 @@ describe('schemas workflows', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     localStorage.clear()
+    sessionStorage.clear()
+    window.history.pushState({}, '', '/')
   })
 
   it('runs validate, create, and row details flows from purpose sections', async () => {
@@ -197,6 +199,10 @@ describe('schemas workflows', () => {
     expect(within(generateJsonPanel).getByText('Schema generation warnings')).toBeInTheDocument()
     expect(within(generateJsonPanel).getByText(/LOW_CONFIDENCE/)).toBeInTheDocument()
     expect(within(generateJsonPanel).getByText(/Check extracted fields/)).toBeInTheDocument()
+    await user.click(within(generateJsonPanel).getByRole('button', { name: 'Open in Builder' }))
+    expect(sessionStorage.getItem('graphrag.schemaBuilderDraft')).toBe('{"name":"generated-schema","version":1}')
+    expect(window.location.pathname).toBe('/schema-builder')
+    expect(window.location.search).toBe('?draft=session')
 
     const jsonSection = screen.getByTestId('schema-json-generation-section')
     await user.click(within(jsonSection).getByLabelText('From file', { selector: 'input' }))

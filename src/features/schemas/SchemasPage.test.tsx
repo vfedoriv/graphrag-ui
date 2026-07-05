@@ -6,6 +6,8 @@ import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers
 describe('schemas page', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    sessionStorage.clear()
+    window.history.pushState({}, '', '/')
   })
 
   it('shows activate and validate error alerts', async () => {
@@ -96,6 +98,34 @@ describe('schemas page', () => {
         expect.objectContaining({ method: 'POST' }),
       )
     })
+  })
+
+  it('opens a listed schema in the builder', async () => {
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/schemas' && !init?.method) {
+        return jsonResponse(200, [
+          {
+            id: 'schema-a',
+            name: 'Schema A',
+            version: 1,
+            sourceType: 'PREDEFINED',
+            format: 'JSON',
+            contentHash: 'hash',
+            status: 'INACTIVE',
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<SchemasPage />, { selectedKnowledgeBaseId: 'kb-a' })
+
+    await user.click(await screen.findByRole('button', { name: 'Builder' }))
+
+    expect(window.location.pathname).toBe('/schema-builder')
+    expect(window.location.search).toBe('?schemaId=schema-a')
   })
 
   it('renders non-interactive active-state action for active schema rows', async () => {

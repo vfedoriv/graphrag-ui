@@ -815,6 +815,95 @@ textarea {
   padding: 4px;
 }
 
+.schema-builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.schema-builder-main,
+.schema-builder-sidebar {
+  min-width: 0;
+}
+
+.schema-builder-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.schema-builder-import {
+  grid-column: auto;
+}
+
+.schema-builder-canvas {
+  width: 100%;
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.schema-flow-node {
+  display: grid;
+  min-width: 172px;
+  gap: 6px;
+  border: 1px solid color-mix(in oklch, var(--accent) 26%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 12px;
+  box-shadow: 0 10px 24px color-mix(in oklch, var(--fg) 8%, transparent);
+}
+
+.schema-flow-node[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 18%, transparent);
+}
+
+.schema-flow-node strong {
+  overflow-wrap: anywhere;
+}
+
+.schema-flow-node small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.schema-property-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.schema-property-row > * {
+  min-width: 0;
+}
+
+.schema-builder-sidebar .button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.schema-builder-sidebar .flow-card {
+  min-width: 0;
+}
+
+.compact-check {
+  min-height: 38px;
+  padding: 9px 10px;
+  font-size: 13px;
+}
+
+@media (min-width: 1280px) {
+  .schema-builder-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  }
+}
+
 .stack {
   display: grid;
   gap: 12px;
@@ -883,8 +972,21 @@ textarea {
   .settings-form,
   .settings-filters,
   .profile-form,
-  .ops-spine {
+  .ops-spine,
+  .schema-builder-layout {
     grid-template-columns: 1fr;
+  }
+
+  .schema-builder-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .schema-builder-import {
+    grid-column: auto;
+  }
+
+  .schema-builder-canvas {
+    min-height: 460px;
   }
 
   .table-wrap table {

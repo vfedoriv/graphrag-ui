@@ -64,6 +64,66 @@ vi.mock('@visual-json/react', () => ({
   ),
 }))
 
+vi.mock('@xyflow/react', () => ({
+  ReactFlow: ({
+    nodes = [],
+    edges = [],
+    onNodeClick,
+    onEdgeClick,
+    onConnect,
+    children,
+  }: {
+    nodes?: Array<{ id: string; data?: { label?: string } }>
+    edges?: Array<{ id: string; label?: string; source?: string; target?: string }>
+    onNodeClick?: (event: unknown, node: { id: string }) => void
+    onEdgeClick?: (event: unknown, edge: { id: string }) => void
+    onConnect?: (connection: { source: string; target: string }) => void
+    children?: React.ReactNode
+  }) => React.createElement(
+    'div',
+    { 'data-testid': 'mock-react-flow' },
+    nodes.map((node) =>
+      React.createElement(
+        'button',
+        {
+          key: node.id,
+          type: 'button',
+          onClick: () => onNodeClick?.({}, node),
+        },
+        node.data?.label ?? node.id,
+      ),
+    ),
+    edges.map((edge) =>
+      React.createElement(
+        'button',
+        {
+          key: edge.id,
+          type: 'button',
+          onClick: () => onEdgeClick?.({}, edge),
+        },
+        edge.label ?? edge.id,
+      ),
+    ),
+    nodes.length >= 2
+      ? React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => onConnect?.({ source: nodes[0].id, target: nodes[1].id }),
+        },
+        'Mock connect first two nodes',
+      )
+      : null,
+    children,
+  ),
+  Handle: () => null,
+  Background: () => React.createElement('div', { 'data-testid': 'mock-flow-background' }),
+  Controls: () => React.createElement('div', { 'data-testid': 'mock-flow-controls' }),
+  MiniMap: () => React.createElement('div', { 'data-testid': 'mock-flow-minimap' }),
+  MarkerType: { ArrowClosed: 'arrowclosed' },
+  Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
+}))
+
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
