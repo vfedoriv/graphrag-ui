@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
-  MarkerType,
   MiniMap,
   Position,
   ReactFlow,
   type Connection,
-  type Edge,
+  type EdgeProps,
   type EdgeMouseHandler,
-  type Node,
   type NodeMouseHandler,
   type NodeProps,
 } from '@xyflow/react'
@@ -44,6 +44,17 @@ import {
   serializeSchemaDraft,
   validateSchemaBuilderDraft,
 } from './schemaBuilderMapping'
+import {
+  buildSchemaFlowEdges,
+  buildSchemaFlowNodes,
+  relationshipLabelOffsetPattern,
+  routeRelationshipPath,
+  schemaRelationshipHandlePercents,
+  type RelationshipRouteOverride,
+  type SchemaFlowEdge,
+  type SchemaFlowNode,
+  type SelectedElement,
+} from './schemaBuilderFlow'
 import type {
   SchemaBuilderDraft,
   SchemaNodeDraft,
@@ -52,20 +63,12 @@ import type {
 } from './schemaBuilderTypes'
 import { SCHEMA_BUILDER_DRAFT_STORAGE_KEY } from './schemaBuilderStorage'
 
-type SelectedElement =
-  | { kind: 'node'; id: string }
-  | { kind: 'relationship'; id: string }
-  | null
-
-type SchemaFlowNode = Node<{
-  label: string
-  key: string[]
-  propertyCount: number
-}, 'schemaNode'>
-type SchemaFlowEdge = Edge<{ relationshipId: string }>
-
 const nodeTypes = {
   schemaNode: SchemaNodeCard,
+}
+
+const edgeTypes = {
+  schemaRelationship: SchemaRelationshipEdge,
 }
 
 export function SchemaBuilderPage() {
@@ -80,6 +83,7 @@ export function SchemaBuilderPage() {
   const [rawJson, setRawJson] = useState(() => serializeSchemaDraft(createBlankSchemaDraft()))
   const [rawParseError, setRawParseError] = useState<string | null>(null)
   const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
+  const [relationshipRouteOverrides, setRelationshipRouteOverrides] = useState<Record<string, RelationshipRouteOverride>>({})
   const [successMessage, setSuccessMessage] = useState('')
   const [schemaSelectValue, setSchemaSelectValue] = useState('')
   const initialLoadKeyRef = useRef('')
@@ -101,40 +105,27 @@ export function SchemaBuilderPage() {
     setRawJson(serializeSchemaDraft(nextDraft))
     setRawParseError(null)
     setSelectedElement(null)
+    setRelationshipRouteOverrides({})
     setSuccessMessage('')
   }, [])
 
   const visualNodes = useMemo<SchemaFlowNode[]>(
-    () =>
-      draft.nodes.map((node) => ({
-        id: node.id,
-        type: 'schemaNode',
-        position: node.position,
-        data: {
-          label: node.label || 'Unnamed node',
-          key: node.key,
-          propertyCount: node.properties.length,
-        },
-        selected: selectedElement?.kind === 'node' && selectedElement.id === node.id,
-      })),
-    [draft.nodes, selectedElement],
+    () => buildSchemaFlowNodes(draft, selectedElement),
+    [draft, selectedElement],
   )
 
   const visualEdges = useMemo<SchemaFlowEdge[]>(
     () =>
-      draft.relationships
-        .filter((relationship) => relationship.fromNodeId && relationship.toNodeId)
-        .map((relationship) => ({
-          id: relationship.id,
-          source: relationship.fromNodeId,
-          target: relationship.toNodeId,
-          label: relationship.type || 'RELATIONSHIP',
-          type: 'smoothstep',
-          markerEnd: { type: MarkerType.ArrowClosed },
-          selected: selectedElement?.kind === 'relationship' && selectedElement.id === relationship.id,
-          data: { relationshipId: relationship.id },
-        })),
-    [draft.relationships, selectedElement],
+      buildSchemaFlowEdges(draft, selectedElement, relationshipRouteOverrides).map((edge) => ({
+        ...edge,
+        data: edge.data
+          ? {
+              ...edge.data,
+              onSelectRelationship: (relationshipId: string) => setSelectedElement({ kind: 'relationship', id: relationshipId }),
+            }
+          : edge.data,
+      })),
+    [draft, relationshipRouteOverrides, selectedElement],
   )
 
   const importSchemaDetails = useCallback((details: SchemaDetails) => {
@@ -213,6 +204,7 @@ export function SchemaBuilderPage() {
     if (result.ok) {
       setDraft(result.draft)
       setRawParseError(null)
+      setRelationshipRouteOverrides({})
     } else {
       setRawParseError(result.error)
     }
@@ -248,15 +240,28 @@ export function SchemaBuilderPage() {
     setSelectedElement(null)
   }
 
-  function addRelationship(fromNodeId?: string, toNodeId?: string) {
+  function addRelationship(fromNodeId?: string, toNodeId?: string, routeOverride?: Omit<RelationshipRouteOverride, 'sourceNodeId' | 'targetNodeId'>) {
     updateDraft((current) => {
       const [firstNode, secondNode] = current.nodes
+      const sourceNodeId = fromNodeId ?? firstNode?.id ?? ''
+      const targetNodeId = toNodeId ?? secondNode?.id ?? firstNode?.id ?? ''
       const relationship = makeRelationshipDraft(current.relationships.length, {
         id: uniqueDraftId('relationship', current),
         type: `RELATIONSHIP_${current.relationships.length + 1}`,
-        fromNodeId: fromNodeId ?? firstNode?.id ?? '',
-        toNodeId: toNodeId ?? secondNode?.id ?? firstNode?.id ?? '',
+        fromNodeId: sourceNodeId,
+        toNodeId: targetNodeId,
       })
+      if (routeOverride && sourceNodeId && targetNodeId) {
+        setRelationshipRouteOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [relationship.id]: {
+            sourceNodeId,
+            targetNodeId,
+            sourceHandle: routeOverride.sourceHandle,
+            targetHandle: routeOverride.targetHandle,
+          },
+        }))
+      }
       setSelectedElement({ kind: 'relationship', id: relationship.id })
       return { ...current, relationships: [...current.relationships, relationship] }
     })
@@ -272,7 +277,36 @@ export function SchemaBuilderPage() {
 
   const onConnect = (connection: Connection) => {
     if (!connection.source || !connection.target || connection.source === connection.target) return
-    addRelationship(connection.source, connection.target)
+    addRelationship(connection.source, connection.target, {
+      sourceHandle: connection.sourceHandle,
+      targetHandle: connection.targetHandle,
+    })
+  }
+
+  const onReconnect = (oldEdge: SchemaFlowEdge, connection: Connection) => {
+    if (!connection.source || !connection.target || connection.source === connection.target) return
+    updateDraft((current) => ({
+      ...current,
+      relationships: current.relationships.map((relationship) =>
+        relationship.id === oldEdge.id
+          ? {
+              ...relationship,
+              fromNodeId: connection.source,
+              toNodeId: connection.target,
+            }
+          : relationship,
+      ),
+    }))
+    setRelationshipRouteOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [oldEdge.id]: {
+        sourceNodeId: connection.source,
+        targetNodeId: connection.target,
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+      },
+    }))
+    setSelectedElement({ kind: 'relationship', id: oldEdge.id })
   }
 
   const onNodeClick: NodeMouseHandler<SchemaFlowNode> = (_, node) => {
@@ -394,10 +428,14 @@ export function SchemaBuilderPage() {
             nodes={visualNodes}
             edges={visualEdges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
             onNodeDragStop={onNodeDragStop}
+            edgesReconnectable
+            reconnectRadius={14}
             isValidConnection={(connection) => Boolean(connection.source && connection.target && connection.source !== connection.target)}
             fitView
           >
@@ -496,13 +534,142 @@ export function SchemaBuilderPage() {
 
 function SchemaNodeCard({ data, selected, isConnectable }: NodeProps<SchemaFlowNode>) {
   return (
-    <div className='schema-flow-node' data-selected={selected ? 'true' : undefined}>
-      <Handle type='target' position={Position.Left} isConnectable={isConnectable} />
+    <div
+      className='schema-flow-node'
+      data-selected={selected ? 'true' : undefined}
+      data-relationship-endpoint={data.isRelationshipEndpoint ? 'true' : undefined}
+    >
+      <SchemaNodeRoutingHandles isConnectable={isConnectable} />
+      <Handle id='target-left' type='target' position={Position.Left} isConnectable={isConnectable} />
       <strong>{data.label}</strong>
       <small>{data.key.length > 0 ? `Key: ${data.key.join(', ')}` : 'No key set'}</small>
       <small>{data.propertyCount} properties</small>
-      <Handle type='source' position={Position.Right} isConnectable={isConnectable} />
+      <Handle id='source-right' type='source' position={Position.Right} isConnectable={isConnectable} />
     </div>
+  )
+}
+
+const schemaNodeHandleSides = ['left', 'right', 'top', 'bottom'] as const
+
+function SchemaNodeRoutingHandles({ isConnectable }: { isConnectable: boolean }) {
+  return (
+    <>
+      {schemaNodeHandleSides.flatMap((side) =>
+        schemaRelationshipHandlePercents.flatMap((percent) => [
+          <Handle
+            key={`target-${side}-${percent}`}
+            id={`target-${side}-${percent}`}
+            type='target'
+            position={positionForHandleSide(side)}
+            isConnectable={isConnectable}
+            className='schema-flow-handle-aux'
+            style={styleForHandleSide(side, percent)}
+          />,
+          <Handle
+            key={`source-${side}-${percent}`}
+            id={`source-${side}-${percent}`}
+            type='source'
+            position={positionForHandleSide(side)}
+            isConnectable={isConnectable}
+            className='schema-flow-handle-aux'
+            style={styleForHandleSide(side, percent)}
+          />,
+        ]),
+      )}
+    </>
+  )
+}
+
+function positionForHandleSide(side: (typeof schemaNodeHandleSides)[number]) {
+  if (side === 'left') return Position.Left
+  if (side === 'right') return Position.Right
+  if (side === 'top') return Position.Top
+  return Position.Bottom
+}
+
+function styleForHandleSide(side: (typeof schemaNodeHandleSides)[number], percent: number) {
+  if (side === 'left' || side === 'right') {
+    return { top: `${percent}%` }
+  }
+  return { left: `${percent}%` }
+}
+
+function SchemaRelationshipEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  style,
+  markerEnd,
+  selected,
+  data,
+}: EdgeProps<SchemaFlowEdge>) {
+  const isSelected = selected || data?.isSelected
+  const labelOffset = data?.labelOffset ?? relationshipLabelOffsetPattern[0]
+  const { path: edgePath, labelX, labelY, labelLeaderPath } = routeRelationshipPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    route: data?.route,
+    label: data?.label,
+    labelOffset,
+  })
+  const labelSide = labelOffset.y > 0 ? 'below' : 'above'
+  const edgeColor = isSelected ? '#2563eb' : '#52616f'
+
+  return (
+    <>
+      {labelLeaderPath ? (
+        <path
+          className='schema-flow-edge-label-leader'
+          d={labelLeaderPath}
+          stroke={edgeColor}
+          strokeWidth={isSelected ? 1.4 : 1}
+          fill='none'
+        />
+      ) : null}
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{
+          ...style,
+          stroke: edgeColor,
+          strokeWidth: isSelected ? 3 : 1.8,
+        }}
+      />
+      <EdgeLabelRenderer>
+        <div
+          role='button'
+          tabIndex={0}
+          aria-label={`Select relationship ${data?.label ?? id}`}
+          className='schema-flow-edge-label nodrag nopan'
+          data-selected={isSelected ? 'true' : undefined}
+          data-side={labelSide}
+          data-testid={`schema-flow-edge-label-${data?.relationshipId ?? id}`}
+          onClick={() => {
+            if (data?.relationshipId) {
+              data.onSelectRelationship?.(data.relationshipId)
+            }
+          }}
+          onKeyDown={(event) => {
+            if ((event.key === 'Enter' || event.key === ' ') && data?.relationshipId) {
+              event.preventDefault()
+              data.onSelectRelationship?.(data.relationshipId)
+            }
+          }}
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX + labelOffset.x}px,${labelY + labelOffset.y}px)`,
+            zIndex: isSelected ? 50 : 40,
+          }}
+        >
+          {data?.label}
+        </div>
+      </EdgeLabelRenderer>
+    </>
   )
 }
 

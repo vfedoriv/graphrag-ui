@@ -74,7 +74,17 @@ vi.mock('@xyflow/react', () => ({
     children,
   }: {
     nodes?: Array<{ id: string; data?: { label?: string } }>
-    edges?: Array<{ id: string; label?: string; source?: string; target?: string }>
+    edges?: Array<{
+      id: string
+      label?: string
+      source?: string
+      target?: string
+      data?: {
+        label?: string
+        relationshipId?: string
+        onSelectRelationship?: (relationshipId: string) => void
+      }
+    }>
     onNodeClick?: (event: unknown, node: { id: string }) => void
     onEdgeClick?: (event: unknown, edge: { id: string }) => void
     onConnect?: (connection: { source: string; target: string }) => void
@@ -99,9 +109,15 @@ vi.mock('@xyflow/react', () => ({
         {
           key: edge.id,
           type: 'button',
-          onClick: () => onEdgeClick?.({}, edge),
+          onClick: () => {
+            if (edge.data?.relationshipId && edge.data.onSelectRelationship) {
+              edge.data.onSelectRelationship(edge.data.relationshipId)
+            } else {
+              onEdgeClick?.({}, edge)
+            }
+          },
         },
-        edge.label ?? edge.id,
+        edge.data?.label ? `Select relationship ${edge.data.label}` : edge.label ?? edge.id,
       ),
     ),
     nodes.length >= 2

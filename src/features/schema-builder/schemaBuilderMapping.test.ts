@@ -39,6 +39,42 @@ const schemaContent = JSON.stringify({
   customTopLevel: { preserved: true },
 })
 
+const branchingSchemaContent = JSON.stringify({
+  name: 'literary-graph',
+  version: 1,
+  nodes: [
+    { label: 'Person', key: ['fullName', 'publicationVenue', 'nationality'], properties: [{ name: 'fullName', type: 'string', required: true }] },
+    { label: 'Work', key: ['title', 'author'], properties: [{ name: 'title', type: 'string', required: true }] },
+    { label: 'Genre', key: 'name', properties: [{ name: 'name', type: 'string', required: true }] },
+    { label: 'Publication', key: 'name', properties: [{ name: 'name', type: 'string', required: true }] },
+  ],
+  relationships: [
+    { type: 'NOTABLE_WORK', from: 'Person', to: 'Work' },
+    { type: 'LITERARY_GENRE', from: 'Work', to: 'Genre' },
+    { type: 'PUBLISHED_IN', from: 'Work', to: 'Publication' },
+  ],
+})
+
+const hubSchemaContent = JSON.stringify({
+  name: 'person-hub',
+  version: 1,
+  nodes: [
+    { label: 'Person', key: ['fullName', 'birthDate', 'nationality'], properties: [{ name: 'fullName', type: 'string', required: true }] },
+    { label: 'Book', key: ['title', 'author'], properties: [{ name: 'title', type: 'string', required: true }] },
+    { label: 'Award', key: 'name', properties: [{ name: 'name', type: 'string', required: true }] },
+    { label: 'Film', key: ['title', 'releaseYear'], properties: [{ name: 'title', type: 'string', required: true }] },
+    { label: 'Invention', key: 'name', properties: [{ name: 'name', type: 'string', required: true }] },
+    { label: 'Location', key: 'country', properties: [{ name: 'country', type: 'string', required: true }] },
+  ],
+  relationships: [
+    { type: 'NOTABLE_WORK', from: 'Person', to: 'Book' },
+    { type: 'RECEIVED_AWARD', from: 'Person', to: 'Award' },
+    { type: 'PROPOSED', from: 'Person', to: 'Film' },
+    { type: 'NATIONALITY', from: 'Person', to: 'Invention' },
+    { type: 'HOST_OF', from: 'Person', to: 'Location' },
+  ],
+})
+
 describe('schemaBuilderMapping', () => {
   it('imports schema JSON into a builder draft', () => {
     const result = parseSchemaContentToDraft(schemaContent, { schemaId: 'schema-1', sourceType: 'PREDEFINED' })
@@ -54,6 +90,50 @@ describe('schemaBuilderMapping', () => {
       fromNodeId: result.draft.nodes[0].id,
       toNodeId: result.draft.nodes[1].id,
     })
+  })
+
+  it('lays out imported relationship chains with wider layered spacing', () => {
+    const result = parseSchemaContentToDraft(branchingSchemaContent)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const byLabel = new Map(result.draft.nodes.map((node) => [node.label, node]))
+    const person = byLabel.get('Person')
+    const work = byLabel.get('Work')
+    const genre = byLabel.get('Genre')
+    const publication = byLabel.get('Publication')
+
+    expect(person).toBeDefined()
+    expect(work).toBeDefined()
+    expect(genre).toBeDefined()
+    expect(publication).toBeDefined()
+    if (!person || !work || !genre || !publication) return
+
+    expect(work.position.x - person.position.x).toBeGreaterThanOrEqual(360)
+    expect(genre.position.x - work.position.x).toBeGreaterThanOrEqual(360)
+    expect(publication.position.x).toBe(genre.position.x)
+    expect(Math.abs(publication.position.y - genre.position.y)).toBeGreaterThanOrEqual(220)
+  })
+
+  it('fans out high-degree imported hub nodes instead of stacking neighbors in one lane', () => {
+    const result = parseSchemaContentToDraft(hubSchemaContent)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const byLabel = new Map(result.draft.nodes.map((node) => [node.label, node]))
+    const person = byLabel.get('Person')
+    const neighbors = ['Book', 'Award', 'Film', 'Invention', 'Location'].map((label) => byLabel.get(label))
+
+    expect(person).toBeDefined()
+    expect(neighbors.every(Boolean)).toBe(true)
+    if (!person || neighbors.some((node) => !node)) return
+
+    const neighborNodes = neighbors.filter((node): node is NonNullable<typeof node> => Boolean(node))
+    expect(new Set(neighborNodes.map((node) => node.position.x)).size).toBeGreaterThan(1)
+    expect(neighborNodes.every((node) => node.position.x > person.position.x)).toBe(true)
+    expect(Math.max(...neighborNodes.map((node) => node.position.y)) - Math.min(...neighborNodes.map((node) => node.position.y))).toBeLessThan(900)
+    expect(person.position.y).toBeGreaterThanOrEqual(Math.min(...neighborNodes.map((node) => node.position.y)))
+    expect(person.position.y).toBeLessThanOrEqual(Math.max(...neighborNodes.map((node) => node.position.y)))
   })
 
   it('serializes builder drafts and preserves advanced top-level fields', () => {

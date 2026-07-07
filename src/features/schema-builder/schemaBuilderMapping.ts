@@ -16,6 +16,12 @@ type SchemaJsonDocument = {
 }
 
 const KNOWN_TOP_LEVEL_FIELDS = new Set(['name', 'version', 'description', 'nodes', 'relationships'])
+const IMPORT_LAYOUT_X = 430
+const IMPORT_LAYOUT_Y = 230
+const IMPORT_LAYOUT_START_X = 80
+const IMPORT_LAYOUT_START_Y = 80
+const IMPORT_LAYOUT_COMPONENT_GAP = 360
+const IMPORT_LAYOUT_HUB_DEGREE = 4
 
 export function createBlankSchemaDraft(): SchemaBuilderDraft {
   return {
@@ -51,6 +57,8 @@ export function schemaDocumentToDraft(
   const draftNodes = nodes.map((node, index) => toNodeDraft(node, index))
   const nodeIdsByLabel = new Map(draftNodes.map((node) => [node.label, node.id]))
   const relationships = Array.isArray(document.relationships) ? document.relationships : []
+  const draftRelationships = relationships.map((relationship, index) => toRelationshipDraft(relationship, index, nodeIdsByLabel))
+  const positionedNodes = layoutImportedNodes(draftNodes, draftRelationships)
   const advancedFields = Object.fromEntries(
     Object.entries(document).filter(([key]) => !KNOWN_TOP_LEVEL_FIELDS.has(key)),
   )
@@ -59,12 +67,233 @@ export function schemaDocumentToDraft(
     name: typeof document.name === 'string' ? document.name : '',
     version: typeof document.version === 'number' ? document.version : Number(document.version) || 1,
     description: typeof document.description === 'string' ? document.description : '',
-    nodes: draftNodes,
-    relationships: relationships.map((relationship, index) => toRelationshipDraft(relationship, index, nodeIdsByLabel)),
+    nodes: positionedNodes,
+    relationships: draftRelationships,
     advancedFields,
     sourceSchemaId: source?.schemaId,
     sourceType: source?.sourceType,
   }
+}
+
+function layoutImportedNodes(nodes: SchemaNodeDraft[], relationships: SchemaRelationshipDraft[]) {
+  const nodeIds = new Set(nodes.map((node) => node.id))
+  const outgoing = new Map<string, string[]>()
+  const incoming = new Map<string, string[]>()
+  const adjacent = new Map<string, string[]>()
+  nodes.forEach((node) => {
+    outgoing.set(node.id, [])
+    incoming.set(node.id, [])
+    adjacent.set(node.id, [])
+  })
+  relationships.forEach((relationship) => {
+    if (
+      relationship.fromNodeId &&
+      relationship.toNodeId &&
+      relationship.fromNodeId !== relationship.toNodeId &&
+      nodeIds.has(relationship.fromNodeId) &&
+      nodeIds.has(relationship.toNodeId)
+    ) {
+      outgoing.get(relationship.fromNodeId)?.push(relationship.toNodeId)
+      incoming.get(relationship.toNodeId)?.push(relationship.fromNodeId)
+      adjacent.get(relationship.fromNodeId)?.push(relationship.toNodeId)
+      adjacent.get(relationship.toNodeId)?.push(relationship.fromNodeId)
+    }
+  })
+  const components = connectedNodeComponents(nodes, adjacent)
+  const positions = new Map<string, { x: number; y: number }>()
+  let nextComponentY = IMPORT_LAYOUT_START_Y
+
+  components.forEach((component) => {
+    const componentPositions = layoutImportedComponent(component, { outgoing, incoming, adjacent }, nextComponentY)
+    let maxY = nextComponentY
+    componentPositions.forEach((position, nodeId) => {
+      positions.set(nodeId, position)
+      maxY = Math.max(maxY, position.y)
+    })
+    nextComponentY = maxY + IMPORT_LAYOUT_Y + IMPORT_LAYOUT_COMPONENT_GAP
+  })
+
+  return nodes.map((node, index) => ({
+    ...node,
+    position: positions.get(node.id) ?? {
+      x: IMPORT_LAYOUT_START_X,
+      y: IMPORT_LAYOUT_START_Y + index * IMPORT_LAYOUT_Y,
+    },
+  }))
+}
+
+function connectedNodeComponents(
+  nodes: SchemaNodeDraft[],
+  adjacent: Map<string, string[]>,
+) {
+  const visited = new Set<string>()
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+  const components: SchemaNodeDraft[][] = []
+
+  nodes.forEach((node) => {
+    if (visited.has(node.id)) return
+
+    const component: SchemaNodeDraft[] = []
+    const queue = [node.id]
+    visited.add(node.id)
+    while (queue.length > 0) {
+      const nodeId = queue.shift()
+      if (!nodeId) continue
+      const currentNode = nodesById.get(nodeId)
+      if (currentNode) component.push(currentNode)
+      ;(adjacent.get(nodeId) ?? []).forEach((nextId) => {
+        if (!visited.has(nextId)) {
+          visited.add(nextId)
+          queue.push(nextId)
+        }
+      })
+    }
+    components.push(component)
+  })
+
+  return components
+}
+
+function layoutImportedComponent(
+  component: SchemaNodeDraft[],
+  graph: {
+    outgoing: Map<string, string[]>
+    incoming: Map<string, string[]>
+    adjacent: Map<string, string[]>
+  },
+  startY: number,
+) {
+  const hub = component.reduce((bestNode, node) => {
+    const bestDegree = (graph.adjacent.get(bestNode.id) ?? []).length
+    const degree = (graph.adjacent.get(node.id) ?? []).length
+    return degree > bestDegree ? node : bestNode
+  }, component[0])
+
+  if ((graph.adjacent.get(hub.id) ?? []).length >= IMPORT_LAYOUT_HUB_DEGREE) {
+    return layoutHubComponent(component, graph, hub, startY)
+  }
+
+  return layoutLayeredComponent(component, graph.incoming, startY)
+}
+
+function layoutHubComponent(
+  component: SchemaNodeDraft[],
+  graph: {
+    outgoing: Map<string, string[]>
+    incoming: Map<string, string[]>
+    adjacent: Map<string, string[]>
+  },
+  hub: SchemaNodeDraft,
+  startY: number,
+) {
+  const positions = new Map<string, { x: number; y: number }>()
+  const componentIds = new Set(component.map((node) => node.id))
+  const directNeighbors = uniqueIds([
+    ...(graph.outgoing.get(hub.id) ?? []),
+    ...(graph.incoming.get(hub.id) ?? []),
+    ...(graph.adjacent.get(hub.id) ?? []),
+  ]).filter((nodeId) => componentIds.has(nodeId))
+  const directRows = Math.max(1, Math.ceil(Math.sqrt(directNeighbors.length)))
+  const hubRow = Math.max(1, Math.floor((directRows - 1) / 2))
+  positions.set(hub.id, {
+    x: IMPORT_LAYOUT_START_X,
+    y: startY + hubRow * IMPORT_LAYOUT_Y,
+  })
+
+  directNeighbors.forEach((nodeId, index) => {
+    const column = 1 + Math.floor(index / directRows)
+    const row = index % directRows
+    positions.set(nodeId, {
+      x: IMPORT_LAYOUT_START_X + column * IMPORT_LAYOUT_X,
+      y: startY + row * IMPORT_LAYOUT_Y,
+    })
+  })
+
+  const rowsByColumn = new Map<number, number>()
+  directNeighbors.forEach((_, index) => {
+    const column = 1 + Math.floor(index / directRows)
+    const row = index % directRows
+    rowsByColumn.set(column, Math.max(rowsByColumn.get(column) ?? 0, row + 1))
+  })
+  const queue = directNeighbors.map((nodeId, index) => ({ nodeId, column: 1 + Math.floor(index / directRows) }))
+  while (queue.length > 0) {
+    const item = queue.shift()
+    if (!item) continue
+
+    const nextIds = uniqueIds([
+      ...(graph.outgoing.get(item.nodeId) ?? []),
+      ...(graph.incoming.get(item.nodeId) ?? []),
+    ]).filter((nodeId) => componentIds.has(nodeId) && nodeId !== hub.id && !positions.has(nodeId))
+    nextIds.forEach((nodeId) => {
+      const column = item.column + 1
+      const row = rowsByColumn.get(column) ?? 0
+      rowsByColumn.set(column, row + 1)
+      positions.set(nodeId, {
+        x: IMPORT_LAYOUT_START_X + column * IMPORT_LAYOUT_X,
+        y: startY + row * IMPORT_LAYOUT_Y,
+      })
+      queue.push({ nodeId, column })
+    })
+  }
+
+  component.forEach((node) => {
+    if (positions.has(node.id)) return
+    const row = rowsByColumn.get(0) ?? hubRow + 1
+    rowsByColumn.set(0, row + 1)
+    positions.set(node.id, {
+      x: IMPORT_LAYOUT_START_X,
+      y: startY + row * IMPORT_LAYOUT_Y,
+    })
+  })
+
+  return positions
+}
+
+function layoutLayeredComponent(
+  component: SchemaNodeDraft[],
+  incoming: Map<string, string[]>,
+  startY: number,
+) {
+  const componentIds = new Set(component.map((node) => node.id))
+  const layerCache = new Map<string, number>()
+  const layerForNode = (nodeId: string, visiting = new Set<string>()): number => {
+    const cached = layerCache.get(nodeId)
+    if (cached !== undefined) return cached
+    if (visiting.has(nodeId)) return 0
+
+    const nextVisiting = new Set(visiting)
+    nextVisiting.add(nodeId)
+    const sources = (incoming.get(nodeId) ?? []).filter((sourceId) => componentIds.has(sourceId))
+    const layer = sources.length === 0
+      ? 0
+      : Math.max(...sources.map((sourceId) => layerForNode(sourceId, nextVisiting) + 1))
+    layerCache.set(nodeId, layer)
+    return layer
+  }
+
+  const rowsByLayer = new Map<number, number>()
+  const positions = new Map<string, { x: number; y: number }>()
+  component.forEach((node) => {
+    const layer = layerForNode(node.id)
+    const row = rowsByLayer.get(layer) ?? 0
+    rowsByLayer.set(layer, row + 1)
+    positions.set(node.id, {
+      x: IMPORT_LAYOUT_START_X + layer * IMPORT_LAYOUT_X,
+      y: startY + row * IMPORT_LAYOUT_Y,
+    })
+  })
+
+  return positions
+}
+
+function uniqueIds(values: string[]) {
+  const ids: string[] = []
+  values.forEach((value) => {
+    if (!ids.includes(value)) {
+      ids.push(value)
+    }
+  })
+  return ids
 }
 
 export function serializeSchemaDraft(draft: SchemaBuilderDraft): string {

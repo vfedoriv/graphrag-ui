@@ -3,6 +3,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaBuilderPage } from './SchemaBuilderPage'
+import { buildSchemaFlowEdges, buildSchemaFlowNodes, routeRelationshipPath } from './schemaBuilderFlow'
+import { parseSchemaContentToDraft, serializeSchemaDraft } from './schemaBuilderMapping'
 import { renderWithProviders, jsonResponse, stubFetch } from '../../test/helpers'
 
 const importedSchemaContent = JSON.stringify({
@@ -22,6 +24,33 @@ const importedSchemaContent = JSON.stringify({
   ],
   relationships: [{ type: 'HAS_PARTY', from: 'Contract', to: 'Party' }],
   indexes: [{ label: 'Contract', properties: ['contractId'], unique: true }],
+})
+
+const denseRelationshipSchemaContent = JSON.stringify({
+  name: 'dense-relationships',
+  version: 1,
+  nodes: [
+    {
+      label: 'Person',
+      key: 'fullName',
+      properties: [{ name: 'fullName', type: 'string', required: true }],
+    },
+    {
+      label: 'Location',
+      key: 'country',
+      properties: [{ name: 'country', type: 'string', required: true }],
+    },
+    {
+      label: 'Nationality',
+      key: 'name',
+      properties: [{ name: 'name', type: 'string', required: true }],
+    },
+  ],
+  relationships: [
+    { type: 'BORN_IN', from: 'Person', to: 'Location' },
+    { type: 'EMIGRATED_TO', from: 'Person', to: 'Location' },
+    { type: 'HAS_NATIONALITY', from: 'Person', to: 'Nationality' },
+  ],
 })
 
 function renderBuilder(initialEntry = '/schema-builder', strict = false) {
@@ -95,10 +124,21 @@ describe('SchemaBuilderPage', () => {
 
     expect(await screen.findByRole('combobox', { name: 'Import existing schema' })).toHaveValue('schema-1')
     expect(await screen.findByRole('button', { name: 'Contract' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'HAS_PARTY' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select relationship HAS_PARTY' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Raw View' }))
     expect((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value).toContain('"indexes"')
+  })
+
+  it('selects a relationship when its canvas label is clicked', async () => {
+    const user = userEvent.setup()
+    renderBuilder('/schema-builder?schemaId=schema-1')
+
+    await user.click(await screen.findByRole('button', { name: 'Select relationship HAS_PARTY' }))
+
+    expect(screen.getByLabelText('Type')).toHaveValue('HAS_PARTY')
+    expect(screen.getByLabelText('From node')).toHaveValue('node-contract-1')
+    expect(screen.getByLabelText('To node')).toHaveValue('node-party-2')
   })
 
   it('supports blank draft visual edits and raw JSON synchronization', async () => {
@@ -157,5 +197,100 @@ describe('SchemaBuilderPage', () => {
     renderBuilder('/schema-builder?draft=session')
 
     expect(await screen.findByRole('button', { name: 'Asset' })).toBeInTheDocument()
+  })
+
+  it('derives selected relationship edge and endpoint node presentation state', () => {
+    const result = parseSchemaContentToDraft(denseRelationshipSchemaContent)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const selectedRelationship = result.draft.relationships[1]
+    const selectedElement = { kind: 'relationship' as const, id: selectedRelationship.id }
+
+    const nodes = buildSchemaFlowNodes(result.draft, selectedElement)
+    expect(nodes.filter((node) => node.data.isRelationshipEndpoint).map((node) => node.data.label)).toEqual(['Person', 'Location'])
+
+    const edges = buildSchemaFlowEdges(result.draft, selectedElement)
+    const selectedEdge = edges.find((edge) => edge.id === selectedRelationship.id)
+    expect(selectedEdge).toMatchObject({
+      type: 'schemaRelationship',
+      selected: true,
+      data: {
+        label: 'EMIGRATED_TO',
+        isSelected: true,
+      },
+    })
+    expect(selectedEdge?.data?.labelOffset.y).not.toBe(0)
+    expect(selectedEdge?.sourceHandle).toMatch(/^source-(left|right|top|bottom)-(20|50|80)$/)
+    expect(selectedEdge?.targetHandle).toMatch(/^target-(left|right|top|bottom)-(20|50|80)$/)
+    expect(selectedEdge?.data?.route.sourceHandle).toBe(selectedEdge?.sourceHandle)
+    expect(selectedEdge?.data?.route.nodeBounds.length).toBe(result.draft.nodes.length)
+
+    const clearedNodes = buildSchemaFlowNodes(result.draft, { kind: 'node', id: result.draft.nodes[0].id })
+    expect(clearedNodes.some((node) => node.data.isRelationshipEndpoint)).toBe(false)
+  })
+
+  it('renders relationship paths as curved cubic edges', () => {
+    const routed = routeRelationshipPath({
+      sourceX: 0,
+      sourceY: 50,
+      targetX: 300,
+      targetY: 160,
+      route: {
+        sourceNodeId: 'source',
+        targetNodeId: 'target',
+        sourceHandle: 'source-right-50',
+        targetHandle: 'target-left-50',
+        centerXOffset: 0,
+        centerYOffset: 0,
+        nodeBounds: [{ id: 'obstacle', x: 100, y: 0, width: 100, height: 100 }],
+      },
+    })
+
+    expect(routed.path).toMatch(/^M 0 50 C /)
+    expect(routed.path).toContain(' C ')
+    expect(routed.path).toContain('300 160')
+    expect(routed.path).not.toContain(' Q ')
+  })
+
+  it('returns a label leader path when a relationship label is offset from its route', () => {
+    const routed = routeRelationshipPath({
+      sourceX: 0,
+      sourceY: 50,
+      targetX: 300,
+      targetY: 50,
+      label: 'OFFSET_LABEL',
+      labelOffset: { x: 0, y: 56 },
+    })
+
+    expect(routed.labelLeaderPath).toMatch(/^M /)
+    expect(routed.labelLeaderPath).toContain(`L ${routed.labelX} ${routed.labelY + 56}`)
+  })
+
+  it('keeps relationship presentation state out of serialized schema content', () => {
+    const result = parseSchemaContentToDraft(denseRelationshipSchemaContent)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const selectedElement = { kind: 'relationship' as const, id: result.draft.relationships[0].id }
+    const before = JSON.parse(serializeSchemaDraft(result.draft))
+
+    buildSchemaFlowNodes(result.draft, selectedElement)
+    const routedEdges = buildSchemaFlowEdges(result.draft, selectedElement, {
+      [result.draft.relationships[0].id]: {
+        sourceNodeId: result.draft.relationships[0].fromNodeId,
+        targetNodeId: result.draft.relationships[0].toNodeId,
+        sourceHandle: 'source-bottom-80',
+        targetHandle: 'target-top-20',
+      },
+    })
+
+    const after = JSON.parse(serializeSchemaDraft(result.draft))
+    expect(routedEdges[0].sourceHandle).toBe('source-bottom-80')
+    expect(routedEdges[0].targetHandle).toBe('target-top-20')
+    expect(after).toEqual(before)
+    expect(JSON.stringify(after)).not.toContain('labelOffset')
+    expect(JSON.stringify(after)).not.toContain('source-bottom-80')
+    expect(JSON.stringify(after)).not.toContain('isRelationshipEndpoint')
   })
 })
