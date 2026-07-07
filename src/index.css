@@ -885,6 +885,35 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.schema-flow-node-drag-preview {
+  position: absolute;
+  display: grid;
+  width: 230px;
+  min-height: 126px;
+  gap: 6px;
+  align-content: start;
+  border: 2px dashed color-mix(in oklch, var(--accent) 70%, var(--fg));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--surface) 76%, transparent);
+  color: var(--fg);
+  opacity: 0.78;
+  padding: 11px;
+  pointer-events: none;
+  box-shadow: 0 14px 28px color-mix(in oklch, var(--accent) 14%, transparent);
+  z-index: 60;
+}
+
+.schema-flow-node-drag-preview strong {
+  overflow-wrap: anywhere;
+}
+
+.schema-flow-node-drag-preview small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .schema-flow-handle-aux {
   width: 7px;
   height: 7px;

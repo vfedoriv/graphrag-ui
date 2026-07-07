@@ -8,6 +8,7 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  ViewportPortal,
   type Connection,
   type EdgeProps,
   type EdgeMouseHandler,
@@ -63,6 +64,8 @@ import type {
 } from './schemaBuilderTypes'
 import { SCHEMA_BUILDER_DRAFT_STORAGE_KEY } from './schemaBuilderStorage'
 
+type DragPreviewNode = Pick<SchemaFlowNode, 'id' | 'position' | 'data'> | null
+
 const nodeTypes = {
   schemaNode: SchemaNodeCard,
 }
@@ -94,11 +97,13 @@ export function SchemaBuilderPage() {
   const hasImportOption = Boolean(importSelectValue) && schemas.some((schema) => schema.id === importSelectValue)
   const localIssues = useMemo(() => validateSchemaBuilderDraft(draft, rawParseError), [draft, rawParseError])
   const isDraftSubmittable = localIssues.length === 0
-  const isAnyPending =
-    getSchemaMutation.isPending ||
+  const isSchemaImportPending = getSchemaMutation.isPending
+  const isWorkflowPending =
     validateMutation.isPending ||
     createMutation.isPending ||
     updateMutation.isPending
+  const isAnyPending = isSchemaImportPending || isWorkflowPending
+  const [dragPreviewNode, setDragPreviewNode] = useState<DragPreviewNode>(null)
 
   const replaceDraft = useCallback((nextDraft: SchemaBuilderDraft) => {
     setDraft(nextDraft)
@@ -106,6 +111,7 @@ export function SchemaBuilderPage() {
     setRawParseError(null)
     setSelectedElement(null)
     setRelationshipRouteOverrides({})
+    setDragPreviewNode(null)
     setSuccessMessage('')
   }, [])
 
@@ -205,6 +211,7 @@ export function SchemaBuilderPage() {
       setDraft(result.draft)
       setRawParseError(null)
       setRelationshipRouteOverrides({})
+      setDragPreviewNode(null)
     } else {
       setRawParseError(result.error)
     }
@@ -317,6 +324,14 @@ export function SchemaBuilderPage() {
     setSelectedElement({ kind: 'relationship', id: edge.id })
   }
 
+  const onNodeDragStart = (_: MouseEvent | TouchEvent, node: SchemaFlowNode) => {
+    setDragPreviewNode({ id: node.id, position: node.position, data: node.data })
+  }
+
+  const onNodeDrag = (_: MouseEvent | TouchEvent, node: SchemaFlowNode) => {
+    setDragPreviewNode({ id: node.id, position: node.position, data: node.data })
+  }
+
   const onNodeDragStop = (_: MouseEvent | TouchEvent, node: SchemaFlowNode) => {
     updateDraft((current) => ({
       ...current,
@@ -324,6 +339,7 @@ export function SchemaBuilderPage() {
         draftNode.id === node.id ? { ...draftNode, position: node.position } : draftNode,
       ),
     }))
+    setDragPreviewNode(null)
   }
 
   async function validateDraft() {
@@ -373,7 +389,7 @@ export function SchemaBuilderPage() {
   const topSection = (
     <div className='schema-builder-layout'>
       <div className='schema-builder-main stack'>
-        {isAnyPending ? <ProgressBanner message='Waiting for schema builder workflow response...' /> : null}
+        {isWorkflowPending ? <ProgressBanner message='Waiting for schema builder workflow response...' /> : null}
         <div className='schema-builder-toolbar'>
           <Button
             type='button'
@@ -433,6 +449,8 @@ export function SchemaBuilderPage() {
             onReconnect={onReconnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
             edgesReconnectable
             reconnectRadius={14}
@@ -442,6 +460,7 @@ export function SchemaBuilderPage() {
             <MiniMap pannable zoomable />
             <Controls />
             <Background />
+            {dragPreviewNode ? <SchemaNodeDragPreview node={dragPreviewNode} /> : null}
           </ReactFlow>
         </div>
 
@@ -546,6 +565,22 @@ function SchemaNodeCard({ data, selected, isConnectable }: NodeProps<SchemaFlowN
       <small>{data.propertyCount} properties</small>
       <Handle id='source-right' type='source' position={Position.Right} isConnectable={isConnectable} />
     </div>
+  )
+}
+
+function SchemaNodeDragPreview({ node }: { node: NonNullable<DragPreviewNode> }) {
+  return (
+    <ViewportPortal>
+      <div
+        className='schema-flow-node-drag-preview'
+        data-testid={`schema-node-drag-preview-${node.id}`}
+        style={{ left: node.position.x, top: node.position.y }}
+      >
+        <strong>{node.data.label}</strong>
+        <small>{node.data.key.length > 0 ? `Key: ${node.data.key.join(', ')}` : 'No key set'}</small>
+        <small>{node.data.propertyCount} properties</small>
+      </div>
+    </ViewportPortal>
   )
 }
 

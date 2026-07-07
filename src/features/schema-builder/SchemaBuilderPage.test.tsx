@@ -130,6 +130,44 @@ describe('SchemaBuilderPage', () => {
     expect((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value).toContain('"indexes"')
   })
 
+  it('does not flash the workflow progress banner while importing an existing schema', async () => {
+    let resolveSchemaDetails: (response: ReturnType<typeof jsonResponse>) => void = () => undefined
+    const schemaDetails = new Promise<ReturnType<typeof jsonResponse>>((resolve) => {
+      resolveSchemaDetails = resolve
+    })
+    const fetchMock = stubFetch(async (url, init) => {
+      if (url.endsWith('/knowledge-bases/kb-a/schemas')) {
+        return jsonResponse(200, [
+          { id: 'schema-1', name: 'Legal', version: 1, sourceType: 'PREDEFINED', format: 'JSON', contentHash: 'h', status: 'ACTIVE', createdAt: '' },
+        ])
+      }
+      if (url.endsWith('/schemas/schema-1') && (!init?.method || init.method === 'GET')) {
+        return schemaDetails
+      }
+      return jsonResponse(200, [])
+    })
+
+    renderBuilder('/schema-builder?schemaId=schema-1')
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/api/v1/schemas/schema-1'))).toBe(true)
+    })
+    expect(screen.queryByText('Waiting for schema builder workflow response...')).not.toBeInTheDocument()
+
+    resolveSchemaDetails(jsonResponse(200, {
+      id: 'schema-1',
+      name: 'Legal',
+      version: 1,
+      sourceType: 'PREDEFINED',
+      format: 'JSON',
+      contentHash: 'h',
+      status: 'ACTIVE',
+      createdAt: '',
+      content: importedSchemaContent,
+    }))
+    expect(await screen.findByRole('button', { name: 'Contract' })).toBeInTheDocument()
+  })
+
   it('selects a relationship when its canvas label is clicked', async () => {
     const user = userEvent.setup()
     renderBuilder('/schema-builder?schemaId=schema-1')
@@ -152,6 +190,27 @@ describe('SchemaBuilderPage', () => {
     await user.click(screen.getByRole('button', { name: 'Raw View' }))
 
     expect((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value).toContain('"Contract"')
+  })
+
+  it('shows a drag preview while keeping the schema node in place until drop', async () => {
+    const user = userEvent.setup()
+    renderBuilder('/schema-builder?schemaId=schema-1')
+
+    const contractNode = await screen.findByTestId('mock-flow-node-node-contract-1')
+    expect(contractNode).toHaveAttribute('data-position', '80,80')
+
+    await user.click(screen.getByRole('button', { name: 'Mock drag Contract' }))
+    expect(screen.getByTestId('mock-flow-node-node-contract-1')).toHaveAttribute('data-position', '80,80')
+    expect(screen.getByTestId('schema-node-drag-preview-node-contract-1')).toHaveStyle({ left: '180px', top: '130px' })
+
+    await user.click(screen.getByRole('button', { name: 'Mock drop Contract' }))
+    expect(screen.getByTestId('mock-flow-node-node-contract-1')).toHaveAttribute('data-position', '180,130')
+    expect(screen.queryByTestId('schema-node-drag-preview-node-contract-1')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Raw View' }))
+    const serializedSchema = JSON.parse((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value)
+    expect(JSON.stringify(serializedSchema)).not.toContain('position')
+    expect(JSON.stringify(serializedSchema)).not.toContain('drag')
   })
 
   it('preserves invalid raw JSON and blocks submit actions', async () => {

@@ -68,12 +68,15 @@ vi.mock('@xyflow/react', () => ({
   ReactFlow: ({
     nodes = [],
     edges = [],
+    onNodeDragStart,
+    onNodeDrag,
+    onNodeDragStop,
     onNodeClick,
     onEdgeClick,
     onConnect,
     children,
   }: {
-    nodes?: Array<{ id: string; data?: { label?: string } }>
+    nodes?: Array<{ id: string; position?: { x: number; y: number }; data?: { label?: string } }>
     edges?: Array<{
       id: string
       label?: string
@@ -85,6 +88,9 @@ vi.mock('@xyflow/react', () => ({
         onSelectRelationship?: (relationshipId: string) => void
       }
     }>
+    onNodeDragStart?: (event: unknown, node: { id: string; position: { x: number; y: number }; data?: { label?: string } }) => void
+    onNodeDrag?: (event: unknown, node: { id: string; position: { x: number; y: number }; data?: { label?: string } }) => void
+    onNodeDragStop?: (event: unknown, node: { id: string; position: { x: number; y: number }; data?: { label?: string } }) => void
     onNodeClick?: (event: unknown, node: { id: string }) => void
     onEdgeClick?: (event: unknown, edge: { id: string }) => void
     onConnect?: (connection: { source: string; target: string }) => void
@@ -98,9 +104,49 @@ vi.mock('@xyflow/react', () => ({
         {
           key: node.id,
           type: 'button',
+          'data-testid': `mock-flow-node-${node.id}`,
+          'data-position': `${node.position?.x ?? 0},${node.position?.y ?? 0}`,
           onClick: () => onNodeClick?.({}, node),
         },
         node.data?.label ?? node.id,
+      ),
+    ),
+    nodes.map((node) =>
+      React.createElement(
+        'button',
+        {
+          key: `${node.id}-drag`,
+          type: 'button',
+          onClick: () => {
+            const draggedNode = {
+              ...node,
+              position: {
+                x: (node.position?.x ?? 0) + 100,
+                y: (node.position?.y ?? 0) + 50,
+              },
+            }
+            onNodeDragStart?.({}, node)
+            onNodeDrag?.({}, draggedNode)
+          },
+        },
+        `Mock drag ${node.data?.label ?? node.id}`,
+      ),
+    ),
+    nodes.map((node) =>
+      React.createElement(
+        'button',
+        {
+          key: `${node.id}-drop`,
+          type: 'button',
+          onClick: () => onNodeDragStop?.({}, {
+            ...node,
+            position: {
+              x: (node.position?.x ?? 0) + 100,
+              y: (node.position?.y ?? 0) + 50,
+            },
+          }),
+        },
+        `Mock drop ${node.data?.label ?? node.id}`,
       ),
     ),
     edges.map((edge) =>
@@ -136,6 +182,7 @@ vi.mock('@xyflow/react', () => ({
   Background: () => React.createElement('div', { 'data-testid': 'mock-flow-background' }),
   Controls: () => React.createElement('div', { 'data-testid': 'mock-flow-controls' }),
   MiniMap: () => React.createElement('div', { 'data-testid': 'mock-flow-minimap' }),
+  ViewportPortal: ({ children }: { children?: React.ReactNode }) => React.createElement(React.Fragment, null, children),
   MarkerType: { ArrowClosed: 'arrowclosed' },
   Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
 }))
