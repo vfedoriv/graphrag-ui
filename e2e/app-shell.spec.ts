@@ -13,22 +13,31 @@ test('navigates across controller pages and preserves knowledge-base context', a
   await expect(page.getByText('Workspace: Alpha Research')).toBeVisible()
 
   await page.getByRole('link', { name: 'Knowledge Bases', exact: true }).click()
+  await expect(page).toHaveURL(/\/knowledge-bases$/)
   await expect(page.getByRole('heading', { name: 'Knowledge Bases', exact: true })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'kb-alpha' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Schemas', exact: true }).click()
+  await expect(page).toHaveURL(/\/schemas$/)
   await expect(page.getByRole('heading', { name: 'Schemas', exact: true })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Customer graph' })).toBeVisible()
 
+  await page.getByRole('link', { name: 'Schema Builder', exact: true }).click()
+  await expect(page).toHaveURL(/\/schema-builder$/)
+  await expect(page.getByRole('heading', { name: 'Schema Builder', exact: true })).toBeVisible()
+
   await page.getByRole('link', { name: 'Documents', exact: true }).click()
+  await expect(page).toHaveURL(/\/documents$/)
   await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible()
   await expect(page.getByRole('cell', { name: 'alpha-notes.txt' })).toBeVisible()
 
   await page.getByRole('link', { name: 'Queries', exact: true }).click()
+  await expect(page).toHaveURL(/\/queries$/)
   await expect(page.getByRole('heading', { name: 'Queries', exact: true })).toBeVisible()
   await expect(page.getByText('Use tabs below to run endpoint workflows')).toBeVisible()
 
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
+  await expect(page).toHaveURL(/\/settings$/)
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
   await expect(page.getByText('Backend settings catalog')).toBeVisible()
   await expect(page.getByText('API base: /api/v1')).toBeVisible()

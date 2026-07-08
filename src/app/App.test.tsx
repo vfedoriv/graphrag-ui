@@ -26,6 +26,17 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Schemas' })).toBeInTheDocument()
   })
 
+  it('keeps the app shell visible while lazy routes load', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(await screen.findByText('GraphRAG UI')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: /Settings/i }))
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
+  })
+
   it('navigates to schema builder from the sidebar', async () => {
     const user = userEvent.setup()
     render(<App />)

@@ -1,25 +1,43 @@
+import { lazy, Suspense, type ComponentType } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import { AppLayout } from './AppLayout'
-import { DashboardPage } from '../features/dashboard/DashboardPage'
-import { KnowledgeBasesPage } from '../features/knowledge-bases/KnowledgeBasesPage'
-import { SchemasPage } from '../features/schemas/SchemasPage'
-import { SchemaBuilderPage } from '../features/schema-builder/SchemaBuilderPage'
-import { DocumentsPage } from '../features/documents/DocumentsPage'
-import { QueriesPage } from '../features/queries/QueriesPage'
-import { SettingsPage } from '../features/settings/SettingsPage'
+import { RouteLoadingFallback } from './RouteLoadingFallback'
+
+const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'), 'DashboardPage')
+const KnowledgeBasesPage = lazyPage(() => import('../features/knowledge-bases/KnowledgeBasesPage'), 'KnowledgeBasesPage')
+const SchemasPage = lazyPage(() => import('../features/schemas/SchemasPage'), 'SchemasPage')
+const SchemaBuilderPage = lazyPage(() => import('../features/schema-builder/SchemaBuilderPage'), 'SchemaBuilderPage')
+const DocumentsPage = lazyPage(() => import('../features/documents/DocumentsPage'), 'DocumentsPage')
+const QueriesPage = lazyPage(() => import('../features/queries/QueriesPage'), 'QueriesPage')
+const SettingsPage = lazyPage(() => import('../features/settings/SettingsPage'), 'SettingsPage')
+
+function lazyPage<T extends Record<string, ComponentType>>(
+  load: () => Promise<T>,
+  exportName: keyof T,
+) {
+  return lazy(async () => ({ default: (await load())[exportName] }))
+}
+
+function routeElement(Page: ComponentType) {
+  return (
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Page />
+    </Suspense>
+  )
+}
 
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'knowledge-bases', element: <KnowledgeBasesPage /> },
-      { path: 'schemas', element: <SchemasPage /> },
-      { path: 'schema-builder', element: <SchemaBuilderPage /> },
-      { path: 'documents', element: <DocumentsPage /> },
-      { path: 'queries', element: <QueriesPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      { index: true, element: routeElement(DashboardPage) },
+      { path: 'knowledge-bases', element: routeElement(KnowledgeBasesPage) },
+      { path: 'schemas', element: routeElement(SchemasPage) },
+      { path: 'schema-builder', element: routeElement(SchemaBuilderPage) },
+      { path: 'documents', element: routeElement(DocumentsPage) },
+      { path: 'queries', element: routeElement(QueriesPage) },
+      { path: 'settings', element: routeElement(SettingsPage) },
     ],
   },
 ])
