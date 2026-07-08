@@ -1,3 +1,7 @@
+## Purpose
+
+This specification defines document processing option discovery, editing, defaults, and option-aware processing behavior in the GraphRAG admin UI.
+
 ## Requirements
 
 ### Requirement: Document processing options are discoverable from the Documents page

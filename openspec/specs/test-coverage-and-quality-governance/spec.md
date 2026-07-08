@@ -1,7 +1,7 @@
 # test-coverage-and-quality-governance Specification
 
 ## Purpose
-TBD - created by archiving change improve-test-coverage-and-quality-plan. Update Purpose after archive.
+This specification defines coverage reporting, browser regression testing, and quality guardrails for the GraphRAG UI test suite.
 ## Requirements
 ### Requirement: Coverage reporting MUST be operational
 The system SHALL provide a working coverage command that produces machine-readable and human-readable coverage output for the current Vitest suite.
@@ -56,3 +56,18 @@ The system SHALL define browser-test implementation patterns that keep Playwrigh
 #### Scenario: Add browser workflow tests
 - **WHEN** contributors add Playwright tests for GraphRAG UI workflows
 - **THEN** tests SHALL use stable selectors, same-origin app routes, deterministic `/api/v1` mocks, and no third-party sample-site dependencies
+
+### Requirement: Project quality guardrails validate the current source of truth
+The system SHALL keep the documented project validation surface executable against the current codebase, current OpenSpec specs, and current project documentation.
+
+#### Scenario: Validate all OpenSpec artifacts
+- **WHEN** a developer runs `openspec validate --all`
+- **THEN** all current specs and active changes SHALL validate without structural errors
+
+#### Scenario: Follow documented validation references
+- **WHEN** a developer follows project documentation for validation and quality gaps
+- **THEN** referenced commands and documents SHALL exist or the documentation SHALL be updated to remove stale references
+
+#### Scenario: Inspect generated output guidance
+- **WHEN** a developer reads project source guidance
+- **THEN** generated outputs such as `dist/` and `coverage/` SHALL be described as generated artifacts rather than source inputs

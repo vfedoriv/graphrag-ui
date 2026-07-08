@@ -1,7 +1,7 @@
 # schema-structured-json-editing Specification
 
 ## Purpose
-TBD - created by archiving change use-json-edit-react-for-schema-editors. Update Purpose after archive.
+This specification defines structured and raw JSON editing behavior for schema JSON drafts in GraphRAG UI workflows.
 ## Requirements
 ### Requirement: Schema JSON uses structured tree editing
 The system SHALL provide a structured JSON tree editor for schema JSON drafts that allows users to add nodes, remove nodes, move or reorder nodes, and edit primitive values.
@@ -81,4 +81,3 @@ The system SHALL allow users to paste or replace the complete JSON document from
 #### Scenario: Whole-document paste is disabled while editor is read-only
 - **WHEN** the schema JSON editor is disabled during a pending workflow
 - **THEN** the system SHALL prevent Raw View from changing the draft
-

@@ -2,10 +2,12 @@ import type {
   DocumentChunk,
   DocumentUpload,
   GeneratedQueryResponse,
+  AiProfile,
   KnowledgeBase,
   QueryAskResponse,
   QueryExecutionResponse,
   QueryValidation,
+  RuntimeSetting,
   Schema,
 } from '../../src/api/types'
 
@@ -99,3 +101,36 @@ export const askFixture: QueryAskResponse = {
   generatedQuery: generatedQueryFixture,
   execution: executionFixture,
 }
+
+export const runtimeSettingsFixture: RuntimeSetting[] = [
+  {
+    key: 'query.topK',
+    category: 'query',
+    valueType: 'INTEGER',
+    currentValue: 5,
+    defaultValue: 5,
+    source: 'DEFAULT',
+    mutable: true,
+    liveApplied: true,
+    sensitive: false,
+    updateMode: 'LIVE',
+    label: 'Query top K',
+    description: 'Default hybrid search hit limit.',
+  },
+]
+
+export const aiProfilesFixture: AiProfile[] = [
+  {
+    id: 'default',
+    name: 'Default profile',
+    baseUrl: 'https://api.example.test/v1',
+    chatModel: 'gpt-test',
+    embeddingModel: 'embed-test',
+    embeddingDimensions: 1536,
+    timeoutSeconds: 60,
+    retryCount: 3,
+    defaultProfile: true,
+    apiKeyConfigured: true,
+    apiKeyMask: 'sk-...test',
+  },
+]

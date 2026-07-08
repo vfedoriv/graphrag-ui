@@ -4,7 +4,7 @@ import { mockGraphRagApi } from './support/apiMock'
 async function selectKnowledgeBase(page: import('@playwright/test').Page, knowledgeBaseId = 'kb-alpha') {
   await page.goto('/')
   await page.getByLabel('knowledge-base-selector').selectOption(knowledgeBaseId)
-  await expect(page.locator('header p.font-semibold', { hasText: knowledgeBaseId })).toBeVisible()
+  await expect(page.getByLabel('knowledge-base-selector')).toHaveValue(knowledgeBaseId)
 }
 
 test('creates, selects, and surfaces create errors for knowledge bases', async ({ page }) => {
@@ -15,7 +15,7 @@ test('creates, selects, and surfaces create errors for knowledge bases', async (
   await page.getByLabel('Knowledge base name').fill('Browser E2E')
   await page.getByRole('button', { name: 'Create' }).click()
 
-  await expect(page.locator('header p.font-semibold', { hasText: 'Browser E2E (kb-e2e)' })).toBeVisible()
+  await expect(page.getByLabel('knowledge-base-selector')).toHaveValue('kb-e2e')
   await expect(page.getByRole('cell', { name: 'kb-e2e' })).toBeVisible()
 
   await page.getByLabel('Knowledge base ID').fill('kb-error')
@@ -32,23 +32,23 @@ test('validates, creates, and activates schemas for the selected knowledge base'
   await selectKnowledgeBase(page)
 
   await page.goto('/schemas')
-  await expect(page.getByRole('cell', { name: 'schema-customer' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Customer graph' })).toBeVisible()
   await page.getByRole('button', { name: 'Activate' }).click()
   await expect.poll(() => api.requests.some((request) => request === 'POST /knowledge-bases/kb-alpha/schemas/schema-customer/activate')).toBe(true)
 
-  await page.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json').click()
-  const validatePanel = page.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+  await page.getByTestId('schemas-purpose-tabs-tab-schema-validation').click()
+  const validatePanel = page.getByTestId('schemas-purpose-tabs-panel-schema-validation')
   await validatePanel.getByRole('button', { name: 'Raw View' }).click()
   await validatePanel.getByRole('textbox', { name: 'Schema JSON content' }).fill('{"nodes":[],"relationships":[]}')
   await validatePanel.getByRole('button', { name: 'Validate schema JSON' }).click()
   await expect(validatePanel.getByText('Schema is valid.')).toBeVisible()
 
-  await page.getByTestId('schemas-endpoint-tabs-tab-create-schema').click()
-  const createPanel = page.getByTestId('schemas-endpoint-tabs-panel-create-schema')
+  await page.getByTestId('schemas-purpose-tabs-tab-schema-creation').click()
+  const createPanel = page.getByTestId('schemas-purpose-tabs-panel-schema-creation')
   await createPanel.getByRole('button', { name: 'Raw View' }).click()
   await createPanel.getByRole('textbox', { name: 'Schema JSON content' }).fill('{"nodes":[{"label":"Person"}],"relationships":[]}')
   await createPanel.getByRole('button', { name: 'Create' }).click()
-  await expect(page.getByRole('cell', { name: 'schema-created' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Created schema' })).toBeVisible()
   expect(api.unhandled).toEqual([])
 })
 
@@ -61,13 +61,13 @@ test('shows selected knowledge-base schema edge states', async ({ page }) => {
   await selectKnowledgeBase(page)
 
   await page.goto('/schemas')
-  await expect(page.getByRole('cell', { name: 'schema-customer' })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Customer graph' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Active' })).toBeDisabled()
 
   await page.getByLabel('knowledge-base-selector').selectOption('kb-beta')
-  await expect(page.locator('header p.font-semibold', { hasText: 'Beta Archive (kb-beta)' })).toBeVisible()
+  await expect(page.getByLabel('knowledge-base-selector')).toHaveValue('kb-beta')
   await expect(page.getByText('No Schemas for selected knowledge base')).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'schema-customer' })).toHaveCount(0)
+  await expect(page.getByRole('cell', { name: 'Customer graph' })).toHaveCount(0)
   expect(api.requests).toEqual(expect.arrayContaining([
     'GET /knowledge-bases/kb-alpha/schemas',
     'GET /knowledge-bases/kb-beta/schemas',
@@ -115,7 +115,7 @@ test('uploads, processes, and inspects document chunks', async ({ page }) => {
 
   await uploadedRow.getByRole('button', { name: 'View chunks' }).click()
   await expect(page.getByText('Selected document: doc-uploaded')).toBeVisible()
-  await expect(page.getByTestId('output-preview-content')).toContainText('Alpha customer chunk text')
+  await expect(page.getByTestId('document-chunks-readable-view')).toContainText('Alpha customer chunk text')
   expect(api.unhandled).toEqual([])
 })
 
@@ -125,8 +125,8 @@ test('surfaces API failure states across controller workflows', async ({ page })
 
   api.failOnce('POST /schemas/validate', 'Schema validation failed in browser coverage.')
   await page.goto('/schemas')
-  await page.getByTestId('schemas-endpoint-tabs-tab-validate-schema-json').click()
-  const validatePanel = page.getByTestId('schemas-endpoint-tabs-panel-validate-schema-json')
+  await page.getByTestId('schemas-purpose-tabs-tab-schema-validation').click()
+  const validatePanel = page.getByTestId('schemas-purpose-tabs-panel-schema-validation')
   await validatePanel.getByRole('button', { name: 'Validate schema JSON' }).click()
   await expect(validatePanel.getByText('Validate failed')).toBeVisible()
   await expect(validatePanel.getByText('Schema validation failed in browser coverage.')).toBeVisible()

@@ -11,7 +11,7 @@ Backend API contract reference:
 
 Implemented workflows:
 - Knowledge bases: create, list, rename, delete, and select the active working KB.
-- Schemas: list registry schemas, validate YAML, generate example data, generate schema YAML, create schemas, and activate a schema for a KB.
+- Schemas: list registry schemas, validate JSON, generate example data, generate schema JSON, create schemas, and activate a schema for a KB.
 - Documents: upload files to a KB, list uploads, process documents, and inspect chunks.
 - Queries: ask a one-shot question, generate Cypher, validate Cypher, execute Cypher, and inspect result rows.
 - App shell: dashboard, controller pages with endpoint tabs, active KB selector, shared status badges, settings page, and responsive navigation.

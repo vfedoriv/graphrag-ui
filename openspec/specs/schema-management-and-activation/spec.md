@@ -98,7 +98,7 @@ The system SHALL show explicit error feedback when schema activation requests fa
 - **WHEN** schema activation request fails
 - **THEN** the system SHALL render a visible activation failure alert in the Schemas page context
 
-#### Scenario: Validate YAML request fails
+#### Scenario: Validate JSON request fails
 - **WHEN** schema validation endpoint request fails
 - **THEN** the system SHALL render a visible validation failure alert in the schema validation workflow section
 
@@ -109,10 +109,10 @@ The system SHALL include workflow tests verifying schema activation can be trigg
 - **WHEN** a user clicks Activate for a schema row with a selected knowledge base
 - **THEN** tests SHALL verify the activation endpoint call and related query invalidation effects
 
-### Requirement: Schema YAML authoring areas are format-aware
+### Requirement: Schema JSON authoring areas are format-aware
 The system SHALL treat schema JSON input and output areas as structured JSON editors with explicit JSON format indication, visible parse or validation feedback, and support for adding, removing, moving, and editing JSON schema nodes.
 
-#### Scenario: Edit schema YAML input
+#### Scenario: Edit schema JSON input
 - **WHEN** a user edits schema JSON content in create/validate/generate workflows
 - **THEN** the field SHALL present a structured JSON editing interface with explicit JSON format indication and controls for editing schema nodes
 

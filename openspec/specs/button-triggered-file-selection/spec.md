@@ -1,7 +1,7 @@
 # button-triggered-file-selection Specification
 
 ## Purpose
-TBD - created by archiving change replace-upload-labels-with-upload-buttons. Update Purpose after archive.
+This specification defines explicit button-triggered file selection behavior and selected-file feedback in GraphRAG UI workflows.
 ## Requirements
 ### Requirement: File chooser is triggered by explicit button controls
 The system SHALL expose explicit button controls for file selection and SHALL open the native file chooser when the button is clicked.
@@ -27,4 +27,3 @@ The system SHALL include automated tests that verify button-triggered file selec
 #### Scenario: Async file callback execution
 - **WHEN** `onFileSelected` performs asynchronous work
 - **THEN** tests SHALL verify the callback receives the selected file and completes without swallowing errors
-

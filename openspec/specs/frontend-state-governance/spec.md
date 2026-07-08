@@ -1,7 +1,7 @@
 # frontend-state-governance Specification
 
 ## Purpose
-TBD - created by archiving change improve-state-management-practices. Update Purpose after archive.
+This specification defines server-state, client-state, query-key, and long-running workflow state ownership practices in the GraphRAG admin UI.
 ## Requirements
 ### Requirement: Server state is owned by TanStack Query
 The system SHALL use TanStack Query hooks as the owner for backend-fetched data, backend command execution state, request errors, cache updates, and invalidation in user-facing endpoint workflows.
@@ -49,4 +49,3 @@ The system SHALL derive user-visible indicators for long-running backend workflo
 #### Scenario: Local action starts before server state updates
 - **WHEN** a user starts a backend workflow and the server list has not yet reflected the in-progress status
 - **THEN** the page MAY use local mutation state for immediate feedback until query data is updated
-

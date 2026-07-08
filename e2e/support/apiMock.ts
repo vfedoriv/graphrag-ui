@@ -1,5 +1,6 @@
 import type { Page, Request, Route } from '@playwright/test'
 import {
+  aiProfilesFixture,
   askFixture,
   chunksFixture,
   documentsFixture,
@@ -7,6 +8,7 @@ import {
   generatedQueryFixture,
   knowledgeBasesFixture,
   queryValidationFixture,
+  runtimeSettingsFixture,
   schemaContent,
   schemasFixture,
 } from './fixtures'
@@ -74,6 +76,16 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
 
   if (method === 'GET' && path === '/knowledge-bases') {
     await json(route, state.knowledgeBases)
+    return
+  }
+
+  if (method === 'GET' && path === '/runtime-settings') {
+    await json(route, runtimeSettingsFixture)
+    return
+  }
+
+  if (method === 'GET' && path === '/ai-profiles') {
+    await json(route, aiProfilesFixture)
     return
   }
 

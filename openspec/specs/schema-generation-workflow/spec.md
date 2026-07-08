@@ -10,11 +10,11 @@ The system SHALL expose schema generation actions as purpose-based workflow tabs
 - **AND** clicks file-select in that file-based workflow and chooses a file
 - **THEN** the system SHALL keep that selected file in workflow state and keep subsequent generation actions available without requiring client-side file text extraction
 
-#### Scenario: Show generated schema YAML response in text generation mode
+#### Scenario: Show generated schema JSON response in text generation mode
 - **WHEN** a user runs `Generate schema JSON` and the backend returns a successful response
 - **THEN** the system SHALL render the returned schema JSON content in that mode's output field
 
-#### Scenario: Show generated schema YAML response in file generation mode
+#### Scenario: Show generated schema JSON response in file generation mode
 - **WHEN** a user runs `Generate schema JSON from file` and the backend returns a successful response
 - **THEN** the system SHALL render the returned schema JSON content in that mode's output field
 
@@ -37,7 +37,7 @@ The system SHALL expose schema generation actions as purpose-based workflow tabs
 ### Requirement: Generated artifacts remain editable before final creation
 The system SHALL keep generated JSON/example outputs editable inside their respective generation workflow modes before creating a schema, and generated schema JSON outputs SHALL be editable through the structured JSON editor.
 
-#### Scenario: Edit generated YAML in active generation section
+#### Scenario: Edit generated JSON in active generation section
 - **WHEN** a user receives generated JSON or example output in a generation section
 - **THEN** the system SHALL allow editing output before submitting create/next-step actions
 
@@ -66,4 +66,3 @@ The system SHALL allow successful schema generation responses to seed editable l
 #### Scenario: User edits generated schema output structurally
 - **WHEN** a generation mutation succeeds and the user changes the generated schema JSON through the structured editor
 - **THEN** the edited structured draft SHALL remain available for validation or creation even though it differs from the original mutation response
-

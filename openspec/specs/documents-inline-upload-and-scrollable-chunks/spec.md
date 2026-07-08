@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the Documents page inline upload and chunk inspection behavior in the GraphRAG admin UI.
+
+## Requirements
 
 ### Requirement: Documents page provides inline upload with action-driven chunk inspection
 The system SHALL render the Documents page without endpoint tabs, SHALL keep `Upload document` directly accessible in the page content, and SHALL expose `View chunks` from document rows to inspect chunk output inline.

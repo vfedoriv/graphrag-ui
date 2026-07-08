@@ -6,7 +6,7 @@ This repository is the implemented React 19 + Vite + TypeScript admin UI for the
 
 The app currently provides controller-oriented pages for:
 - Knowledge base CRUD and active knowledge base selection.
-- Schema registry, YAML validation, generation, creation, and activation.
+- Schema registry, JSON validation, generation, creation, and activation.
 - Document upload, processing, listing, and chunk inspection.
 - Query generation, validation, execution, and one-shot ask flows.
 - Settings/proxy visibility and dashboard navigation.
