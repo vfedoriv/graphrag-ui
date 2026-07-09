@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import {
   Background,
   BaseEdge,
@@ -24,7 +24,6 @@ import {
   useUpdateSchemaMutation,
   useValidateSchemaMutation,
 } from '../../api/schemas'
-import type { SchemaDetails } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -41,9 +40,6 @@ import {
   makeNodeDraft,
   makePropertyDraft,
   makeRelationshipDraft,
-  parseSchemaContentToDraft,
-  serializeSchemaDraft,
-  validateSchemaBuilderDraft,
 } from './schemaBuilderMapping'
 import {
   buildSchemaFlowEdges,
@@ -62,7 +58,7 @@ import type {
   SchemaPropertyDraft,
   SchemaRelationshipDraft,
 } from './schemaBuilderTypes'
-import { SCHEMA_BUILDER_DRAFT_STORAGE_KEY } from './schemaBuilderStorage'
+import { useSchemaBuilderDraftSync } from './useSchemaBuilderDraftSync'
 
 type DragPreviewNode = Pick<SchemaFlowNode, 'id' | 'position' | 'data'> | null
 
@@ -82,20 +78,32 @@ export function SchemaBuilderPage() {
   const validateMutation = useValidateSchemaMutation()
   const createMutation = useCreateSchemaMutation()
   const updateMutation = useUpdateSchemaMutation()
-  const [draft, setDraft] = useState<SchemaBuilderDraft>(() => createBlankSchemaDraft())
-  const [rawJson, setRawJson] = useState(() => serializeSchemaDraft(createBlankSchemaDraft()))
-  const [rawParseError, setRawParseError] = useState<string | null>(null)
-  const [selectedElement, setSelectedElement] = useState<SelectedElement>(null)
-  const [relationshipRouteOverrides, setRelationshipRouteOverrides] = useState<Record<string, RelationshipRouteOverride>>({})
-  const [successMessage, setSuccessMessage] = useState('')
-  const [schemaSelectValue, setSchemaSelectValue] = useState('')
-  const initialLoadKeyRef = useRef('')
+  const draftSync = useSchemaBuilderDraftSync({ searchParams, getSchemaMutation })
+  const {
+    draft,
+    rawJson,
+    rawParseError,
+    selectedElement,
+    relationshipRouteOverrides,
+    successMessage,
+    schemaSelectValue,
+    dragPreviewNode,
+    localIssues,
+    setSelectedElement,
+    setRelationshipRouteOverrides,
+    setSuccessMessage,
+    setSchemaSelectValue,
+    setDragPreviewNode,
+    replaceDraft,
+    loadSchemaById,
+    updateDraft,
+    updateRawJson,
+  } = draftSync
 
   const selectedSchemaId = draft.sourceSchemaId
   const routeSchemaId = searchParams.get('schemaId') ?? ''
   const importSelectValue = schemaSelectValue || routeSchemaId
   const hasImportOption = Boolean(importSelectValue) && schemas.some((schema) => schema.id === importSelectValue)
-  const localIssues = useMemo(() => validateSchemaBuilderDraft(draft, rawParseError), [draft, rawParseError])
   const isDraftSubmittable = localIssues.length === 0
   const isSchemaImportPending = getSchemaMutation.isPending
   const isWorkflowPending =
@@ -103,18 +111,6 @@ export function SchemaBuilderPage() {
     createMutation.isPending ||
     updateMutation.isPending
   const isAnyPending = isSchemaImportPending || isWorkflowPending
-  const [dragPreviewNode, setDragPreviewNode] = useState<DragPreviewNode>(null)
-
-  const replaceDraft = useCallback((nextDraft: SchemaBuilderDraft) => {
-    setDraft(nextDraft)
-    setRawJson(serializeSchemaDraft(nextDraft))
-    setRawParseError(null)
-    setSelectedElement(null)
-    setRelationshipRouteOverrides({})
-    setDragPreviewNode(null)
-    setSuccessMessage('')
-  }, [])
-
   const visualNodes = useMemo<SchemaFlowNode[]>(
     () => buildSchemaFlowNodes(draft, selectedElement),
     [draft, selectedElement],
@@ -131,91 +127,8 @@ export function SchemaBuilderPage() {
             }
           : edge.data,
       })),
-    [draft, relationshipRouteOverrides, selectedElement],
+    [draft, relationshipRouteOverrides, selectedElement, setSelectedElement],
   )
-
-  const importSchemaDetails = useCallback((details: SchemaDetails) => {
-    const result = parseSchemaContentToDraft(details.content, { schemaId: details.id, sourceType: details.sourceType })
-    if (result.ok) {
-      replaceDraft(result.draft)
-      setSchemaSelectValue(details.id)
-    } else {
-      setRawJson(details.content)
-      setRawParseError(result.error)
-    }
-  }, [replaceDraft])
-
-  const loadSchemaById = useCallback(async (schemaId: string) => {
-    setSuccessMessage('')
-    getSchemaMutation.reset()
-    try {
-      const details = await getSchemaMutation.mutateAsync(schemaId)
-      importSchemaDetails(details)
-    } catch {
-      // surfaced by mutation error
-    }
-  }, [getSchemaMutation, importSchemaDetails])
-
-  const importRawContent = useCallback((content: string) => {
-    const result = parseSchemaContentToDraft(content)
-    if (result.ok) {
-      replaceDraft(result.draft)
-    } else {
-      setRawJson(content)
-      setRawParseError(result.error)
-      setSuccessMessage('')
-    }
-  }, [replaceDraft])
-
-  useEffect(() => {
-    const schemaId = searchParams.get('schemaId')
-    const draftSource = searchParams.get('draft')
-    const key = `${schemaId ?? ''}:${draftSource ?? ''}`
-    if (key === initialLoadKeyRef.current) return
-
-    if (schemaId) {
-      const timeout = window.setTimeout(() => {
-        initialLoadKeyRef.current = key
-        void loadSchemaById(schemaId)
-      }, 0)
-      return () => window.clearTimeout(timeout)
-    }
-
-    if (draftSource === 'session') {
-      const timeout = window.setTimeout(() => {
-        initialLoadKeyRef.current = key
-        const storedDraft = sessionStorage.getItem(SCHEMA_BUILDER_DRAFT_STORAGE_KEY)
-        if (storedDraft) {
-          importRawContent(storedDraft)
-        }
-      }, 0)
-      return () => window.clearTimeout(timeout)
-    }
-  }, [importRawContent, loadSchemaById, searchParams])
-
-  function updateDraft(updater: (current: SchemaBuilderDraft) => SchemaBuilderDraft) {
-    setDraft((current) => {
-      const nextDraft = updater(current)
-      setRawJson(serializeSchemaDraft(nextDraft))
-      setRawParseError(null)
-      setSuccessMessage('')
-      return nextDraft
-    })
-  }
-
-  function updateRawJson(nextValue: string) {
-    setRawJson(nextValue)
-    setSuccessMessage('')
-    const result = parseSchemaContentToDraft(nextValue, { schemaId: draft.sourceSchemaId, sourceType: draft.sourceType })
-    if (result.ok) {
-      setDraft(result.draft)
-      setRawParseError(null)
-      setRelationshipRouteOverrides({})
-      setDragPreviewNode(null)
-    } else {
-      setRawParseError(result.error)
-    }
-  }
 
   function addNode() {
     updateDraft((current) => {
