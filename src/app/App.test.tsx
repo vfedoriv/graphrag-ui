@@ -26,6 +26,38 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Schemas' })).toBeInTheDocument()
   })
 
+  it('changes and persists appearance without resetting workspace context', async () => {
+    const user = userEvent.setup()
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify([{ id: 'kb-a', name: 'KB A', activeSchemaId: null, createdAt: '2026-01-01T00:00:00Z' }]),
+    })
+
+    const { container } = render(<App />)
+
+    const appearance = await screen.findByRole('combobox', { name: 'Appearance' })
+    expect((await screen.findAllByText('KB A (kb-a)')).length).toBeGreaterThan(0)
+    const workspace = screen.getByRole('combobox', { name: 'knowledge-base-selector' })
+    await user.selectOptions(workspace, 'kb-a')
+    const routeBeforeThemeChange = window.location.pathname
+    expect(appearance).toHaveValue('system')
+    await user.selectOptions(appearance, 'light')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(container.querySelector('main')).toBeInTheDocument()
+    expect(container.querySelector('.panel')).toBeInTheDocument()
+    expect(container.querySelector('.button')).toBeInTheDocument()
+    await user.selectOptions(appearance, 'dark')
+
+    expect(appearance).toHaveValue('dark')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(localStorage.getItem('graphrag.appearance')).toBe('dark')
+    expect(workspace).toHaveValue('kb-a')
+    expect(window.location.pathname).toBe(routeBeforeThemeChange)
+  })
+
   it('keeps the app shell visible while lazy routes load', async () => {
     const user = userEvent.setup()
     render(<App />)

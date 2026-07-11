@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import type { ReactElement, ReactNode } from 'react'
 import { SelectedKnowledgeBaseProvider } from '../shared/state/selectedKnowledgeBase'
+import { ThemeProvider } from '../shared/state/ThemeProvider'
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -24,9 +25,11 @@ export function renderWithProviders(
   }
 
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>
-      <SelectedKnowledgeBaseProvider>{children}</SelectedKnowledgeBaseProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <SelectedKnowledgeBaseProvider>{children}</SelectedKnowledgeBaseProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 
   return {

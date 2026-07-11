@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 :root {
+  color-scheme: light;
   --bg: oklch(98% 0.005 250);
   --surface: oklch(100% 0 0);
   --surface-2: oklch(96% 0.006 250);
@@ -14,6 +15,14 @@
   --danger: oklch(58% 0.16 25);
   --output-bg: oklch(18% 0.018 250);
   --output-fg: oklch(94% 0.006 250);
+  --control-bg: var(--surface);
+  --on-solid: oklch(100% 0 0);
+  --focus: oklch(62% 0.16 250);
+  --interaction-base: oklch(100% 0 0);
+  --interaction-contrast: oklch(0% 0 0);
+  --warning-fg: oklch(45% 0.12 70);
+  --flow-edge: oklch(47% 0.03 235);
+  --flow-edge-selected: oklch(54% 0.19 255);
   --font-display: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
@@ -22,6 +31,31 @@
   --sidebar-width: 260px;
   --workspace-padding: 28px;
   --panel-padding: 18px;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: oklch(16% 0.014 250);
+  --surface: oklch(20% 0.016 250);
+  --surface-2: oklch(24% 0.018 250);
+  --surface-3: oklch(29% 0.02 250);
+  --fg: oklch(94% 0.007 250);
+  --muted: oklch(72% 0.018 245);
+  --border: oklch(34% 0.018 245);
+  --accent: oklch(72% 0.14 250);
+  --success: oklch(73% 0.12 150);
+  --warn: oklch(79% 0.12 80);
+  --danger: oklch(72% 0.15 25);
+  --output-bg: oklch(12% 0.012 250);
+  --output-fg: oklch(92% 0.008 250);
+  --control-bg: oklch(18% 0.015 250);
+  --on-solid: oklch(15% 0.014 250);
+  --focus: oklch(78% 0.13 250);
+  --interaction-base: var(--surface);
+  --interaction-contrast: oklch(100% 0 0);
+  --warning-fg: oklch(84% 0.11 80);
+  --flow-edge: oklch(72% 0.025 235);
+  --flow-edge-selected: oklch(75% 0.14 250);
 }
 
 * {
@@ -111,7 +145,7 @@ select {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: white;
+  background: var(--control-bg);
   color: var(--fg);
   padding: 9px 10px;
 }
@@ -131,7 +165,7 @@ textarea:focus-visible,
 .tab:focus-visible,
 .action-card:focus-visible,
 .icon-button:focus-visible {
-  outline: 2px solid color-mix(in oklch, var(--accent) 72%, white);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -179,7 +213,7 @@ textarea:focus-visible,
   place-items: center;
   border-radius: var(--radius-sm);
   background: var(--fg);
-  color: white;
+  color: var(--on-solid);
   font-family: var(--font-mono);
   font-size: 13px;
 }
@@ -206,7 +240,7 @@ textarea:focus-visible,
 }
 
 .nav-link.active {
-  background: color-mix(in oklch, var(--accent) 10%, white);
+  background: color-mix(in oklch, var(--accent) 12%, var(--interaction-base));
   color: var(--accent);
 }
 
@@ -214,10 +248,27 @@ textarea:focus-visible,
   flex: 0 0 auto;
 }
 
-.workspace-switcher {
+.sidebar-context {
   display: grid;
   gap: 10px;
   margin-top: auto;
+}
+
+.appearance-control {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 12px;
+}
+
+.appearance-control small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.workspace-switcher {
+  display: grid;
+  gap: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -369,11 +420,11 @@ textarea:focus-visible,
 .button.primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: white;
+  color: var(--on-solid);
 }
 
 .button.primary:hover {
-  background: color-mix(in oklch, var(--accent) 88%, black);
+  background: color-mix(in oklch, var(--accent) 88%, var(--interaction-contrast));
 }
 
 .button.danger {
@@ -382,7 +433,7 @@ textarea:focus-visible,
 }
 
 .button.danger:hover {
-  background: color-mix(in oklch, var(--danger) 7%, white);
+  background: color-mix(in oklch, var(--danger) 9%, var(--interaction-base));
 }
 
 .button.ghost {
@@ -420,18 +471,18 @@ textarea:focus-visible,
 }
 
 .status.success {
-  background: color-mix(in oklch, var(--success) 12%, white);
+  background: color-mix(in oklch, var(--success) 14%, var(--interaction-base));
   color: var(--success);
 }
 
 .status.warning {
-  background: color-mix(in oklch, var(--warn) 18%, white);
-  color: oklch(45% 0.12 70);
+  background: color-mix(in oklch, var(--warn) 18%, var(--interaction-base));
+  color: var(--warning-fg);
 }
 
 .status.danger,
 .status.error {
-  background: color-mix(in oklch, var(--danger) 12%, white);
+  background: color-mix(in oklch, var(--danger) 14%, var(--interaction-base));
   color: var(--danger);
 }
 
@@ -492,7 +543,7 @@ textarea:focus-visible,
 }
 
 .table-wrap tr.is-selected td {
-  background: color-mix(in oklch, var(--success) 5%, white);
+  background: color-mix(in oklch, var(--success) 7%, var(--interaction-base));
 }
 
 .table-wrap tr.is-selected td:first-child {
@@ -559,7 +610,7 @@ textarea:focus-visible,
 .tab[aria-pressed='true'] {
   border-color: var(--fg);
   background: var(--fg);
-  color: white;
+  color: var(--on-solid);
 }
 
 .tab:disabled {
@@ -649,7 +700,7 @@ textarea:focus-visible,
 .notice {
   border: 1px solid color-mix(in oklch, var(--accent) 24%, var(--border));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--accent) 7%, white);
+  background: color-mix(in oklch, var(--accent) 9%, var(--interaction-base));
   color: var(--fg);
   padding: 12px;
 }
@@ -661,17 +712,17 @@ textarea:focus-visible,
 
 .notice.danger {
   border-color: color-mix(in oklch, var(--danger) 28%, var(--border));
-  background: color-mix(in oklch, var(--danger) 8%, white);
+  background: color-mix(in oklch, var(--danger) 10%, var(--interaction-base));
 }
 
 .notice.success {
   border-color: color-mix(in oklch, var(--success) 28%, var(--border));
-  background: color-mix(in oklch, var(--success) 8%, white);
+  background: color-mix(in oklch, var(--success) 10%, var(--interaction-base));
 }
 
 .notice.warning {
   border-color: color-mix(in oklch, var(--warn) 32%, var(--border));
-  background: color-mix(in oklch, var(--warn) 12%, white);
+  background: color-mix(in oklch, var(--warn) 14%, var(--interaction-base));
 }
 
 .file-picker {
@@ -679,7 +730,7 @@ textarea:focus-visible,
   gap: 8px;
   border: 1px dashed color-mix(in oklch, var(--accent) 35%, var(--border));
   border-radius: var(--radius-sm);
-  background: color-mix(in oklch, var(--accent) 4%, white);
+  background: color-mix(in oklch, var(--accent) 6%, var(--interaction-base));
   padding: 12px;
   font-size: 13px;
 }
@@ -770,7 +821,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  color: var(--text);
+  color: var(--fg);
   padding: 10px 12px;
   font: inherit;
 }
@@ -940,7 +991,7 @@ textarea {
   max-width: 160px;
   border: 1px solid color-mix(in oklch, var(--accent) 28%, var(--border));
   border-radius: var(--radius-xs);
-  background: color-mix(in oklch, var(--surface) 94%, white);
+  background: color-mix(in oklch, var(--surface) 94%, var(--interaction-base));
   color: var(--fg);
   font-size: 12px;
   font-weight: 700;

@@ -565,7 +565,7 @@ function SchemaRelationshipEdge({
     labelOffset,
   })
   const labelSide = labelOffset.y > 0 ? 'below' : 'above'
-  const edgeColor = isSelected ? '#2563eb' : '#52616f'
+  const edgeColor = isSelected ? 'var(--flow-edge-selected)' : 'var(--flow-edge)'
 
   return (
     <>

@@ -5,6 +5,8 @@ import { useKnowledgeBasesQuery } from '../api/knowledgeBases'
 import { useSelectedKnowledgeBase } from '../shared/state/useSelectedKnowledgeBase'
 import { cn } from '../shared/lib/cn'
 import { StatusBadge } from '../shared/ui/StatusBadge'
+import type { ThemePreference } from '../shared/state/theme'
+import { useTheme } from '../shared/state/useTheme'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: House },
@@ -19,6 +21,7 @@ const navItems = [
 export function AppLayout() {
   const { data: knowledgeBases = [], isLoading, isSuccess } = useKnowledgeBasesQuery()
   const { selectedKnowledgeBaseId, setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+  const { preference, resolvedTheme, setPreference } = useTheme()
   const activeKb = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null
 
   useEffect(() => {
@@ -52,30 +55,46 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className='workspace-switcher'>
-          <label>
-            <span className='eyebrow'>Workspace</span>
+        <div className='sidebar-context'>
+          <label className='appearance-control'>
+            <span className='eyebrow'>Appearance</span>
             <select
-              aria-label='knowledge-base-selector'
-              value={selectedKnowledgeBaseId ?? ''}
-              onChange={(e) => setSelectedKnowledgeBaseId(e.target.value || null)}
+              aria-label='Appearance'
+              value={preference}
+              onChange={(event) => setPreference(event.target.value as ThemePreference)}
             >
-              <option value=''>No selection</option>
-              {knowledgeBases.map((kb) => (
-                <option key={kb.id} value={kb.id}>
-                  {kb.name} ({kb.id})
-                </option>
-              ))}
+              <option value='light'>Light</option>
+              <option value='system'>System</option>
+              <option value='dark'>Dark</option>
             </select>
+            <small>Using {resolvedTheme} theme</small>
           </label>
-          <div className='workspace-meta'>
-            <strong>{activeKb ? `${activeKb.name} (${activeKb.id})` : 'None selected'}</strong>
-            <small>{activeKb?.activeSchemaId ? `Active schema: ${activeKb.activeSchemaId}` : 'No active schema selected'}</small>
+
+          <div className='workspace-switcher'>
+            <label>
+              <span className='eyebrow'>Workspace</span>
+              <select
+                aria-label='knowledge-base-selector'
+                value={selectedKnowledgeBaseId ?? ''}
+                onChange={(e) => setSelectedKnowledgeBaseId(e.target.value || null)}
+              >
+                <option value=''>No selection</option>
+                {knowledgeBases.map((kb) => (
+                  <option key={kb.id} value={kb.id}>
+                    {kb.name} ({kb.id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className='workspace-meta'>
+              <strong>{activeKb ? `${activeKb.name} (${activeKb.id})` : 'None selected'}</strong>
+              <small>{activeKb?.activeSchemaId ? `Active schema: ${activeKb.activeSchemaId}` : 'No active schema selected'}</small>
+            </div>
+            <StatusBadge
+              label={isLoading ? 'Loading workspace list' : knowledgeBases.length > 0 ? 'Backend data available' : 'No API data yet'}
+              tone={knowledgeBases.length > 0 ? 'success' : 'neutral'}
+            />
           </div>
-          <StatusBadge
-            label={isLoading ? 'Loading workspace list' : knowledgeBases.length > 0 ? 'Backend data available' : 'No API data yet'}
-            tone={knowledgeBases.length > 0 ? 'success' : 'neutral'}
-          />
         </div>
       </aside>
 

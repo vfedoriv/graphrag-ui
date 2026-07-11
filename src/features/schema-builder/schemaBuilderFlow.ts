@@ -164,7 +164,10 @@ export function buildSchemaFlowEdges(
         label,
         ariaLabel: label,
         type: 'schemaRelationship',
-        markerEnd: { type: MarkerType.ArrowClosed, color: isSelected ? '#2563eb' : '#52616f' },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isSelected ? 'var(--flow-edge-selected)' : 'var(--flow-edge)',
+        },
         selected: isSelected,
         zIndex: isSelected ? 4 : 1,
         data: {
