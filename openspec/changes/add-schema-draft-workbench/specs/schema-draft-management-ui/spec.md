@@ -35,20 +35,29 @@ The system SHALL allow creating an open draft with target name and version, opti
 - **AND** SHALL adopt the revision returned by the successful mutation before enabling another revision-bearing action
 
 ### Requirement: Structured guidance can be round-tripped safely
-The system SHALL render and edit the complete current guidance value for an existing draft, including domain description, intended questions, required, preferred, and excluded concepts, naming rules, property rules, relationship rules, and additional instructions where supported by the backend contract, and SHALL NOT replace unavailable guidance with an assumed empty value.
+The system SHALL render and edit the complete canonical guidance value returned for an existing draft, including domain description, intended questions, required, preferred, and excluded concepts, naming rules, property rules, relationship rules, and additional instructions, and SHALL preserve its revision and fingerprint metadata.
 
 #### Scenario: Reopen an existing draft
 - **WHEN** a user opens a draft that already has guidance
-- **THEN** the system SHALL load the authoritative guidance value and populate the guidance editor without losing unknown supported fields
-
-#### Scenario: Guidance value is unavailable from the API
-- **WHEN** draft detail exposes only a guidance fingerprint and revision
-- **THEN** the system SHALL show guidance metadata as read-only
-- **AND** SHALL disable guidance replacement rather than submitting an empty object
+- **THEN** the system SHALL load the authoritative typed guidance envelope and populate the guidance editor
+- **AND** SHALL keep additional instructions distinct from structured discovery guidance
 
 #### Scenario: Save guidance
 - **WHEN** the user submits changed structured guidance for an open draft
 - **THEN** the system SHALL send the current draft revision and preserve the edited input until the request succeeds
+
+### Requirement: Draft lists and details expose workflow navigation
+The system SHALL use nullable current-analysis, latest-evaluation, and latest-reprocessing references returned with draft list and detail responses to orient users without loading outcome collections eagerly.
+
+#### Scenario: Draft has active or historical workflow state
+- **WHEN** a draft response contains workflow references
+- **THEN** the system SHALL show their statuses and current/latest semantics
+- **AND** SHALL use their status locations to open or resume the corresponding resource
+
+#### Scenario: Workflow reference is stale
+- **WHEN** the latest evaluation is not current or the latest reprocessing target is not current
+- **THEN** the system SHALL retain the historical reference
+- **AND** SHALL label it as stale rather than presenting it as applicable current state
 
 ### Requirement: Optimistic-concurrency conflicts preserve user work
 The system SHALL surface stale-revision conflicts as a distinct recoverable state, refresh authoritative draft resources, and preserve unsent form values or pending selections for user-directed retry.

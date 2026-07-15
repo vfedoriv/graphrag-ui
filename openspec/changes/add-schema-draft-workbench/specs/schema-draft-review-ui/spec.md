@@ -1,12 +1,18 @@
 ## ADDED Requirements
 
 ### Requirement: Candidates are reviewed with evidence and independent state dimensions
-The system SHALL present paged draft candidates with kind, canonical identity, coordinates, support count, confidence, evidence origins, evidence references, and review state without treating confidence or origin as user approval.
+The system SHALL present paged typed draft candidates with kind, canonical identity, coordinates, support count, confidence, evidence origins, evidence references, analyzer recommendation state, effective persistent review state, and latest decision linkage without treating confidence, origin, or recommendation as user approval.
 
 #### Scenario: Inspect a candidate
 - **WHEN** a user expands a candidate row
 - **THEN** the system SHALL show its observed, guided, inferred, or existing origins and source/chunk evidence metadata
+- **AND** SHALL label `recommendationState` separately from `effectiveReviewState`
 - **AND** SHALL not expose source text that the backend did not return
+
+#### Scenario: Candidate has a persisted decision
+- **WHEN** a candidate response includes an effective review state and latest decision ID
+- **THEN** the system SHALL display the persistent state and link it to decision history
+- **AND** SHALL retain the independent analyzer recommendation
 
 #### Scenario: Candidate response has an unexpected shape
 - **WHEN** the persistent candidate payload does not match the documented candidate page contract

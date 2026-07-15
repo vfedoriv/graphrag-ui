@@ -2,7 +2,7 @@
 
 The schema-draft workbench ends with a reviewed effective projection; it intentionally does not create or activate a registered schema. The backend now adds three further stages: held-out dry evaluation, revision/hash-bound publication as a normal inactive generated schema, and asynchronous post-activation reprocessing plans. Each stage has different safety and retry semantics, and the backend explicitly keeps them separate.
 
-This change depends on the route, draft detail cache, revision handling, source/candidate context, and result views from `add-schema-draft-workbench`. Current backend evaluation and plan resources can be retrieved only by known ID, and metrics/advisory payloads are generic objects. Those limitations constrain durable recovery and semantic metric rendering.
+This change depends on the route, draft detail cache, revision handling, source/candidate context, and result views from `add-schema-draft-workbench`. The backend now exposes paged evaluation history, paged draft-filtered reprocessing history, draft workflow references, explicit evaluation eligibility, and typed deterministic/advisory result contracts. These resources make reload recovery, history, eligibility, and semantic metric rendering server-authoritative.
 
 ## Goals / Non-Goals
 
@@ -40,23 +40,25 @@ Reviewed draft -> Held-out evaluation -> Readiness -> Publish inactive schema
 
 Each completed stage remains independently inspectable. Actions for later stages are disabled until their backend preconditions are visible, but users can move back to inspect evidence and evaluation. A combined publish-and-migrate action was rejected because it would misrepresent backend atomicity and make partial processing hard to understand.
 
-### Derive held-out choices conservatively
+### Load held-out eligibility from the backend
 
-Evaluation selection starts from documents owned by the selected knowledge base and excludes active `DOCUMENT` draft sources shown in the source list. The backend remains authoritative and can reject any document that contributed evidence but is not identifiable from available metadata. Selected document IDs, advisory enabled state, and current draft revision form the start request.
+Evaluation selection loads `GET .../evaluation-eligible-documents`, whose standard page envelope includes document metadata, `eligible`, an optional `ACTIVE_DISCOVERY_EVIDENCE` reason, the evaluated draft revision, and current aggregate ID. Only eligible rows are selectable. Selected document IDs, advisory-enabled state, and the current response revision form the start request.
 
-This conservative filter may exclude a document source that did not contribute evidence, but it prevents the UI from advertising obviously invalid held-out choices without requiring it to load every candidate page.
+The eligibility query is keyed by knowledge base, draft, page, and size and is invalidated after changes that can alter discovery evidence or the current aggregate. The start control is disabled if the eligibility snapshot no longer matches current draft state, forcing a refresh instead of guessing eligibility locally.
 
 ### Poll evaluation and plan resources through typed status hooks
 
-Start/retry mutations return an ID and status location. Dedicated queries poll active statuses and stop for terminal statuses. Terminal evaluation invalidates readiness; terminal reprocessing invalidates document lists and active-schema-related context. Page and size are part of status query keys because outcomes/items are paged.
+Start/retry mutations return an ID and status location. Dedicated queries poll active statuses and stop for terminal statuses. Terminal evaluation invalidates readiness; terminal reprocessing invalidates document lists and active-schema-related context. Page and size are part of status query keys because detailed status responses contain standard nested page envelopes under `outcomes` and `items`; the frontend does not read removed parallel count fields.
 
-Reload recovery requires backend current/list operations for evaluation runs and reprocessing plans. Browser persistence can retain a convenience link to a recently started resource, but it cannot establish that it is current or enumerate history. The feature does not claim durable recovery until the backend prerequisite is available.
+On route entry, `DraftResponse.latestEvaluation` and `latestReprocessing` provide lightweight navigation references. Paged evaluation history supplies currentness, retryability, lineage, counts, reproducibility identifiers, timestamps, and status locations. Paged reprocessing history is filtered by owned draft and supplies latest/target-current/retryable flags, lineage, counts, timestamps, and status locations. Active resources resume polling through their detailed status endpoints; stale history remains inspectable. Browser persistence is unnecessary for correctness.
 
 ### Separate deterministic metrics from advisory assessments
 
-The evaluation result uses distinct panels and language. Deterministic extraction/validation metrics show formulas, counts, rates, and not-applicable denominators when the backend contract supplies typed fields. Advisory question coverage and schema-noise judgments are labeled as model assessments and show reproducibility metadata and evidence coordinates.
+The evaluation result uses distinct panels and language. Deterministic extraction/validation metrics are typed as identified rate and count collections. Rates show numerator, denominator, calculated value, applicability, and evidence; count metrics show count and evidence; evaluation reasons remain explicit. `NOT_APPLICABLE` values render as such rather than zero.
 
-Until exact payload schemas are documented, generic structured inspectors may expose raw objects for diagnosis, but implementation cannot assign semantic labels or thresholds to unknown fields. An alternative was to infer the Java map shape from example responses; it was rejected as a fragile contract.
+Advisory results display the explicit execution status, intended-question coverage, schema-noise coordinate assessments, reasons, warnings, and profile/prompt/contract reproducibility metadata. `NOT_REQUESTED`, model-free completion, and failure states remain visually distinct from deterministic results. No generic payload inspector or inferred threshold is needed.
+
+Historical `schema-draft-evaluation-v1` runs are rendered through the same typed response model while their original contract revision remains visible. Empty evidence, reason, or advisory-detail collections on those runs mean the older record did not persist those details; they are not presented as affirmative evidence that no issue existed.
 
 ### Treat readiness as a short-lived publication token
 
@@ -78,9 +80,10 @@ The plan view shows aggregate counts and paged items, distinguishing success, fa
 
 ## Risks / Trade-offs
 
-- [No list/current evaluation or plan endpoints exist] → Gate durable reload recovery on backend discoverability and avoid treating browser IDs as authoritative.
-- [Evaluation metric objects are not typed] → Require documented payload contracts for semantic rendering; use a generic structured inspector only as a transparent fallback.
-- [UI eligibility filtering can be incomplete] → Exclude all active document sources conservatively and preserve normalized backend rejection details.
+- [The latest evaluation may be stale after the draft changes] → Respect the summary/reference `current` flag and bind retry/start behavior to the current draft revision.
+- [The latest reprocessing target may no longer be active/current] → Respect `targetCurrent` and backend `retryable` flags rather than deriving safety from recency.
+- [Eligibility pages can become stale after analysis or source changes] → Compare the returned draft revision/current aggregate with current draft state and invalidate eligibility on relevant mutations.
+- [Typed metric identifiers may grow] → Render known identifiers semantically and preserve a safe unknown-enum contract error without inventing formulas or thresholds.
 - [Readiness becomes stale after any review mutation] → Key it by draft/aggregate revision, invalidate it on mutations, and publish only its exact token.
 - [Users may assume publication activates the schema] → Use distinct step labels, confirmations, statuses, and separate buttons.
 - [Large reprocessing plans can produce extensive item data] → Poll aggregate pages economically, paginate outcomes, and stop polling terminal plans.
@@ -88,7 +91,7 @@ The plan view shows aggregate counts and paged items, distinguishing success, fa
 
 ## Migration Plan
 
-1. Complete `add-schema-draft-workbench` and confirm backend run-discovery and evaluation-metric contracts.
+1. Complete `add-schema-draft-workbench` and capture matching backend fixtures for workflow references, histories, eligibility, metrics, and advisory results.
 2. Add evaluation/publication/reprocessing DTOs, API functions, query keys, and contract tests.
 3. Add evaluation selection, polling, result, retry, and recovery UI.
 4. Add readiness blocker and guarded publication UI.
@@ -96,9 +99,3 @@ The plan view shows aggregate counts and paged items, distinguishing success, fa
 6. Add reprocessing scope/options, polling, outcomes, and retry UI.
 7. Validate unit, workflow, coverage, build, and browser end-to-end behavior against the matching backend.
 8. Roll back by removing release sections and hooks; already published schemas and running plans remain backend-owned resources.
-
-## Open Questions
-
-- Which endpoint will enumerate or identify the current evaluation run and reprocessing plan after reload?
-- What are the stable JSON schemas for evaluation aggregate metrics, per-document metrics, and advisory assessment?
-- Should the backend expose evaluation-eligible document IDs directly, or is conservative frontend filtering plus backend validation the intended contract?

@@ -4,11 +4,11 @@ A reviewed draft is not yet safe or usable as an extraction contract: users stil
 
 ## What Changes
 
-- Extend the Schema Drafts workbench with held-out document selection, optional advisory assessment, durable evaluation progress, deterministic metrics, per-document outcomes, partial/failed handling, and retry.
+- Extend the Schema Drafts workbench with server-authoritative held-out eligibility, optional advisory assessment, durable evaluation progress and history, typed deterministic metrics, per-document outcomes, partial/failed handling, reload recovery, and retry.
 - Add publication-readiness checks that display every blocking reason and bind publication to the exact current draft revision and projection content hash.
 - Add idempotent publication of a ready draft and display the resulting inactive schema, immutable publication hash, live schema hash, and post-publication content drift.
 - Keep publication, activation, and reprocessing as three distinct user-confirmed steps; reuse the existing activation endpoint and related query invalidation.
-- Add reprocessing-plan creation for all eligible documents or an explicit selection, processing-option payloads, aggregate and per-document progress, active-schema blocking, stale-source handling, and retry with an explicit resnapshot choice.
+- Add reprocessing-plan creation for all eligible documents or an explicit selection, processing-option payloads, paged plan history and per-document progress, active-schema blocking, stale-source handling, reload recovery, and retry with an explicit resnapshot choice.
 - Render published drafts as read-only audit records while keeping links/actions for the normal registered-schema lifecycle.
 
 ## Capabilities
@@ -28,6 +28,8 @@ A reviewed draft is not yet safe or usable as an extraction contract: users stil
 - Depends on `add-schema-draft-workbench` and its schema-draft route, DTOs, revision-aware cache, and review context.
 - Adds evaluation, publication, and reprocessing-plan DTOs, API operations, query keys, polling hooks, UI sections, confirmations, and tests.
 - Reuses knowledge-base documents for held-out and reprocessing selection, registered schemas for activation state, document processing option shapes, and existing API error normalization.
-- Reliable reload recovery and historical inspection require backend list/current operations for evaluation runs and reprocessing plans; current contracts expose only get-by-known-ID operations.
-- A precise metrics UI requires documented response shapes for evaluation `metrics` and `advisoryAssessment`; otherwise those values must initially use a structured generic inspector.
+- Uses paged evaluation-run and reprocessing-plan history endpoints plus draft workflow references to recover active/recent resources after navigation or reload.
+- Uses the evaluation-eligible-documents page, including draft/aggregate snapshot metadata and explicit ineligibility reasons, instead of deriving held-out eligibility in the browser.
+- Uses typed aggregate/per-document metric, applicability, advisory-status, reason, evidence, and reproducibility contracts; generic metric fallback rendering is no longer part of the scope.
+- Adopts the standard nested page envelope for evaluation `outcomes` and reprocessing `items`, with the removed legacy list-plus-count fields treated as unsupported contracts.
 - The frontend does not change backend contracts or automatically publish, activate, or reprocess.

@@ -4,7 +4,7 @@ The frontend currently has a single `/schemas` controller page for registered-sc
 
 This is too stateful and deep for another tab on the existing Schemas page. It also introduces asynchronous resources whose status must remain authoritative across navigation. The frontend must preserve the distinction between a draft planning artifact and a registered schema that can be activated.
 
-Three backend contract limitations affect the design: loaded drafts do not return their guidance value, analysis runs cannot be listed or discovered after losing a run ID, and the persistent candidate page is declared as `Object` despite returning the discovery candidate shape. These are integration prerequisites, not frontend data that can be reconstructed safely.
+The backend now returns canonical typed guidance in draft responses, exposes lightweight `currentAnalysis`, `latestEvaluation`, and `latestReprocessing` workflow references, provides paged analysis-run history, and declares a typed candidate page. The frontend can therefore recover authoritative workflow state after navigation without browser-retained identifiers and can render review state without inferring response shapes.
 
 ## Goals / Non-Goals
 
@@ -34,9 +34,9 @@ This keeps the complex workflow out of the already dense Schemas page and gives 
 
 ### Separate typed API domains while sharing contracts
 
-Add a `schemaDrafts` API module and feature-local DTO modules for lifecycle, sources, analysis, candidates, decisions, conflicts, projection, and diff. Candidate, evidence, origin, guidance, and naming-rule types mirror the reusable backend discovery contracts. Generic structured payload types remain `unknown` at transport boundaries and are narrowed before feature-specific rendering.
+Add a `schemaDrafts` API module and feature-local DTO modules for lifecycle, workflow references, sources, analysis history, candidates, decisions, conflicts, projection, and diff. Candidate, evidence, origin, guidance, and naming-rule types mirror the explicit backend contracts. One reusable `PageResponse<T>` models candidates, run histories, and nested `sourceOutcomes` using zero-based `page`, bounded `size`, `totalElements`, and `content`; no compatibility adapter is added for removed list-plus-count fields. Only genuinely open structured values such as projection schemas, decision values, conflict alternatives, and diff before/after payloads remain `unknown` at transport boundaries and are narrowed before rendering.
 
-Stable keys nest under knowledge base and draft, for example draft lists, detail, sources, current analysis, candidates by page, decisions, conflicts, projection, and diff. Mutations update or invalidate the detail revision before another revision-bearing command is enabled.
+Stable keys nest under knowledge base and draft, for example draft lists, detail, sources, analysis history by page, analysis status/outcomes by run and page, candidates by page, decisions, conflicts, projection, and diff. Mutations update or invalidate the detail revision before another revision-bearing command is enabled.
 
 An alternative was adding all new records to the already broad `src/api/types.ts`; feature-local types were chosen to keep the large planning domain cohesive without expanding unrelated API consumers.
 
@@ -54,11 +54,11 @@ The source table presents `DOCUMENT`, `FILE`, and `TEXT` separately and never su
 
 Actions depend on source state: active document sources can become stale or unavailable and may be refreshed; analyzed removed sources are inactive and restorable; destructive removal is confirmed. The UI refetches both source and draft detail after each mutation because source membership advances the draft revision and affects analysis currency.
 
-### Poll server-owned analysis state and require discoverability
+### Recover and poll server-owned analysis state
 
-Starting or retrying analysis stores the returned run ID in query state and begins bounded polling. `RUNNING` polls continue; `COMPLETED`, `PARTIAL`, and `FAILED` stop polling and invalidate draft detail, candidates, conflicts, projection, and diff. Partial and failed runs preserve per-source outcomes and expose retry only when the response permits it.
+Starting or retrying analysis stores the returned run ID in query state and begins bounded polling. `RUNNING` polls continue; `COMPLETED`, `PARTIAL`, and `FAILED` stop polling and invalidate draft detail, analysis history, candidates, conflicts, projection, and diff. Partial and failed runs preserve paged per-source outcomes and expose retry only when the response permits it.
 
-To comply with the existing durable-state governance requirement, route reload must discover the current/recent run from the backend. Browser storage may be used only as a convenience hint, never as the authoritative solution. Implementation of reload recovery is gated on a backend current/list-analysis-runs contract.
+On route entry, `DraftResponse.currentAnalysis` identifies the applicable current run and its status location. Paged `GET .../analysis-runs` supplies recent history, currentness, retryability, retry lineage, aggregate linkage, counts, timestamps, and status locations. The UI resumes polling a current running reference and keeps stale historical runs inspectable without treating them as current. Browser storage is unnecessary for correctness.
 
 ### Organize review by candidate, conflict, and result
 
@@ -68,32 +68,26 @@ Conflict resolution shows alternatives and evidence, then requires exactly one b
 
 An alternative was editing the generated projection directly. It was rejected because the backend persists decisions and resolutions, not arbitrary projection replacements.
 
-### Gate loaded-guidance editing on a readable backend value
+### Round-trip canonical typed guidance
 
-Create-draft supports the complete structured guidance form immediately. Editing an existing draft requires the backend to return the current guidance through draft detail or a dedicated owned endpoint. The UI will not initialize an empty guidance object from a fingerprint, because saving it would erase unknown guidance. Until the prerequisite exists, loaded guidance is shown as unavailable rather than editable.
+Draft create, list, detail, metadata update, and guidance update responses return the canonical `DraftGuidance` envelope together with guidance revision and fingerprint. The editor initializes from that value, preserves `additionalInstructions` separately from structured discovery guidance, and submits only documented fields. Validation failures preserve the editor and never mutate cached authority.
 
 ## Risks / Trade-offs
 
-- [The backend cannot currently restore an in-progress analysis after reload] → Require a current/list-runs contract before claiming durable recovery; do not rely on browser-only IDs.
-- [The backend cannot return existing guidance] → Gate edit behavior and preserve the fingerprint/revision as read-only metadata until a readable value exists.
-- [Candidate `Object` responses can drift from discovery contracts] → Add runtime shape validation and require a documented typed contract before enabling decision mutations.
+- [A draft may reference a historical analysis that is no longer current] → Respect the reference/summary `current` flags and never infer currentness from recency alone.
+- [Canonical guidance rejects unknown or invalid fields] → Model the documented envelope explicitly, retain rejected form input, and surface normalized validation details.
+- [Recommendation and persistent review state can be confused] → Render `recommendationState` and `effectiveReviewState` as separate labeled dimensions and use `latestDecisionId` for history linkage.
 - [Many dependent queries can refetch excessively after each decision] → Update the returned draft revision deliberately, invalidate only affected review/result keys, and keep paged candidate data cached.
 - [Multi-select source addition can partially succeed] → Serialize requests, show per-item success/failure, and leave failed selections available for retry.
 - [Large evidence and diff payloads can overwhelm the page] → Paginate candidates/outcomes, collapse evidence by default, filter diffs, and lazy-load selected workbench sections.
 
 ## Migration Plan
 
-1. Confirm the readable-guidance, analysis-run discovery, and typed candidate response prerequisites with the backend.
-2. Add DTOs, API functions, query keys, runtime guards, and contract tests without changing existing schema APIs.
+1. Capture representative typed guidance, workflow-reference, analysis-history, and candidate-page fixtures from the matching backend.
+2. Add DTOs, API functions, query keys, boundary guards, and contract tests without changing existing schema APIs.
 3. Add the lazy route and navigation entry with list/create/detail lifecycle behavior.
 4. Add source management and serialized revision mutations.
 5. Add analysis polling/recovery and outcome views.
 6. Add candidate decisions, conflicts, projection, and diff sections.
 7. Run lint, unit/workflow tests, coverage, build, and browser flows against the matching backend.
 8. Roll back by removing the route/navigation entry and unused frontend modules; backend drafts remain intact.
-
-## Open Questions
-
-- Will backend draft detail include the structured guidance value, or will it expose a dedicated guidance endpoint?
-- Will analysis recovery use a `current` endpoint, a paged run list, or a run summary embedded in `DraftResponse`?
-- Will the persistent candidate endpoint be formally typed as `Page<Candidate>`, including the exact discovery candidate fields?

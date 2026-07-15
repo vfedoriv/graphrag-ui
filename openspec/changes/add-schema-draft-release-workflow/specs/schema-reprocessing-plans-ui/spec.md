@@ -27,11 +27,12 @@ The system SHALL require either all eligible documents or an explicit document s
 - **THEN** the system SHALL send those values in the plan `processingOptions` object using the existing option semantics
 
 ### Requirement: Plan progress and safety outcomes are observable
-The system SHALL poll queued or running plans, display aggregate counts, paginate plan items, and distinguish succeeded, failed, stale, blocked, interrupted, and skipped outcomes.
+The system SHALL poll queued or running plans, display aggregate counts, paginate `items` through the nested standard page envelope, and distinguish succeeded, failed, stale, blocked, interrupted, and skipped outcomes.
 
 #### Scenario: Plan is running
 - **WHEN** a plan status is `QUEUED` or `RUNNING`
 - **THEN** the system SHALL show total, queued, running, succeeded, failed, stale, and blocked counts and continue polling
+- **AND** SHALL navigate item results using `items.page`, `items.size`, `items.totalElements`, and `items.content`
 
 #### Scenario: Active schema changes during a plan
 - **WHEN** item outcomes become `BLOCKED` because the published schema is no longer active
@@ -54,12 +55,18 @@ The system SHALL allow retry for retryable terminal plans and SHALL require the 
 - **AND** SHALL show the new plan's retry lineage separately from prior successful items
 
 ### Requirement: Plan progress is recoverable after reload
-The system SHALL rediscover active and recent reprocessing plans from authoritative backend state after navigation or reload.
+The system SHALL rediscover the latest reprocessing plan from the draft workflow reference and expose knowledge-base plan history filtered by the owned draft after navigation or reload.
 
 #### Scenario: Return to a running plan
 - **WHEN** the selected draft page remounts while a plan is active
-- **THEN** the system SHALL identify the active plan and resume polling its paged status
+- **THEN** the system SHALL follow the latest-reprocessing status location and resume polling its paged status
 
-#### Scenario: Backend exposes only get by known plan ID
-- **WHEN** the frontend cannot enumerate or identify current plans
-- **THEN** the system SHALL not claim complete plan-history or reload recovery support
+#### Scenario: Inspect plan history
+- **WHEN** the user opens reprocessing history for a draft
+- **THEN** the system SHALL request the paged knowledge-base plan list filtered by that draft ID
+- **AND** SHALL show latest, target-current, retryable, retry-lineage, aggregate-count, timestamp, and status-location fields
+
+#### Scenario: Historical plan target is no longer current
+- **WHEN** a plan summary reports `targetCurrent: false`
+- **THEN** the system SHALL retain the plan for audit and explain that its schema target is no longer current
+- **AND** SHALL enable retry only when the backend summary reports it as retryable

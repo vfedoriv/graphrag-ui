@@ -49,7 +49,7 @@ The system SHALL prevent concurrent source mutations from reusing the same draft
 - **AND** SHALL keep unresolved selections available for explicit retry
 
 ### Requirement: Analysis is a durable polled workflow
-The system SHALL start analysis with the current draft revision, poll the authoritative run resource while it is active, display aggregate and per-source progress, and stop polling at a terminal state.
+The system SHALL start analysis with the current draft revision, poll the authoritative run resource while it is active, display aggregate progress and nested paged `sourceOutcomes`, and stop polling at a terminal state.
 
 #### Scenario: Start analysis
 - **WHEN** an open draft has analyzable active sources and the user starts analysis
@@ -62,7 +62,7 @@ The system SHALL start analysis with the current draft revision, poll the author
 
 #### Scenario: Analysis partially completes
 - **WHEN** a run becomes `PARTIAL`
-- **THEN** the system SHALL show succeeded and failed source counts and each paged source outcome
+- **THEN** the system SHALL show succeeded and failed source counts and each source outcome from the nested `page`, `size`, `totalElements`, and `content` envelope
 - **AND** SHALL keep any returned aggregate available for review
 
 #### Scenario: Analysis fails
@@ -70,16 +70,21 @@ The system SHALL start analysis with the current draft revision, poll the author
 - **THEN** the system SHALL show its privacy-safe failure category and retryability without inventing model or source content
 
 ### Requirement: Analysis progress survives navigation and reload
-The system SHALL restore current or recent analysis progress from authoritative backend state rather than depending only on route-local mutation state or a browser-retained run identifier.
+The system SHALL restore current analysis progress from the draft's workflow reference, expose paged recent run history, and never depend on route-local mutation state or a browser-retained run identifier for correctness.
 
 #### Scenario: Return while analysis is running
 - **WHEN** the page remounts while a draft analysis is active
-- **THEN** the system SHALL rediscover the active run from the backend and resume polling it
+- **THEN** the system SHALL follow `currentAnalysis.statusLocation` and resume polling it
 
-#### Scenario: Backend cannot expose the active run identifier
-- **WHEN** no backend current/list-run contract is available
-- **THEN** the system SHALL not claim reliable reload recovery
-- **AND** implementation of durable recovery SHALL remain blocked or visibly limited
+#### Scenario: Inspect analysis history
+- **WHEN** the user opens analysis history
+- **THEN** the system SHALL load the paged analysis-run list ordered by backend history semantics
+- **AND** SHALL show each run's currentness, retryability, retry lineage, aggregate, counts, timestamps, and status location
+
+#### Scenario: Latest run is not current
+- **WHEN** source membership, guidance, or draft state makes a historical run stale
+- **THEN** the system SHALL keep the run inspectable
+- **AND** SHALL not treat recency alone as proof that its result is current
 
 ### Requirement: Retry preserves backend reuse semantics
 The system SHALL allow retry only for a terminal retryable run and SHALL bind retry to the latest reviewed draft revision.
