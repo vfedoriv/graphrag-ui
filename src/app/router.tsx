@@ -10,6 +10,7 @@ const SchemaBuilderPage = lazyPage(() => import('../features/schema-builder/Sche
 const DocumentsPage = lazyPage(() => import('../features/documents/DocumentsPage'), 'DocumentsPage')
 const QueriesPage = lazyPage(() => import('../features/queries/QueriesPage'), 'QueriesPage')
 const SettingsPage = lazyPage(() => import('../features/settings/SettingsPage'), 'SettingsPage')
+const SchemaDraftsPage = lazyPage(() => import('../features/schema-drafts/SchemaDraftsPage'), 'SchemaDraftsPage')
 
 function lazyPage<T extends Record<string, ComponentType>>(
   load: () => Promise<T>,
@@ -35,6 +36,8 @@ export const router = createBrowserRouter([
       { path: 'knowledge-bases', element: routeElement(KnowledgeBasesPage) },
       { path: 'schemas', element: routeElement(SchemasPage) },
       { path: 'schema-builder', element: routeElement(SchemaBuilderPage) },
+      { path: 'schema-drafts', element: routeElement(SchemaDraftsPage) },
+      { path: 'schema-drafts/:draftId', element: routeElement(SchemaDraftsPage) },
       { path: 'documents', element: routeElement(DocumentsPage) },
       { path: 'queries', element: routeElement(QueriesPage) },
       { path: 'settings', element: routeElement(SettingsPage) },

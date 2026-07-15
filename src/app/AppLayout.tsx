@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Database, FileText, GitBranch, House, Settings, Spline, Waypoints } from 'lucide-react'
+import { Database, FileClock, FileText, GitBranch, House, Settings, Spline, Waypoints } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useKnowledgeBasesQuery } from '../api/knowledgeBases'
 import { useSelectedKnowledgeBase } from '../shared/state/useSelectedKnowledgeBase'
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/knowledge-bases', label: 'Knowledge Bases', icon: Database },
   { to: '/schemas', label: 'Schemas', icon: Spline },
   { to: '/schema-builder', label: 'Schema Builder', icon: GitBranch },
+  { to: '/schema-drafts', label: 'Schema Drafts', icon: FileClock },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/queries', label: 'Queries', icon: Waypoints },
   { to: '/settings', label: 'Settings', icon: Settings },

@@ -1,9 +1,7 @@
 ## Purpose
 
 This specification defines the required behavior for admin app shell and navigation in the GraphRAG admin UI.
-
 ## Requirements
-
 ### Requirement: Admin shell provides stable navigation and context
 The system SHALL expose primary navigation entries by controller pages and schema-building workspace (Dashboard, Knowledge Bases, Schemas, Schema Builder, Documents, Queries, Settings), route each entry to its configured workspace, render the prototype-aligned brand/sidebar treatment, and provide shell-level action buttons with the shared interactive visual feedback states.
 
@@ -86,3 +84,15 @@ The system SHALL provide a labeled appearance control in the shared admin shell 
 #### Scenario: Use appearance control on a narrow viewport
 - **WHEN** a user views the stacked shell on a narrow viewport
 - **THEN** the appearance control SHALL remain visible and usable without causing horizontal page overflow
+
+### Requirement: Primary navigation includes Schema Drafts
+The system SHALL expose a `Schema Drafts` primary-navigation destination at `/schema-drafts` and SHALL lazy-load its route module inside the existing application shell.
+
+#### Scenario: Navigate to Schema Drafts
+- **WHEN** a user selects Schema Drafts from primary navigation
+- **THEN** the application SHALL navigate to `/schema-drafts`
+- **AND** SHALL preserve the globally selected knowledge base while the route module loads
+
+#### Scenario: Open a draft deep link
+- **WHEN** a user opens `/schema-drafts/{draftId}` with a matching selected knowledge base
+- **THEN** the application SHALL render that draft's workbench after validating knowledge-base ownership through the API
