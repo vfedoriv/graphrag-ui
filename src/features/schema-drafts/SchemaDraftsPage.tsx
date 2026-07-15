@@ -33,6 +33,7 @@ import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
 import type { CandidateResponse, Compatibility, DecisionType, DraftGuidance, DraftResponse } from './schemaDraftTypes'
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
+import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
 const formatJson = (value: unknown) => JSON.stringify(value, null, 2)
@@ -125,10 +126,10 @@ function SchemaDraftList() {
   />
 }
 
-type WorkbenchSection = 'overview' | 'sources' | 'analysis' | 'candidates' | 'conflicts' | 'projection' | 'diff'
+type WorkbenchSection = 'overview' | 'sources' | 'analysis' | 'candidates' | 'conflicts' | 'projection' | 'diff' | 'release'
 const sections: Array<{ id: WorkbenchSection; label: string }> = [
   { id: 'overview', label: 'Overview' }, { id: 'sources', label: 'Sources' }, { id: 'analysis', label: 'Analysis' },
-  { id: 'candidates', label: 'Candidates' }, { id: 'conflicts', label: 'Conflicts' }, { id: 'projection', label: 'Projection' }, { id: 'diff', label: 'Diff' },
+  { id: 'candidates', label: 'Candidates' }, { id: 'conflicts', label: 'Conflicts' }, { id: 'projection', label: 'Projection' }, { id: 'diff', label: 'Diff' }, { id: 'release', label: 'Release' },
 ]
 
 function SchemaDraftWorkbench({ draftId }: { draftId: string }) {
@@ -155,7 +156,7 @@ function SchemaDraftWorkbench({ draftId }: { draftId: string }) {
     actions={<Link className='button' to='/schema-drafts'>Back to drafts</Link>}
     workspaceStrip={<WorkspaceStrip items={[{ label: 'Knowledge base', value: selectedKnowledgeBaseId }, { label: 'Lifecycle', value: value.status, tone: readOnly ? 'success' : 'neutral' }, { label: 'Revision', value: value.revision }, { label: 'Aggregate', value: value.currentAggregateId ?? 'none' }]} />}
     topSectionTitle='Workbench sections'
-    topSection={<div className='endpoint-tabs' role='tablist'>{sections.map((item) => <button type='button' role='tab' aria-selected={section === item.id} className={section === item.id ? 'active' : ''} key={item.id} onClick={() => setSection(item.id)}>{item.label}</button>)}</div>}
+    topSection={<div className='tabs' role='tablist'>{sections.map((item) => <button type='button' role='tab' aria-selected={section === item.id} className={`tab${section === item.id ? ' active' : ''}`} key={item.id} onClick={() => setSection(item.id)}>{item.label}</button>)}</div>}
     tabsTitle={sections.find((item) => item.id === section)?.label}
     tabs={
       section === 'overview' ? <Overview draft={value} readOnly={readOnly} /> :
@@ -163,7 +164,8 @@ function SchemaDraftWorkbench({ draftId }: { draftId: string }) {
       section === 'analysis' ? <Analysis draft={value} readOnly={readOnly} /> :
       section === 'candidates' ? <Candidates draft={value} readOnly={readOnly} /> :
       section === 'conflicts' ? <Conflicts draft={value} readOnly={readOnly} /> :
-      section === 'projection' ? <Projection draft={value} /> : <Diff draft={value} />
+      section === 'projection' ? <Projection draft={value} /> :
+      section === 'diff' ? <Diff draft={value} /> : <SchemaDraftReleaseWorkflow draft={value} />
     }
   />
 }

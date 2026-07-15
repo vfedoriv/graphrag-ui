@@ -48,8 +48,12 @@ describe('SchemaDraftsPage', () => {
     const user = userEvent.setup()
     renderRoute('/schema-drafts/draft-1', 'kb-1')
     expect(await screen.findByText('Support v2')).toBeInTheDocument()
+    expect(screen.getByRole('tablist')).toHaveClass('tabs')
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveClass('tab', 'active')
+    expect(screen.getByRole('tab', { name: 'Sources' })).toHaveClass('tab')
 
     await user.click(screen.getByRole('tab', { name: 'Sources' }))
+    expect(screen.getByRole('tab', { name: 'Sources' })).toHaveClass('active')
     expect(await screen.findByText('Document one')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
 

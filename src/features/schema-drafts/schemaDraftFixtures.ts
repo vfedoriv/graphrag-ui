@@ -1,5 +1,6 @@
 import type { AnalysisRunResponse, AnalysisRunSummaryResponse, CandidateResponse, DraftResponse, PageResponse } from './schemaDraftTypes'
 import { emptyDraftGuidance } from './schemaDraftTypes'
+import type { EligibilityPage, EvaluationRun, EvaluationRunSummary, Publication, PublicationReadiness, ReprocessingPlan, ReprocessingPlanSummary } from './schemaDraftReleaseTypes'
 
 export const canonicalGuidance = {
   additionalInstructions: 'Prefer stable business identifiers.',
@@ -59,3 +60,64 @@ export const validationProblemFixture = {
   type: 'about:blank', title: 'Validation failed', status: 400, detail: 'Draft guidance is invalid',
   errors: { 'guidance.guidance.requiredConcepts[0].name': ['must not be blank'] },
 }
+
+export const eligibilityFixture: EligibilityPage = {
+  draftRevision: 7, currentAggregateId: 'aggregate-1', page: 0, size: 20, totalElements: 2,
+  content: [
+    { documentId: 'held-out-1', filename: 'held-out.txt', contentType: 'text/plain', sizeBytes: 120, sha256: 'held-out-sha', uploadedAt: '2026-07-15T07:00:00Z', eligible: true, ineligibilityReason: null },
+    { documentId: 'document-1', filename: 'discovery.txt', contentType: 'text/plain', sizeBytes: 240, sha256: 'discovery-sha', uploadedAt: '2026-07-15T07:01:00Z', eligible: false, ineligibilityReason: 'ACTIVE_DISCOVERY_EVIDENCE' },
+  ],
+}
+const metrics = {
+  rates: [
+    { metric: 'RECOGNIZED_ENTITY_RATE' as const, numerator: 8, denominator: 10, value: 0.8, applicability: 'APPLICABLE' as const, evidence: [{ coordinate: 'nodes.Customer' }] },
+    { metric: 'KEY_AVAILABILITY_RATE' as const, numerator: 0, denominator: 0, value: null, applicability: 'NOT_APPLICABLE' as const, evidence: [] },
+  ],
+  counts: [
+    { metric: 'PROPERTY_TYPE_CONFLICTS' as const, count: 1, evidence: [{ coordinate: 'nodes.Customer.properties.customerId' }] },
+    { metric: 'LOW_SUPPORT_CANDIDATES' as const, count: 2, evidence: [{ coordinate: 'nodes.Ticket' }] },
+  ],
+  reasons: [{ code: 'HELD_OUT_MISMATCH', detail: 'One property type differed from the reviewed projection.' }],
+}
+const advisoryAssessment = {
+  status: 'COMPLETED' as const,
+  intendedQuestions: [{ questionFingerprint: 'question-sha', coverage: 'PARTIALLY_SUPPORTED' as const, reasons: [{ code: 'MISSING_PATH', detail: 'The escalation path is not represented.' }], schemaCoordinates: ['relationships.ESCALATED_TO'] }],
+  schemaNoise: [{ schemaCoordinate: 'nodes.InternalTag', assessment: 'POSSIBLE_NOISE', reasons: [{ code: 'LOW_UTILITY', detail: 'No intended question references this concept.' }] }],
+  reasons: [], warnings: ['Advisory judgments are model-generated.'],
+  reproducibility: { profileId: 'profile-1', profileRevision: 2, promptRevision: 'evaluation-prompt-v2', contractRevision: 'schema-draft-evaluation-v2' },
+}
+const evaluationBase = {
+  draftRevision: 7, aggregateRevisionId: 'aggregate-1', projectionContentHash: 'projection-sha', aiProfileId: 'profile-1', aiProfileRevision: 2,
+  promptRevision: 'evaluation-prompt-v2', contractRevision: 'schema-draft-evaluation-v2', retryOfRunId: null, totalDocuments: 2,
+  succeededDocuments: 1, failedDocuments: 1, staleDocuments: 0, failureCategory: null, retryable: true,
+  createdAt: '2026-07-15T10:00:00Z', startedAt: '2026-07-15T10:00:01Z', completedAt: '2026-07-15T10:01:00Z',
+}
+export const evaluationFixture: EvaluationRun = {
+  ...evaluationBase, id: 'evaluation-partial', status: 'PARTIAL', metrics, advisoryAssessment,
+  outcomes: { page: 0, size: 20, totalElements: 2, content: [
+    { id: 'evaluation-outcome-1', documentId: 'held-out-1', documentSha256: 'held-out-sha', status: 'SUCCEEDED', reused: true, chunkCount: 4, metrics, evidenceCoordinates: ['nodes.Customer'], failureCategory: null, retryable: false, startedAt: '2026-07-15T10:00:01Z', completedAt: '2026-07-15T10:00:30Z' },
+    { id: 'evaluation-outcome-2', documentId: 'held-out-2', documentSha256: 'held-out-2-sha', status: 'STALE_SOURCE', reused: false, chunkCount: 0, metrics: null, evidenceCoordinates: [], failureCategory: 'SOURCE_CHANGED', retryable: true, startedAt: null, completedAt: '2026-07-15T10:00:32Z' },
+  ] },
+}
+export const evaluationHistoryFixture: PageResponse<EvaluationRunSummary> = { page: 0, size: 20, totalElements: 3, content: [
+  { ...evaluationBase, id: 'evaluation-partial', status: 'PARTIAL', current: true, statusLocation: '/evaluation-runs/evaluation-partial' },
+  { ...evaluationBase, id: 'evaluation-failed', status: 'FAILED', current: false, succeededDocuments: 0, failedDocuments: 2, failureCategory: 'PROVIDER_ERROR', statusLocation: '/evaluation-runs/evaluation-failed' },
+  { ...evaluationBase, id: 'evaluation-legacy', status: 'COMPLETED', current: false, contractRevision: 'schema-draft-evaluation-v1', retryable: false, statusLocation: '/evaluation-runs/evaluation-legacy' },
+] }
+export const readinessFixture: PublicationReadiness = { ready: true, draftRevision: 7, aggregateRevisionId: 'aggregate-1', projectionContentHash: 'projection-sha', targetName: 'Support', targetVersion: 2, blockingReasons: [] }
+export const blockedReadinessFixture: PublicationReadiness = { ...readinessFixture, ready: false, blockingReasons: [{ id: 'evaluation-current', category: 'EVALUATION', detail: 'A current successful held-out evaluation is required.' }] }
+export const publicationFixture: Publication = { publicationId: 'publication-1', draftId: 'draft-1', schemaId: 'schema-2', draftRevision: 7, publicationContentHash: 'projection-sha', currentSchemaContentHash: 'projection-sha', contentDrifted: false, active: false, publishedAt: '2026-07-15T11:00:00Z' }
+export const planFixture: ReprocessingPlan = {
+  id: 'plan-partial', status: 'PARTIAL', draftId: 'draft-1', knowledgeBaseId: 'kb-1', schemaId: 'schema-2', schemaContentHash: 'projection-sha', aiProfileId: 'profile-1', aiProfileRevision: 2, retryOfPlanId: null,
+  totalDocuments: 3, queuedDocuments: 0, runningDocuments: 0, succeededDocuments: 1, failedDocuments: 0, staleDocuments: 1, blockedDocuments: 1,
+  createdAt: '2026-07-15T12:00:00Z', startedAt: '2026-07-15T12:00:01Z', completedAt: '2026-07-15T12:02:00Z',
+  items: { page: 0, size: 20, totalElements: 3, content: [
+    { id: 'plan-item-1', documentId: 'document-1', documentSha256: 'sha-1', status: 'SUCCEEDED', failureCategory: null, retryable: false, priorItemId: null, startedAt: '2026-07-15T12:00:02Z', completedAt: '2026-07-15T12:00:20Z' },
+    { id: 'plan-item-2', documentId: 'document-2', documentSha256: 'sha-2', status: 'STALE_SOURCE', failureCategory: 'SOURCE_CHANGED', retryable: true, priorItemId: null, startedAt: null, completedAt: '2026-07-15T12:00:21Z' },
+    { id: 'plan-item-3', documentId: 'document-3', documentSha256: 'sha-3', status: 'BLOCKED', failureCategory: 'ACTIVE_SCHEMA_CHANGED', retryable: true, priorItemId: null, startedAt: null, completedAt: '2026-07-15T12:00:22Z' },
+  ] },
+}
+export const planHistoryFixture: PageResponse<ReprocessingPlanSummary> = { page: 0, size: 20, totalElements: 2, content: [
+  { id: 'plan-partial', status: 'PARTIAL', draftId: 'draft-1', schemaId: 'schema-2', schemaContentHash: 'projection-sha', retryOfPlanId: null, totalDocuments: 3, queuedDocuments: 0, runningDocuments: 0, succeededDocuments: 1, failedDocuments: 0, staleDocuments: 1, blockedDocuments: 1, latest: true, targetCurrent: true, retryable: true, createdAt: '2026-07-15T12:00:00Z', startedAt: '2026-07-15T12:00:01Z', completedAt: '2026-07-15T12:02:00Z', statusLocation: '/reprocessing-plans/plan-partial' },
+  { id: 'plan-old', status: 'COMPLETED', draftId: 'draft-1', schemaId: 'schema-1', schemaContentHash: 'old-sha', retryOfPlanId: null, totalDocuments: 2, queuedDocuments: 0, runningDocuments: 0, succeededDocuments: 2, failedDocuments: 0, staleDocuments: 0, blockedDocuments: 0, latest: false, targetCurrent: false, retryable: false, createdAt: '2026-07-14T12:00:00Z', startedAt: '2026-07-14T12:00:01Z', completedAt: '2026-07-14T12:01:00Z', statusLocation: '/reprocessing-plans/plan-old' },
+] }

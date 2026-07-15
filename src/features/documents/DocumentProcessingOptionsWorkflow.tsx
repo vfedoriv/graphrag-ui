@@ -66,20 +66,7 @@ export function DocumentProcessingOptionsWorkflow({
       {clearError ? <Alert title='Clear defaults failed' message={formatDocumentErrorMessage(clearError)} /> : null}
       {processError ? <Alert title='Process with options failed' message={formatDocumentErrorMessage(processError)} /> : null}
 
-      <div className='stack'>
-        {data.options.length === 0 ? (
-          <p>No processing options are available for this document.</p>
-        ) : (
-          data.options.map((option) => (
-            <ProcessingOptionControl
-              key={option.key}
-              option={option}
-              value={draft[option.key]}
-              onChange={(value) => onDraftChange(option.key, value)}
-            />
-          ))
-        )}
-      </div>
+      <ProcessingOptionsEditor data={data} draft={draft} onDraftChange={onDraftChange} />
 
       <div className='toolbar'>
         <Button type='button' variant='primary' isPending={isSaving} pendingText='Saving...' onClick={onSave}>
@@ -96,7 +83,17 @@ export function DocumentProcessingOptionsWorkflow({
   )
 }
 
-function ProcessingOptionControl({
+export function ProcessingOptionsEditor({ data, draft, onDraftChange }: {
+  data: DocumentProcessingOptionsResponse
+  draft: ProcessingOptionDraft
+  onDraftChange: (key: string, value: ProcessingOptionDraftValue) => void
+}) {
+  return <div className='stack'>
+    {data.options.length === 0 ? <p>No processing options are available for this document.</p> : data.options.map((option) => <ProcessingOptionControl key={option.key} option={option} value={draft[option.key]} onChange={(value) => onDraftChange(option.key, value)} />)}
+  </div>
+}
+
+export function ProcessingOptionControl({
   option,
   value,
   onChange,
