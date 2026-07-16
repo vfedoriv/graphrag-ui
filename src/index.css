@@ -890,12 +890,51 @@ textarea {
 }
 
 .schema-builder-canvas {
+  --xy-controls-box-shadow: 0 8px 20px color-mix(in oklch, var(--fg) 16%, transparent);
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--surface-3);
+  --xy-controls-button-border-color: color-mix(in oklch, var(--fg) 24%, var(--border));
+  --xy-controls-button-color: var(--fg);
+  --xy-controls-button-color-hover: var(--accent);
   width: 100%;
   min-height: 560px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
+}
+
+.schema-builder-canvas .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--fg) 24%, var(--border));
+  border-radius: var(--radius-sm);
+}
+
+.schema-builder-canvas .react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.schema-builder-canvas .react-flow__controls-button:active:not(:disabled) {
+  background: color-mix(in oklch, var(--accent) 18%, var(--surface));
+  color: var(--fg);
+}
+
+.schema-builder-canvas .react-flow__controls-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.schema-builder-canvas .react-flow__controls-button:disabled {
+  background: var(--surface-2);
+  color: var(--muted);
+  opacity: 0.55;
 }
 
 .schema-flow-node {
@@ -1056,6 +1095,21 @@ textarea {
 
 .schema-builder-sidebar .flow-card {
   min-width: 0;
+  gap: 8px;
+  padding: 12px;
+}
+
+.schema-builder-sidebar.stack,
+.schema-builder-sidebar .stack {
+  gap: 8px;
+}
+
+.schema-builder-description {
+  min-height: 72px;
+}
+
+.schema-property-editor {
+  min-width: 0;
 }
 
 .compact-check {
@@ -1067,6 +1121,18 @@ textarea {
 @media (min-width: 1280px) {
   .schema-builder-layout {
     grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  }
+
+  .schema-builder-sidebar {
+    max-block-size: max(560px, min(680px, calc(100dvh - 220px)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+  }
+
+  .schema-property-row {
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 0.7fr);
   }
 }
 
@@ -1155,6 +1221,12 @@ textarea {
     min-height: 460px;
   }
 
+  .schema-builder-sidebar {
+    max-block-size: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
   .table-wrap table {
     min-width: 680px;
   }
@@ -1170,6 +1242,12 @@ textarea {
 
   .ops-spine > div:last-child {
     border-bottom: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .schema-property-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

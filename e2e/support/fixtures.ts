@@ -40,8 +40,30 @@ export const schemasFixture: Schema[] = [
 ]
 
 export const schemaContent = JSON.stringify({
-  nodes: [{ label: 'Customer', properties: ['name'] }],
-  relationships: [],
+  name: 'Customer graph',
+  version: 1,
+  nodes: [
+    { label: 'Customer', key: 'name', properties: [{ name: 'name', type: 'string', required: true }] },
+    { label: 'Account', key: 'accountId', properties: [{ name: 'accountId', type: 'string', required: true }] },
+  ],
+  relationships: [
+    {
+      type: 'OWNS_ACCOUNT',
+      from: 'Customer',
+      to: 'Account',
+      description: 'Links a customer to an account.',
+      properties: [
+        { name: 'role', type: 'string', required: true },
+        { name: 'openedAt', type: 'date', required: false },
+        { name: 'source', type: 'string', required: false },
+        { name: 'confidence', type: 'number', required: false },
+        { name: 'status', type: 'string', required: false },
+        { name: 'region', type: 'string', required: false },
+        { name: 'priority', type: 'integer', required: false },
+        { name: 'reviewedAt', type: 'datetime', required: false },
+      ],
+    },
+  ],
 })
 
 export const documentsFixture: DocumentUpload[] = [

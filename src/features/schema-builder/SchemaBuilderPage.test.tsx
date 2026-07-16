@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaBuilderPage } from './SchemaBuilderPage'
 import { buildSchemaFlowEdges, buildSchemaFlowNodes, routeRelationshipPath } from './schemaBuilderFlow'
@@ -22,7 +22,21 @@ const importedSchemaContent = JSON.stringify({
       properties: [{ name: 'name', type: 'string', required: true }],
     },
   ],
-  relationships: [{ type: 'HAS_PARTY', from: 'Contract', to: 'Party' }],
+  relationships: [
+    {
+      type: 'HAS_PARTY',
+      from: 'Contract',
+      to: 'Party',
+      description: 'Links a contract to a participating party.',
+      properties: [
+        { name: 'role', type: 'string', required: true },
+        { name: 'significance', type: 'number', required: false },
+        { name: 'effectiveDate', type: 'date', required: false },
+        { name: 'source', type: 'string', required: false },
+        { name: 'confidence', type: 'number', required: false },
+      ],
+    },
+  ],
   indexes: [{ label: 'Contract', properties: ['contractId'], unique: true }],
 })
 
@@ -177,6 +191,41 @@ describe('SchemaBuilderPage', () => {
     expect(screen.getByLabelText('Type')).toHaveValue('HAS_PARTY')
     expect(screen.getByLabelText('From node')).toHaveValue('node-contract-1')
     expect(screen.getByLabelText('To node')).toHaveValue('node-party-2')
+  })
+
+  it('keeps a long relationship inspector accessible and editable', async () => {
+    const user = userEvent.setup()
+    renderBuilder('/schema-builder?schemaId=schema-1')
+
+    await user.click(await screen.findByRole('button', { name: 'Select relationship HAS_PARTY' }))
+
+    const inspector = screen.getByTestId('schema-builder-sidebar')
+    expect(inspector).toHaveAttribute('aria-label', 'Schema builder inspector')
+    expect(inspector).toHaveAttribute('tabindex', '0')
+    expect(within(inspector).getByLabelText('Description', { selector: '#schema-builder-relationship-description' })).toHaveClass(
+      'schema-builder-description',
+    )
+
+    const propertyGroup = within(inspector).getByRole('group', { name: 'Relationship properties' })
+    const propertyNames = within(propertyGroup).getAllByLabelText('Relationship properties name')
+    const propertyTypes = within(propertyGroup).getAllByLabelText('Relationship properties type')
+    const requiredControls = within(propertyGroup).getAllByRole('checkbox', { name: 'Required' })
+    expect(propertyNames).toHaveLength(5)
+    expect(propertyTypes).toHaveLength(5)
+    expect(requiredControls).toHaveLength(5)
+    expect(within(propertyGroup).getAllByRole('button', { name: 'Remove' })).toHaveLength(5)
+
+    await user.clear(propertyNames[0])
+    await user.type(propertyNames[0], 'participationRole')
+    await user.selectOptions(propertyTypes[1], 'integer')
+    await user.click(requiredControls[1])
+
+    await user.click(screen.getByRole('button', { name: 'Raw View' }))
+    const serializedSchema = JSON.parse((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value)
+    expect(serializedSchema.relationships[0].properties).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'participationRole', type: 'string', required: true }),
+      expect.objectContaining({ name: 'significance', type: 'integer', required: true }),
+    ]))
   })
 
   it('supports blank draft visual edits and raw JSON synchronization', async () => {

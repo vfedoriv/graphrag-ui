@@ -398,7 +398,12 @@ export function SchemaBuilderPage() {
         />
       </div>
 
-      <aside className='schema-builder-sidebar stack'>
+      <aside
+        aria-label='Schema builder inspector'
+        className='schema-builder-sidebar stack'
+        data-testid='schema-builder-sidebar'
+        tabIndex={0}
+      >
         <SchemaMetadataEditor draft={draft} onChange={updateDraft} />
         <SchemaElementInspector
           draft={draft}
@@ -647,6 +652,7 @@ function SchemaMetadataEditor({
       />
       <FieldLabel htmlFor='schema-builder-description'>Description</FieldLabel>
       <textarea
+        className='schema-builder-description'
         id='schema-builder-description'
         rows={3}
         value={draft.description}
@@ -733,6 +739,7 @@ function NodeInspector({
       <Input id='schema-builder-node-label' value={node.label} onChange={(event) => onChange({ ...node, label: event.target.value })} />
       <FieldLabel htmlFor='schema-builder-node-description'>Description</FieldLabel>
       <textarea
+        className='schema-builder-description'
         id='schema-builder-node-description'
         rows={3}
         value={node.description}
@@ -806,6 +813,7 @@ function RelationshipInspector({
       </select>
       <FieldLabel htmlFor='schema-builder-relationship-description'>Description</FieldLabel>
       <textarea
+        className='schema-builder-description'
         id='schema-builder-relationship-description'
         rows={3}
         value={relationship.description}
@@ -830,7 +838,7 @@ function PropertyEditor({
   onChange: (properties: SchemaPropertyDraft[]) => void
 }) {
   return (
-    <div className='stack'>
+    <div className='stack schema-property-editor' role='group' aria-label={ownerLabel}>
       <div className='split-stack'>
         <h4>{ownerLabel}</h4>
         <Button
