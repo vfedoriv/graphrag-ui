@@ -101,11 +101,26 @@ export function useSchemaDraftAnalysisRunQuery(knowledgeBaseId: string | null, d
   refetchInterval: (query) => query.state.data && !isTerminalAnalysisStatus(query.state.data.status) ? 1500 : false })
 }
 
-export function useSchemaDraftCandidatesQuery(knowledgeBaseId: string | null, draftId: string | null, page: number, size: number, enabled = true) {
-  return useQuery({ queryKey: queryKeys.schemaDraftCandidatesMaybe(knowledgeBaseId, draftId, page, size), queryFn: () => {
+const candidateBackendPageSize = 50
+
+export async function loadAllSchemaDraftCandidates(knowledgeBaseId: string, draftId: string) {
+  const firstPage = await schemaDraftsApi.candidates(knowledgeBaseId, draftId, 0, candidateBackendPageSize)
+  if (firstPage.totalElements <= firstPage.content.length) return firstPage.content
+  if (firstPage.size <= 0) throw new Error('Candidate page response cannot be completed because its page size is zero')
+
+  const pageCount = Math.ceil(firstPage.totalElements / firstPage.size)
+  const remainingPages = await Promise.all(Array.from(
+    { length: pageCount - 1 },
+    (_, index) => schemaDraftsApi.candidates(knowledgeBaseId, draftId, index + 1, firstPage.size),
+  ))
+  return [firstPage, ...remainingPages].flatMap((page) => page.content)
+}
+
+export function useSchemaDraftCandidatesQuery(knowledgeBaseId: string | null, draftId: string | null, enabled = true) {
+  return useQuery({ queryKey: queryKeys.schemaDraftCandidatesMaybe(knowledgeBaseId, draftId), queryFn: () => {
     const ids = requireIds(knowledgeBaseId, draftId)
-    return schemaDraftsApi.candidates(ids.knowledgeBaseId, ids.draftId, page, size)
-  }, enabled: Boolean(knowledgeBaseId && draftId && enabled), placeholderData: keepPreviousData })
+    return loadAllSchemaDraftCandidates(ids.knowledgeBaseId, ids.draftId)
+  }, enabled: Boolean(knowledgeBaseId && draftId && enabled) })
 }
 
 export function useSchemaDraftReviewQueries(knowledgeBaseId: string | null, draftId: string | null, enabled = true) {

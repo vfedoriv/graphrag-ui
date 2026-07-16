@@ -37,10 +37,10 @@ export const queryKeys = {
     ['schema-drafts', knowledgeBaseId, draftId, 'analysis-runs', runId, page, size] as const,
   schemaDraftAnalysisRunMaybe: (knowledgeBaseId: string | null, draftId: string | null, runId: string | null, page: number, size: number) =>
     knowledgeBaseId && draftId && runId ? queryKeys.schemaDraftAnalysisRun(knowledgeBaseId, draftId, runId, page, size) : (['schema-drafts', 'none', 'none', 'analysis-runs', 'none', page, size] as const),
-  schemaDraftCandidates: (knowledgeBaseId: string, draftId: string, page: number, size: number) =>
-    ['schema-drafts', knowledgeBaseId, draftId, 'candidates', page, size] as const,
-  schemaDraftCandidatesMaybe: (knowledgeBaseId: string | null, draftId: string | null, page: number, size: number) =>
-    knowledgeBaseId && draftId ? queryKeys.schemaDraftCandidates(knowledgeBaseId, draftId, page, size) : (['schema-drafts', 'none', 'none', 'candidates', page, size] as const),
+  schemaDraftCandidates: (knowledgeBaseId: string, draftId: string) =>
+    ['schema-drafts', knowledgeBaseId, draftId, 'candidates'] as const,
+  schemaDraftCandidatesMaybe: (knowledgeBaseId: string | null, draftId: string | null) =>
+    knowledgeBaseId && draftId ? queryKeys.schemaDraftCandidates(knowledgeBaseId, draftId) : (['schema-drafts', 'none', 'none', 'candidates'] as const),
   schemaDraftDecisions: (knowledgeBaseId: string, draftId: string) => ['schema-drafts', knowledgeBaseId, draftId, 'decisions'] as const,
   schemaDraftConflicts: (knowledgeBaseId: string, draftId: string) => ['schema-drafts', knowledgeBaseId, draftId, 'conflicts'] as const,
   schemaDraftProjection: (knowledgeBaseId: string, draftId: string) => ['schema-drafts', knowledgeBaseId, draftId, 'projection'] as const,

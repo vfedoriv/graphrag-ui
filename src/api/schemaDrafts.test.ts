@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createElement, type ReactNode } from 'react'
-import { schemaDraftsApi, useSchemaDraftWorkflowMutations } from './schemaDrafts'
+import { loadAllSchemaDraftCandidates, schemaDraftsApi, useSchemaDraftWorkflowMutations } from './schemaDrafts'
 import { ApiError } from './types'
 import { queryKeys } from './queryKeys'
 import { analysisDetailFixture, analysisHistoryFixture, candidatePageFixture, draftFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
@@ -62,6 +62,50 @@ describe('schemaDraftsApi', () => {
     const page = await schemaDraftsApi.candidates('kb-1', 'draft-1')
 
     expect(page.content[0]).toMatchObject({ effectiveReviewState: null, latestDecisionId: null })
+  })
+
+  it('loads a single complete candidate page without extra requests', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, candidatePageFixture))
+
+    await expect(loadAllSchemaDraftCandidates('kb-1', 'draft-1')).resolves.toEqual(candidatePageFixture.content)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toContain('/candidates?page=0&size=50')
+  })
+
+  it('combines all candidate pages including parent and child data split across boundaries', async () => {
+    const node = { ...candidatePageFixture.content[0], kind: 'NODE', identity: 'node:Customer', label: 'Customer', property: null }
+    const property = { ...candidatePageFixture.content[0], identity: 'node-property:Customer:customerId' }
+    const relationship = { ...candidatePageFixture.content[0], kind: 'RELATIONSHIP', identity: 'relationship:Customer:OWNS:Account', label: null, property: null, relationshipType: 'OWNS', fromLabel: 'Customer', toLabel: 'Account' }
+    const fetchMock = stubFetch((url) => {
+      const page = Number(new URL(url, 'http://test').searchParams.get('page'))
+      const content = page === 0 ? [node] : page === 1 ? [property] : [relationship]
+      return jsonResponse(200, { page, size: 1, totalElements: 3, content })
+    })
+
+    await expect(loadAllSchemaDraftCandidates('kb-1', 'draft-1')).resolves.toEqual([node, property, relationship])
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual(expect.arrayContaining([
+      expect.stringContaining('page=0&size=50'),
+      expect.stringContaining('page=1&size=1'),
+      expect.stringContaining('page=2&size=1'),
+    ]))
+  })
+
+  it('loads an empty candidate result without requesting more pages', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, { page: 0, size: 50, totalElements: 0, content: [] }))
+
+    await expect(loadAllSchemaDraftCandidates('kb-1', 'draft-1')).resolves.toEqual([])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects the complete candidate query when any remaining page fails', async () => {
+    stubFetch((url) => {
+      const page = Number(new URL(url, 'http://test').searchParams.get('page'))
+      if (page === 1) return jsonResponse(500, { title: 'Candidate page failed', status: 500 })
+      return jsonResponse(200, { page, size: 1, totalElements: 2, content: [candidatePageFixture.content[0]] })
+    })
+
+    await expect(loadAllSchemaDraftCandidates('kb-1', 'draft-1')).rejects.toMatchObject({ status: 500 })
   })
 
   it('normalizes validation and stale-revision problem details', async () => {

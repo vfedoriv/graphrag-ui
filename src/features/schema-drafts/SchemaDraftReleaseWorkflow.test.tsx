@@ -125,4 +125,18 @@ describe('SchemaDraftReleaseWorkflow', () => {
     expect(screen.getByText('Changed document: document-2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry unresolved work' })).toBeInTheDocument()
   })
+
+  it('identifies item totals in every release workbench pager', async () => {
+    const draft = {
+      ...draftFixture,
+      latestEvaluation: { id: 'evaluation-partial', status: 'PARTIAL', current: true, latest: true, statusLocation: '/evaluation-runs/evaluation-partial' },
+      latestReprocessing: { id: 'plan-partial', status: 'PARTIAL', targetCurrent: true, latest: true, statusLocation: '/reprocessing-plans/plan-partial' },
+    }
+    setup('schema-2', true, draft)
+
+    expect(await screen.findByText('Reused prior success')).toBeInTheDocument()
+    expect(await screen.findByText('Blocked: document-3')).toBeInTheDocument()
+    expect(screen.getAllByText('Page 1 · 2 items total')).toHaveLength(3)
+    expect(screen.getAllByText('Page 1 · 3 items total')).toHaveLength(2)
+  })
 })

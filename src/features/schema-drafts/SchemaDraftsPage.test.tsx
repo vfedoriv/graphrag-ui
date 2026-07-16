@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
 import { analysisDetailFixture, analysisHistoryFixture, candidateFixture, candidatePageFixture, draftFixture } from './schemaDraftFixtures'
+import type { CandidateResponse } from './schemaDraftTypes'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
 afterEach(() => vi.restoreAllMocks())
@@ -60,9 +61,12 @@ describe('SchemaDraftsPage', () => {
     await user.click(screen.getByRole('tab', { name: 'Analysis' }))
     expect(await screen.findByText('Recent analysis history')).toBeInTheDocument()
     expect((await screen.findAllByText(/2\/3 succeeded/)).length).toBeGreaterThan(0)
+    expect(screen.getByText('Page 1 · 3 items total')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 · 4 items total')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Candidates' }))
     await user.click(await screen.findByText('Customer.customerId'))
+    expect(screen.getByText('Page 1 · 1 items total')).toBeInTheDocument()
     expect((await screen.findAllByText('Recommended')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Pinned').length).toBeGreaterThan(0)
 
@@ -127,5 +131,68 @@ describe('SchemaDraftsPage', () => {
     await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
     expect(await screen.findByText('Candidate contract error')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument()
+  })
+
+  it('organizes candidates across backend pages and clamps the UI page after a decision refresh', async () => {
+    const makeCandidate = (identity: string, overrides: Partial<CandidateResponse>): CandidateResponse => ({
+      ...candidateFixture,
+      identity,
+      evidence: [],
+      effectiveReviewState: null,
+      latestDecisionId: null,
+      ...overrides,
+    })
+    const fillers = Array.from({ length: 24 }, (_, index) => makeCandidate(`node:Filler${index}`, {
+      kind: 'NODE',
+      label: `Filler ${String(index).padStart(2, '0')}`,
+      property: null,
+      propertyType: null,
+      confidence: 0.99 - index * 0.01,
+    }))
+    const boundaryNode = makeCandidate('node:Boundary', { kind: 'NODE', label: 'Boundary', property: null, propertyType: null, confidence: 0.1 })
+    const boundaryProperty = makeCandidate('node-property:Boundary:id', { kind: 'NODE_PROPERTY', label: 'Boundary', property: 'id', confidence: 0.95 })
+    const relationship = makeCandidate('relationship:Boundary:LINKS:Target', {
+      kind: 'RELATIONSHIP', label: null, property: null, propertyType: null, fromLabel: 'Boundary', relationshipType: 'LINKS', toLabel: 'Target', confidence: 0.99, recommendationState: 'RECOMMENDED',
+    })
+    const backendPages = [[relationship, boundaryProperty, ...fillers.slice(0, 23)], [fillers[23], boundaryNode]]
+    let reduced = false
+    const fetchMock = stubFetch((url, init) => {
+      const parsed = new URL(url, 'http://test')
+      const path = parsed.pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/candidates')) {
+        if (reduced) return jsonResponse(200, { page: 0, size: 25, totalElements: 1, content: [fillers[0]] })
+        const page = Number(parsed.searchParams.get('page'))
+        return jsonResponse(200, { page, size: 25, totalElements: 27, content: backendPages[page] })
+      }
+      if (path.endsWith('/decisions') && init?.method === 'POST') {
+        reduced = true
+        return jsonResponse(200, { id: 'decision-refresh', sequence: 1, draftRevision: 8, type: 'ACCEPT', reviewState: 'ACCEPTED', candidateIdentity: boundaryProperty.identity, priorValue: null, resultingValue: boundaryProperty, rationale: null, createdAt: '2026-07-15T10:00:00Z' })
+      }
+      if (path.endsWith('/decisions')) return jsonResponse(200, [])
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
+
+    expect(await screen.findByText('Boundary')).toBeInTheDocument()
+    expect(screen.queryByText('Boundary.id')).not.toBeInTheDocument()
+    expect(screen.queryByText('Boundary —[LINKS]→ Target')).not.toBeInTheDocument()
+    expect(screen.getByText('Page 1 · 27 items total')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    const propertyTitle = await screen.findByText('Boundary.id')
+    const relationshipTitle = screen.getByText('Boundary —[LINKS]→ Target')
+    expect(screen.queryByText('Boundary')).not.toBeInTheDocument()
+    expect(propertyTitle.compareDocumentPosition(relationshipTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('Page 2 · 27 items total')).toBeInTheDocument()
+
+    await user.click(propertyTitle)
+    await user.click(screen.getByRole('button', { name: 'Accept' }))
+
+    expect(await screen.findByText('Page 1 · 1 items total')).toBeInTheDocument()
+    expect(screen.getByText('Filler 00')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/decisions') && init?.method === 'POST')).toBe(true)
   })
 })

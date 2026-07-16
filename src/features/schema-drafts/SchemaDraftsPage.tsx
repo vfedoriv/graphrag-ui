@@ -35,6 +35,7 @@ import type { Compatibility, DraftGuidance, DraftResponse } from './schemaDraftT
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import { CandidateReviewItem } from './CandidateReviewItem'
+import { organizeCandidates } from './organizeCandidates'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
 const formatJson = (value: unknown) => JSON.stringify(value, null, 2)
@@ -296,16 +297,22 @@ function Analysis({ draft, readOnly }: { draft: DraftResponse; readOnly: boolean
 }
 
 function Pager({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (page: number) => void }) {
-  return <div className='button-row'><Button variant='ghost' disabled={page === 0} onClick={() => onPage(Math.max(0, page - 1))}>Previous</Button><span>Page {page + 1} · {total} total</span><Button variant='ghost' disabled={(page + 1) * size >= total} onClick={() => onPage(page + 1)}>Next</Button></div>
+  return <div className='button-row'><Button variant='ghost' disabled={page === 0} onClick={() => onPage(Math.max(0, page - 1))}>Previous</Button><span>Page {page + 1} · {total} items total</span><Button variant='ghost' disabled={(page + 1) * size >= total} onClick={() => onPage(page + 1)}>Next</Button></div>
 }
+
+const candidatePageSize = 25
 
 function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boolean }) {
   const [page, setPage] = useState(0)
-  const candidates = useSchemaDraftCandidatesQuery(draft.knowledgeBaseId, draft.id, page, 25, Boolean(draft.currentAggregateId))
+  const candidates = useSchemaDraftCandidatesQuery(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const review = useSchemaDraftReviewQueries(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const workflow = useSchemaDraftWorkflowMutations()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [requestedDecisionId, setRequestedDecisionId] = useState<string | null>(null)
+  const organizedCandidates = useMemo(() => organizeCandidates(candidates.data ?? []), [candidates.data])
+  const lastPage = Math.max(0, Math.ceil(organizedCandidates.length / candidatePageSize) - 1)
+  const currentPage = Math.min(page, lastPage)
+  const visibleCandidates = organizedCandidates.slice(currentPage * candidatePageSize, (currentPage + 1) * candidatePageSize)
   const requestedDecision = requestedDecisionId ? review.decisions.data?.find((item) => item.id === requestedDecisionId) : null
   const historyNavigationMessage = requestedDecisionId && review.decisions.data && !requestedDecision
     ? 'The latest decision is not present in the loaded decision history.'
@@ -324,7 +331,7 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
   return <div className='stack-lg'>
     {candidates.error ? <Alert title='Candidate contract error' message={`${errorMessage(candidates.error)} Decision actions are disabled for this payload.`} /> : null}
     <MutationError error={workflow.decide.error} />
-    <div className='candidate-review-queue'>{candidates.data?.content.map((candidate) => <CandidateReviewItem
+    <div className='candidate-review-queue'>{visibleCandidates.map((candidate) => <CandidateReviewItem
       key={candidate.identity}
       candidate={candidate}
       readOnly={readOnly}
@@ -333,7 +340,7 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
       onDecide={(value, type, resultingValue, rationale) => workflow.decide.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: draft.revision, type, candidateIdentity: value.identity, resultingValue, rationale } })}
       onShowDecision={showDecision}
     />)}</div>
-    <Pager page={page} size={candidates.data?.size ?? 25} total={candidates.data?.totalElements ?? 0} onPage={setPage} />
+    <Pager page={currentPage} size={candidatePageSize} total={organizedCandidates.length} onPage={setPage} />
     <details className='decision-history' open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary><strong>Append-only decision history</strong></summary><div className='stack'>
       {historyNavigationMessage ? <p className='inline-state' role='status'>{historyNavigationMessage}</p> : null}
       {review.decisions.data?.length ? <div className='table-wrap'><table aria-label='Append-only decision history'><thead><tr>{['Sequence', 'Decision', 'Candidate', 'Review state', 'Rationale', 'Created'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{review.decisions.data.map((item) => <tr id={`decision-${item.id}`} tabIndex={-1} key={item.id}><td>{item.sequence}</td><td>{item.type}</td><td>{item.candidateIdentity}</td><td>{item.reviewState}</td><td>{item.rationale ?? '—'}</td><td>{formatDate(item.createdAt)}</td></tr>)}</tbody></table></div> : <p>No decisions yet.</p>}
