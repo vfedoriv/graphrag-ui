@@ -725,6 +725,181 @@ textarea:focus-visible,
   background: color-mix(in oklch, var(--warn) 14%, var(--interaction-base));
 }
 
+.candidate-review-queue {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.candidate-review-item,
+.decision-history,
+.candidate-technical-details {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--interaction-base);
+}
+
+.candidate-review-item[open] {
+  border-color: color-mix(in oklch, var(--accent) 38%, var(--border));
+  box-shadow: 0 8px 24px color-mix(in oklch, var(--border) 55%, transparent);
+}
+
+.candidate-review-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(0, 3fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.candidate-review-summary::marker,
+.decision-history > summary::marker,
+.candidate-technical-details > summary::marker {
+  color: var(--accent);
+}
+
+.candidate-review-summary:focus-visible,
+.decision-history > summary:focus-visible,
+.candidate-technical-details > summary:focus-visible {
+  outline: 3px solid color-mix(in oklch, var(--accent) 48%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.candidate-definition,
+.candidate-signal {
+  min-width: 0;
+}
+
+.candidate-definition strong,
+.candidate-definition small,
+.candidate-signal small,
+.candidate-signal b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.candidate-definition strong {
+  font-size: 14px;
+}
+
+.candidate-definition small,
+.candidate-signal small,
+.candidate-readable-details dt,
+.candidate-state-groups small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.candidate-summary-signals {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.candidate-signal {
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+  font-size: 12px;
+}
+
+.candidate-signal.recommendation {
+  border-color: var(--accent);
+}
+
+.candidate-signal.recommendation.low_support,
+.candidate-signal.recommendation.review_required {
+  border-color: var(--warn);
+}
+
+.candidate-signal.review.accepted,
+.candidate-signal.review.pinned {
+  border-color: var(--success);
+}
+
+.candidate-signal.review.rejected {
+  border-color: var(--danger);
+}
+
+.candidate-review-body {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--border);
+  padding: 14px;
+}
+
+.candidate-state-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.candidate-state-groups > div {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.candidate-readable-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.candidate-readable-details > div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 9px 10px;
+}
+
+.candidate-readable-details dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
+.candidate-changes {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+}
+
+.candidate-changes h4,
+.candidate-changes ul {
+  margin-block: 0 6px;
+}
+
+.candidate-technical-details > summary,
+.decision-history > summary {
+  padding: 11px 12px;
+  cursor: pointer;
+}
+
+.candidate-technical-details > .stack,
+.decision-history > .stack {
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+
+.candidate-actions {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.decision-history tr:focus {
+  outline: 3px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  outline-offset: -3px;
+  background: color-mix(in oklch, var(--accent) 12%, var(--interaction-base));
+}
+
 .file-picker {
   display: grid;
   gap: 8px;
@@ -1246,6 +1421,15 @@ textarea {
 }
 
 @media (max-width: 520px) {
+  .candidate-review-summary,
+  .candidate-readable-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .candidate-summary-signals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .schema-property-row {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -31,9 +31,10 @@ import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
-import type { CandidateResponse, Compatibility, DecisionType, DraftGuidance, DraftResponse } from './schemaDraftTypes'
+import type { Compatibility, DraftGuidance, DraftResponse } from './schemaDraftTypes'
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
+import { CandidateReviewItem } from './CandidateReviewItem'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
 const formatJson = (value: unknown) => JSON.stringify(value, null, 2)
@@ -303,40 +304,40 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
   const candidates = useSchemaDraftCandidatesQuery(draft.knowledgeBaseId, draft.id, page, 25, Boolean(draft.currentAggregateId))
   const review = useSchemaDraftReviewQueries(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const workflow = useSchemaDraftWorkflowMutations()
-  const [rationale, setRationale] = useState<Record<string, string>>({})
-  const [editing, setEditing] = useState<CandidateResponse | null>(null)
-  const [editType, setEditType] = useState<'MODIFY' | 'PIN'>('MODIFY')
-  const [editValue, setEditValue] = useState('')
-  const [editError, setEditError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState<string[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [requestedDecisionId, setRequestedDecisionId] = useState<string | null>(null)
+  const requestedDecision = requestedDecisionId ? review.decisions.data?.find((item) => item.id === requestedDecisionId) : null
+  const historyNavigationMessage = requestedDecisionId && review.decisions.data && !requestedDecision
+    ? 'The latest decision is not present in the loaded decision history.'
+    : null
 
-  const decide = (candidate: CandidateResponse, type: DecisionType, resultingValue?: unknown) => workflow.decide.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: draft.revision, type, candidateIdentity: candidate.identity, resultingValue, rationale: rationale[candidate.identity] || undefined } })
-  const submitEdit = () => {
-    if (!editing) return
-    try {
-      const value = JSON.parse(editValue) as Record<string, unknown>
-      if (value.identity !== editing.identity || value.kind !== editing.kind) throw new Error('Modified or pinned value must preserve candidate identity and kind.')
-      setEditError(null)
-      decide(editing, editType, value)
-    } catch (error) { setEditError(errorMessage(error)) }
+  useEffect(() => {
+    if (historyOpen && requestedDecision) document.getElementById(`decision-${requestedDecision.id}`)?.focus()
+  }, [historyOpen, requestedDecision])
+
+  const showDecision = (decisionId: string) => {
+    setRequestedDecisionId(decisionId)
+    setHistoryOpen(true)
   }
 
   if (!draft.currentAggregateId) return <EmptyState title='No current aggregate' description='Add active sources and run analysis before reviewing candidates.' />
   return <div className='stack-lg'>
     {candidates.error ? <Alert title='Candidate contract error' message={`${errorMessage(candidates.error)} Decision actions are disabled for this payload.`} /> : null}
     <MutationError error={workflow.decide.error} />
-    {candidates.data?.content.map((candidate) => <details className='notice' key={candidate.identity} onToggle={(event) => {
-      const open = event.currentTarget.open
-      setExpanded((current) => open ? [...new Set([...current, candidate.identity])] : current.filter((identity) => identity !== candidate.identity))
-    }}><summary><strong>{candidate.identity}</strong> · {candidate.kind} · support {candidate.supportCount} · confidence {candidate.confidence ?? '—'}</summary>{expanded.includes(candidate.identity) ? <div className='stack'>
-      <div className='button-row'><StatusBadge label={`Recommendation: ${candidate.recommendationState}`} tone='neutral' /><StatusBadge label={`Review: ${candidate.effectiveReviewState ?? 'Unreviewed'}`} tone={candidate.effectiveReviewState === 'ACCEPTED' || candidate.effectiveReviewState === 'PINNED' ? 'success' : 'neutral'} />{candidate.origins.map((origin) => <StatusBadge key={origin} label={origin} />)}{candidate.latestDecisionId ? <span>Latest decision: {candidate.latestDecisionId}</span> : null}</div>
-      <pre className='output-preview'>{formatJson(candidate)}</pre>
-      <h4>Evidence</h4>{candidate.evidence.length ? <Table headers={['Source', 'Fingerprint', 'Chunk', 'Document', 'Origins']} rows={candidate.evidence.map((evidence) => [evidence.sourceId, evidence.sourceFingerprint, evidence.chunkId ?? '—', evidence.documentId ?? '—', evidence.origins.join(', ')])} /> : <p>No evidence references returned.</p>}
-      {!readOnly && !candidates.error ? <><Input placeholder='Optional rationale' value={rationale[candidate.identity] ?? ''} onChange={(event) => setRationale((current) => ({ ...current, [candidate.identity]: event.target.value }))} /><div className='button-row'><Button onClick={() => decide(candidate, 'ACCEPT')}>Accept</Button><Button onClick={() => decide(candidate, 'REJECT')}>Reject</Button><Button onClick={() => { setEditing(candidate); setEditType('MODIFY'); setEditValue(formatJson(candidate)) }}>Modify</Button><Button onClick={() => { setEditing(candidate); setEditType('PIN'); setEditValue(formatJson(candidate)) }}>Pin</Button></div></> : null}
-    </div> : null}</details>)}
-    {editing ? <div className='panel stack'><h3>{editType} {editing.identity}</h3><StructuredPayloadEditor format='json' rows={18} value={editValue} onChange={setEditValue} error={editError} onErrorChange={setEditError} /><div className='button-row'><Button variant='primary' isPending={workflow.decide.isPending} onClick={submitEdit}>Submit {editType.toLowerCase()}</Button><Button onClick={() => setEditing(null)}>Cancel</Button></div></div> : null}
+    <div className='candidate-review-queue'>{candidates.data?.content.map((candidate) => <CandidateReviewItem
+      key={candidate.identity}
+      candidate={candidate}
+      readOnly={readOnly}
+      actionsDisabled={Boolean(candidates.error)}
+      isPending={workflow.decide.isPending}
+      onDecide={(value, type, resultingValue, rationale) => workflow.decide.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: draft.revision, type, candidateIdentity: value.identity, resultingValue, rationale } })}
+      onShowDecision={showDecision}
+    />)}</div>
     <Pager page={page} size={candidates.data?.size ?? 25} total={candidates.data?.totalElements ?? 0} onPage={setPage} />
-    <div className='stack'><h3>Append-only decision history</h3>{review.decisions.data?.length ? <Table headers={['Sequence', 'Decision', 'Candidate', 'Review state', 'Rationale', 'Created']} rows={review.decisions.data.map((item) => [item.sequence, item.type, item.candidateIdentity, item.reviewState, item.rationale ?? '—', formatDate(item.createdAt)])} rowKeys={review.decisions.data.map((item) => item.id)} /> : <p>No decisions yet.</p>}</div>
+    <details className='decision-history' open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary><strong>Append-only decision history</strong></summary><div className='stack'>
+      {historyNavigationMessage ? <p className='inline-state' role='status'>{historyNavigationMessage}</p> : null}
+      {review.decisions.data?.length ? <div className='table-wrap'><table aria-label='Append-only decision history'><thead><tr>{['Sequence', 'Decision', 'Candidate', 'Review state', 'Rationale', 'Created'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{review.decisions.data.map((item) => <tr id={`decision-${item.id}`} tabIndex={-1} key={item.id}><td>{item.sequence}</td><td>{item.type}</td><td>{item.candidateIdentity}</td><td>{item.reviewState}</td><td>{item.rationale ?? '—'}</td><td>{formatDate(item.createdAt)}</td></tr>)}</tbody></table></div> : <p>No decisions yet.</p>}
+    </div></details>
   </div>
 }
 

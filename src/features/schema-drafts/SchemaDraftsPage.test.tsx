@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
-import { analysisDetailFixture, analysisHistoryFixture, candidatePageFixture, draftFixture } from './schemaDraftFixtures'
+import { analysisDetailFixture, analysisHistoryFixture, candidateFixture, candidatePageFixture, draftFixture } from './schemaDraftFixtures'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
 afterEach(() => vi.restoreAllMocks())
@@ -62,10 +62,9 @@ describe('SchemaDraftsPage', () => {
     expect((await screen.findAllByText(/2\/3 succeeded/)).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('tab', { name: 'Candidates' }))
-    const candidateIdentities = await screen.findAllByText(candidatePageFixture.content[0].identity)
-    await user.click(candidateIdentities[0])
-    expect(await screen.findByText('Recommendation: RECOMMENDED')).toBeInTheDocument()
-    expect(screen.getByText('Review: PINNED')).toBeInTheDocument()
+    await user.click(await screen.findByText('Customer.customerId'))
+    expect((await screen.findAllByText('Recommended')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Pinned').length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('tab', { name: 'Conflicts' }))
     expect(await screen.findByText('Customer.age')).toBeInTheDocument()
@@ -79,5 +78,54 @@ describe('SchemaDraftsPage', () => {
     expect((await screen.findAllByText(/CHANGE_TYPE/)).length).toBeGreaterThan(0)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
+  })
+
+  it('reviews candidates through progressive disclosure and navigates to the latest decision', async () => {
+    const decision = { id: 'decision-4', sequence: 4, draftRevision: 7, type: 'PIN', reviewState: 'PINNED', candidateIdentity: candidateFixture.identity, priorValue: null, resultingValue: candidateFixture, rationale: 'Stable identifier', createdAt: '2026-07-15T08:02:00Z' }
+    const fetchMock = stubFetch((url, init) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/candidates')) return jsonResponse(200, candidatePageFixture)
+      if (path.endsWith('/decisions') && init?.method === 'POST') return jsonResponse(200, { ...decision, type: 'ACCEPT', reviewState: 'ACCEPTED' })
+      if (path.endsWith('/decisions')) return jsonResponse(200, [decision])
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
+
+    const summaryTitle = await screen.findByText('Customer.customerId')
+    expect(screen.queryByText('Evidence references')).not.toBeInTheDocument()
+    expect(screen.queryByText(/sourceFingerprint/)).not.toBeInTheDocument()
+    expect(screen.getByText('Supported by 4 independent sources')).toBeInTheDocument()
+    await user.click(summaryTitle)
+    expect(await screen.findByText('Evidence references')).toBeInTheDocument()
+    expect(screen.queryByText(/sourceFingerprint/)).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Technical details'))
+    expect(await screen.findByText(/sourceFingerprint/)).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Optional rationale for Customer.customerId'), 'Looks correct')
+    await user.click(screen.getByRole('button', { name: 'Accept' }))
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/decisions'), expect.objectContaining({ method: 'POST', body: expect.stringContaining('Looks correct') }))
+
+    await user.click(screen.getByRole('button', { name: 'Show latest decision in history' }))
+    const history = screen.getByRole('table', { name: 'Append-only decision history' })
+    expect(history).toBeVisible()
+    expect(document.getElementById('decision-decision-4')).toHaveFocus()
+  })
+
+  it('reports candidate contract errors without exposing decision actions', async () => {
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/candidates')) return jsonResponse(200, { ...candidatePageFixture, content: [{ identity: 'broken' }] })
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
+    expect(await screen.findByText('Candidate contract error')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument()
   })
 })

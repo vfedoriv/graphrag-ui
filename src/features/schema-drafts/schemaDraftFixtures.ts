@@ -56,6 +56,32 @@ export const candidateFixture: CandidateResponse = {
 }
 export const candidatePageFixture: PageResponse<CandidateResponse> = { page: 0, size: 50, totalElements: 1, content: [candidateFixture] }
 
+const candidateVariant = (identity: string, overrides: Partial<CandidateResponse>): CandidateResponse => ({
+  ...candidateFixture,
+  identity,
+  evidence: [],
+  origins: ['OBSERVED'],
+  effectiveReviewState: null,
+  latestDecisionId: null,
+  ...overrides,
+})
+
+export const candidateReviewFixtures: CandidateResponse[] = [
+  candidateVariant('node:Customer', { kind: 'NODE', label: 'Customer', property: null, propertyType: null, supportCount: 2, recommendationState: 'RECOMMENDED' }),
+  candidateVariant('node:Account', { kind: 'NODE', label: 'Account', property: null, propertyType: null, supportCount: 1, effectiveReviewState: 'ACCEPTED', latestDecisionId: 'decision-accepted' }),
+  candidateVariant('node:DeprecatedTag', { kind: 'NODE', label: 'DeprecatedTag', property: null, propertyType: null, supportCount: 1, effectiveReviewState: 'REJECTED', latestDecisionId: 'decision-rejected' }),
+  candidateVariant('node:GuidedConcept', { kind: 'NODE', label: 'GuidedConcept', property: null, propertyType: null, origins: ['GUIDED'], supportCount: 0, confidence: null, recommendationState: 'REVIEW_REQUIRED' }),
+  candidateVariant('node-property:Ticket:priority', { kind: 'NODE_PROPERTY', label: 'Ticket', property: 'priority', propertyType: 'STRING', supportCount: 1, recommendationState: 'LOW_SUPPORT' }),
+  candidateVariant('node-property:Customer:customerId', { kind: 'NODE_PROPERTY', label: 'Customer', originalLabel: 'customer', property: 'customerId', originalProperty: 'customer_id', propertyType: 'STRING', supportCount: 1 }),
+  candidateVariant('relationship:Customer:OPENED:Ticket', { kind: 'RELATIONSHIP', label: null, property: null, propertyType: null, relationshipType: 'OPENED', originalRelationshipType: 'opened', fromLabel: 'Customer', toLabel: 'Ticket', supportCount: 1 }),
+  candidateVariant('node-property:Ticket:status', { kind: 'NODE_PROPERTY', label: 'Ticket', property: 'status', propertyType: 'STRING', supportCount: 1, evidence: [
+    { sourceId: 'source-shared', sourceFingerprint: 'shared-sha', documentId: 'document-shared', chunkId: 'chunk-1', origins: ['OBSERVED'] },
+    { sourceId: 'source-shared', sourceFingerprint: 'shared-sha', documentId: 'document-shared', chunkId: 'chunk-2', origins: ['OBSERVED'] },
+  ] }),
+]
+
+export const candidateReviewPageFixture: PageResponse<CandidateResponse> = { page: 0, size: 25, totalElements: candidateReviewFixtures.length, content: candidateReviewFixtures }
+
 export const validationProblemFixture = {
   type: 'about:blank', title: 'Validation failed', status: 400, detail: 'Draft guidance is invalid',
   errors: { 'guidance.guidance.requiredConcepts[0].name': ['must not be blank'] },
