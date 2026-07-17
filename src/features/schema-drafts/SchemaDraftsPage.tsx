@@ -35,6 +35,7 @@ import type { Compatibility, DraftGuidance, DraftResponse } from './schemaDraftT
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import { CandidateReviewItem } from './CandidateReviewItem'
+import { ConflictReviewItem } from './ConflictReviewItem'
 import { organizeCandidates } from './organizeCandidates'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
@@ -351,22 +352,18 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
 function Conflicts({ draft, readOnly }: { draft: DraftResponse; readOnly: boolean }) {
   const review = useSchemaDraftReviewQueries(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const workflow = useSchemaDraftWorkflowMutations()
-  const [selected, setSelected] = useState<Record<string, string>>({})
-  const [custom, setCustom] = useState<Record<string, string>>({})
-  const [rationale, setRationale] = useState<Record<string, string>>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [activeConflictId, setActiveConflictId] = useState<string | null>(null)
   if (!draft.currentAggregateId) return <EmptyState title='No conflicts available' description='Run analysis to produce a current aggregate.' />
-  const submit = (id: string) => {
-    try {
-      const selectedAlternative = selected[id]
-      const customText = custom[id]?.trim()
-      if (Boolean(selectedAlternative) === Boolean(customText)) throw new Error('Choose exactly one existing alternative or one custom resolution.')
-      const customResolution = customText ? JSON.parse(customText) as unknown : undefined
-      setErrors((current) => ({ ...current, [id]: '' }))
-      workflow.resolveConflict.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, conflictId: id, payload: { revision: draft.revision, selectedAlternative: selectedAlternative || undefined, customResolution, rationale: rationale[id] || undefined } })
-    } catch (error) { setErrors((current) => ({ ...current, [id]: errorMessage(error) })) }
-  }
-  return <div className='stack-lg'><MutationError error={workflow.resolveConflict.error} />{review.conflicts.data?.length ? review.conflicts.data.map((conflict) => <div className='notice stack' key={conflict.id}><div><strong>{conflict.coordinate}</strong><p>{conflict.type} · {conflict.resolved ? 'Resolved' : 'Unresolved'}</p></div><details><summary>Alternatives and evidence</summary><pre className='output-preview'>{formatJson({ alternatives: conflict.alternatives, evidence: conflict.evidence })}</pre></details>{!readOnly && !conflict.resolved ? <><FieldLabel label='Existing alternative'><select value={selected[conflict.id] ?? ''} onChange={(event) => { setSelected((current) => ({ ...current, [conflict.id]: event.target.value })); if (event.target.value) setCustom((current) => ({ ...current, [conflict.id]: '' })) }}><option value=''>Choose one</option>{(Array.isArray(conflict.alternatives) ? conflict.alternatives : Object.keys((conflict.alternatives ?? {}) as object)).map((alternative) => <option value={String(alternative)} key={String(alternative)}>{String(alternative)}</option>)}</select></FieldLabel><FieldLabel label='Or custom structured resolution'><StructuredPayloadEditor format='json' rows={7} value={custom[conflict.id] ?? ''} onChange={(value) => { setCustom((current) => ({ ...current, [conflict.id]: value })); if (value.trim()) setSelected((current) => ({ ...current, [conflict.id]: '' })) }} error={errors[conflict.id]} onErrorChange={(value) => setErrors((current) => ({ ...current, [conflict.id]: value ?? '' }))} /></FieldLabel><Input placeholder='Optional rationale' value={rationale[conflict.id] ?? ''} onChange={(event) => setRationale((current) => ({ ...current, [conflict.id]: event.target.value }))} /><Button isPending={workflow.resolveConflict.isPending} onClick={() => submit(conflict.id)}>Resolve conflict</Button></> : null}</div>) : <EmptyState title='No conflicts' description='The current aggregate has no conflicts.' />}</div>
+  const conflicts = [...(review.conflicts.data ?? [])].sort((left, right) => Number(left.resolved) - Number(right.resolved))
+  return <div className='stack-lg'><MutationError error={workflow.resolveConflict.error} />{conflicts.length ? <div className='conflict-review-queue'>{conflicts.map((conflict) => <ConflictReviewItem
+    key={conflict.id}
+    conflict={conflict}
+    readOnly={readOnly}
+    open={activeConflictId === conflict.id}
+    isPending={workflow.resolveConflict.isPending}
+    onToggle={() => setActiveConflictId((current) => current === conflict.id ? null : conflict.id)}
+    onResolve={(conflictId, payload) => workflow.resolveConflict.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, conflictId, payload: { revision: draft.revision, ...payload } })}
+  />)}</div> : <EmptyState title='No conflicts' description='The current aggregate has no conflicts.' />}</div>
 }
 
 function Projection({ draft }: { draft: DraftResponse }) {

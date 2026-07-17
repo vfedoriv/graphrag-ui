@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
 import { analysisDetailFixture, analysisHistoryFixture, candidateFixture, candidatePageFixture, draftFixture } from './schemaDraftFixtures'
-import type { CandidateResponse } from './schemaDraftTypes'
+import type { CandidateResponse, ConflictResponse } from './schemaDraftTypes'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
 afterEach(() => vi.restoreAllMocks())
@@ -12,6 +12,20 @@ afterEach(() => vi.restoreAllMocks())
 function renderRoute(path: string, selectedKnowledgeBaseId: string | null) {
   return renderWithProviders(<MemoryRouter initialEntries={[path]}><Routes><Route path='/schema-drafts' element={<SchemaDraftsPage />} /><Route path='/schema-drafts/:draftId' element={<SchemaDraftsPage />} /></Routes></MemoryRouter>, { selectedKnowledgeBaseId })
 }
+
+const conflictFixture = (overrides: Partial<ConflictResponse> = {}): ConflictResponse => ({
+  id: 'conflict-1',
+  type: 'PROPERTY_TYPE',
+  coordinate: 'Customer.age',
+  alternatives: ['STRING', 'INTEGER'],
+  evidence: [],
+  resolved: false,
+  selectedAlternative: null,
+  customResolution: null,
+  createdAt: '2026-07-15T08:03:00Z',
+  resolvedAt: null,
+  ...overrides,
+})
 
 describe('SchemaDraftsPage', () => {
   it('does not request drafts without a selected knowledge base', () => {
@@ -82,6 +96,120 @@ describe('SchemaDraftsPage', () => {
     expect((await screen.findAllByText(/CHANGE_TYPE/)).length).toBeGreaterThan(0)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
+  })
+
+  it('presents conflicts as a compact unresolved-first queue with one focused workflow', async () => {
+    const conflicts = [
+      conflictFixture({ id: 'resolved', coordinate: 'Customer.name', resolved: true, selectedAlternative: 'STRING', resolvedAt: '2026-07-15T09:00:00Z' }),
+      conflictFixture({ id: 'unresolved-1', coordinate: 'Customer.age', evidence: [{ sourceId: 'hidden-source-one' }] }),
+      conflictFixture({ id: 'unresolved-2', coordinate: 'Customer.status', type: 'ALIAS', evidence: [{ sourceId: 'hidden-source-two' }] }),
+    ]
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/conflicts')) return jsonResponse(200, conflicts)
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Conflicts' }))
+
+    const items = await screen.findAllByRole('article')
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('Customer.age'),
+      expect.stringContaining('Customer.status'),
+      expect.stringContaining('Customer.name'),
+    ])
+    expect(screen.queryByRole('textbox', { name: /Custom resolution/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('hidden-source-one')).not.toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'Review conflict' })[0])
+    expect(screen.getByText('How do you want to resolve this conflict?')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: 'Review conflict' })[0])
+    expect(screen.getAllByText('How do you want to resolve this conflict?')).toHaveLength(1)
+    expect(screen.getByText('Customer.status').closest('article')).toHaveClass('active')
+  })
+
+  it('submits the exact backend identifier for a suggested conflict value', async () => {
+    const conflict = conflictFixture({ alternatives: { stringChoice: 'STRING', integerChoice: 'INTEGER' } })
+    let resolved = false
+    const fetchMock = stubFetch((url, init) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/resolution') && init?.method === 'POST') {
+        resolved = true
+        return jsonResponse(200, { ...conflict, resolved: true, selectedAlternative: 'integerChoice', resolvedAt: '2026-07-15T09:00:00Z' })
+      }
+      if (path.endsWith('/conflicts')) return jsonResponse(200, [{ ...conflict, resolved, selectedAlternative: resolved ? 'integerChoice' : null }])
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Conflicts' }))
+    await user.click(await screen.findByRole('button', { name: 'Review conflict' }))
+    await user.click(screen.getByRole('radio', { name: 'INTEGER' }))
+    await user.type(screen.getByRole('textbox', { name: 'Optional rationale for Customer.age' }), 'Prefer numeric ages')
+    await user.click(screen.getByRole('button', { name: 'Resolve conflict' }))
+
+    const resolutionCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/resolution') && init?.method === 'POST')
+    expect(JSON.parse(String(resolutionCall?.[1]?.body))).toEqual({ revision: 7, selectedAlternative: 'integerChoice', rationale: 'Prefer numeric ages' })
+  })
+
+  it('switches to a validated custom resolution and sends no suggested value', async () => {
+    const conflict = conflictFixture()
+    const fetchMock = stubFetch((url, init) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/resolution') && init?.method === 'POST') return jsonResponse(200, { ...conflict, resolved: true, customResolution: { type: 'DATE' }, resolvedAt: '2026-07-15T09:00:00Z' })
+      if (path.endsWith('/conflicts')) return jsonResponse(200, [conflict])
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Conflicts' }))
+    await user.click(await screen.findByRole('button', { name: 'Review conflict' }))
+    await user.click(screen.getByRole('radio', { name: 'STRING' }))
+    await user.click(screen.getByRole('radio', { name: /Enter a custom value/ }))
+    expect(screen.queryByRole('radio', { name: 'STRING' })).not.toBeInTheDocument()
+
+    const editor = screen.getByRole('textbox', { name: 'Custom resolution for Customer.age' })
+    await user.type(editor, 'not json')
+    expect(screen.getByText('Enter a valid JSON value.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Resolve conflict' })).toBeDisabled()
+    await user.clear(editor)
+    await user.click(editor)
+    await user.paste('{"type":"DATE"}')
+    await user.click(screen.getByRole('button', { name: 'Resolve conflict' }))
+
+    const resolutionCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/resolution') && init?.method === 'POST')
+    expect(JSON.parse(String(resolutionCall?.[1]?.body))).toEqual({ revision: 7, customResolution: { type: 'DATE' } })
+  })
+
+  it('renders resolved and published conflicts read-only across unfamiliar payload shapes', async () => {
+    const conflicts = [
+      conflictFixture({ id: 'array', coordinate: 'Shape.array', alternatives: [{ type: 'STRING' }], evidence: [{ sourceId: 'source-array' }], resolved: true, customResolution: { type: 'STRING' }, resolvedAt: '2026-07-15T09:00:00Z' }),
+      conflictFixture({ id: 'object', coordinate: 'Shape.object', alternatives: { first: { nested: true } }, evidence: { source: 'source-object' } }),
+      conflictFixture({ id: 'scalar', coordinate: 'Shape.scalar', alternatives: 42, evidence: 'source-scalar' }),
+      conflictFixture({ id: 'null', coordinate: 'Shape.null', alternatives: null, evidence: null }),
+    ]
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, { ...draftFixture, status: 'PUBLISHED' })
+      if (path.endsWith('/conflicts')) return jsonResponse(200, conflicts)
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Conflicts' }))
+
+    expect(await screen.findAllByRole('article')).toHaveLength(4)
+    expect(screen.queryByRole('button', { name: 'Review conflict' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Resolve conflict' })).not.toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: 'View details' })[0])
+    expect(screen.getByText('Resolution')).toBeInTheDocument()
+    expect(screen.getByText(/Custom value: type: STRING/)).toBeInTheDocument()
+    await user.click(screen.getByText('Technical details'))
+    expect(screen.getByText(/"alternatives"/)).toBeInTheDocument()
   })
 
   it('reviews candidates through progressive disclosure and navigates to the latest decision', async () => {

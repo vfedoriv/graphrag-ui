@@ -725,6 +725,205 @@ textarea:focus-visible,
   background: color-mix(in oklch, var(--warn) 14%, var(--interaction-base));
 }
 
+.conflict-review-queue {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 920px);
+  min-width: 0;
+}
+
+.conflict-review-item {
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--interaction-base);
+}
+
+.conflict-review-item.active {
+  border-color: color-mix(in oklch, var(--accent) 38%, var(--border));
+  box-shadow: 0 8px 24px color-mix(in oklch, var(--border) 55%, transparent);
+}
+
+.conflict-review-item.resolved {
+  background: color-mix(in oklch, var(--success) 4%, var(--interaction-base));
+}
+
+.conflict-review-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(240px, 1.5fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 9px 12px;
+}
+
+.conflict-review-heading,
+.conflict-review-state {
+  min-width: 0;
+}
+
+.conflict-review-heading strong,
+.conflict-review-heading span,
+.conflict-review-state > span:last-child {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.conflict-review-heading strong {
+  font-size: 14px;
+}
+
+.conflict-review-meta,
+.conflict-review-state > span:last-child,
+.conflict-resolution-modes small,
+.conflict-alternative small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.conflict-review-state {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+}
+
+.conflict-review-panel {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  padding: 16px;
+}
+
+.conflict-resolution-modes,
+.conflict-alternatives {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.conflict-resolution-modes legend,
+.conflict-alternatives legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.conflict-resolution-modes > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.conflict-resolution-modes label span,
+.conflict-resolution-modes label strong,
+.conflict-resolution-modes label small,
+.conflict-alternative span,
+.conflict-alternative strong,
+.conflict-alternative small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.conflict-resolution-modes label span,
+.conflict-alternative span {
+  flex: 1 1 auto;
+}
+
+.conflict-resolution-modes input[type='radio'],
+.conflict-alternative input[type='radio'] {
+  flex: 0 0 auto;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: initial;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.conflict-alternatives {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.conflict-alternatives legend {
+  grid-column: 1 / -1;
+}
+
+.conflict-alternative {
+  display: flex;
+  min-width: 0;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 10px;
+  cursor: pointer;
+}
+
+.conflict-alternative:hover,
+.conflict-alternative.selected {
+  border-color: color-mix(in oklch, var(--accent) 52%, var(--border));
+  background: color-mix(in oklch, var(--accent) 8%, var(--surface-2));
+}
+
+.conflict-alternative small {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.conflict-custom-resolution,
+.conflict-custom-resolution textarea,
+.conflict-read-only-value,
+.conflict-disclosure,
+.conflict-disclosure-body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.conflict-resolution-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.conflict-read-only-value {
+  border-left: 3px solid var(--success);
+  padding-left: 12px;
+}
+
+.conflict-read-only-value p {
+  margin-bottom: 0;
+}
+
+.conflict-disclosure {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.conflict-disclosure > summary {
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.conflict-disclosure > summary:focus-visible {
+  outline: 3px solid color-mix(in oklch, var(--accent) 48%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.conflict-disclosure-body {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+
 .candidate-review-queue {
   display: grid;
   gap: 8px;
@@ -1382,6 +1581,19 @@ textarea {
   .ops-spine,
   .schema-builder-layout {
     grid-template-columns: 1fr;
+  }
+
+  .conflict-review-summary {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .conflict-review-summary .button {
+    justify-self: start;
+  }
+
+  .conflict-alternatives {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .schema-builder-toolbar {
