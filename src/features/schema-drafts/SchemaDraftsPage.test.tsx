@@ -97,13 +97,32 @@ describe('SchemaDraftsPage', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Projection' }))
     expect(await screen.findByText('Projection is derived')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Projected schema' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByLabelText('Mock structured JSON data')).toBeDisabled()
+    expect(screen.getByLabelText('Mock structured JSON data')).toHaveValue(JSON.stringify({ nodes: [{ label: 'Customer' }] }, null, 2))
     await user.click(screen.getByRole('button', { name: 'Structured JSON' }))
+    expect(screen.queryByRole('group', { name: 'Projected schema' })).not.toBeInTheDocument()
     expect(screen.getByText(/"nodes"/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Readable view' }))
+    expect(screen.getByRole('group', { name: 'Projected schema' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Mock structured JSON data')).toHaveValue(JSON.stringify({ nodes: [{ label: 'Customer' }] }, null, 2))
 
     await user.click(screen.getByRole('tab', { name: 'Diff' }))
     expect((await screen.findAllByText(/CHANGE_TYPE/)).length).toBeGreaterThan(0)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
+  })
+
+  it('shows projection guidance without requesting projection data when no current aggregate exists', async () => {
+    const fetchMock = stubFetch((url) => jsonResponse(200, url.endsWith('/draft-1') ? { ...draftFixture, currentAggregateId: null } : []))
+    const user = userEvent.setup()
+
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Projection' }))
+
+    expect(screen.getByText('No current projection')).toBeInTheDocument()
+    expect(screen.getByText('Add sources and run analysis to produce an effective projection.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/projection'))).toBe(false)
   })
 
   it('presents conflicts as a compact unresolved-first queue with one focused workflow', async () => {

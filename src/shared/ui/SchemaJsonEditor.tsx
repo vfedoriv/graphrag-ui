@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { JsonEditor, type JsonValue } from '@visual-json/react'
+import type { JsonValue } from '@visual-json/react'
 import { Textarea } from './Textarea'
 import { cn } from '../lib/cn'
+import { JsonTreeView } from './JsonTreeView'
 
 type SchemaJsonEditorProps = {
   id: string
@@ -73,25 +74,13 @@ export function SchemaJsonEditor({
         </div>
       </div>
       {activeViewMode === 'tree' && parsed.ok ? (
-        <div
-          className='panel'
-          aria-label={label}
-          aria-disabled={disabled}
-          role='group'
-          style={{ minHeight }}
-        >
-          <JsonEditor
-            value={parsed.data}
-            onChange={handleDataChange}
-            readOnly={disabled}
-            height='100%'
-            width='100%'
-            sidebarOpen
-            treeShowValues
-            treeShowCounts
-            editorShowCounts
-          />
-        </div>
+        <JsonTreeView
+          label={label}
+          value={parsed.data}
+          onChange={handleDataChange}
+          readOnly={disabled}
+          minHeight={minHeight}
+        />
       ) : (
         <div className='stack'>
           <Textarea

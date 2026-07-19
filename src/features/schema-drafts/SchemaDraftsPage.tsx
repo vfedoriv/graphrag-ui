@@ -19,6 +19,7 @@ import {
   useUpdateSchemaDraftGuidanceMutation,
   useUpdateSchemaDraftMutation,
 } from '../../api/schemaDrafts'
+import { isJsonValue } from '../../shared/lib/isJsonValue'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -26,6 +27,7 @@ import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { Input } from '../../shared/ui/Input'
+import { JsonTreeView } from '../../shared/ui/JsonTreeView'
 import { WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
@@ -420,8 +422,8 @@ function Projection({ draft }: { draft: DraftResponse }) {
 }
 
 function ProjectionReadable({ value }: { value: unknown }) {
-  if (!value || typeof value !== 'object') return <pre className='output-preview'>{formatJson(value)}</pre>
-  return <div className='stack'>{Object.entries(value).map(([key, item]) => <details key={key} open><summary><strong>{key}</strong></summary><pre className='output-preview'>{formatJson(item)}</pre></details>)}</div>
+  if (!isJsonValue(value)) return <pre className='output-preview'>{formatJson(value)}</pre>
+  return <JsonTreeView label='Projected schema' value={value} readOnly minHeight={360} />
 }
 
 function Diff({ draft }: { draft: DraftResponse }) {
