@@ -33,9 +33,10 @@ import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
-import type { CandidateKind, Compatibility, DraftGuidance, DraftResponse, EvidenceOrigin, RecommendationState } from './schemaDraftTypes'
+import type { CandidateKind, DraftGuidance, DraftResponse, EvidenceOrigin, RecommendationState } from './schemaDraftTypes'
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
+import { SchemaDiffReview } from './SchemaDiffReview'
 import { CandidateReviewItem } from './CandidateReviewItem'
 import { ConflictReviewItem } from './ConflictReviewItem'
 import { organizeCandidates } from './organizeCandidates'
@@ -428,11 +429,8 @@ function ProjectionReadable({ value }: { value: unknown }) {
 
 function Diff({ draft }: { draft: DraftResponse }) {
   const review = useSchemaDraftReviewQueries(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
-  const [compatibility, setCompatibility] = useState<'ALL' | Compatibility>('ALL')
-  const [operation, setOperation] = useState('ALL')
-  const operations = useMemo(() => [...new Set(review.diff.data?.changes.map((item) => item.operation) ?? [])], [review.diff.data])
-  const changes = review.diff.data?.changes.filter((item) => (compatibility === 'ALL' || item.compatibility === compatibility) && (operation === 'ALL' || item.operation === operation)) ?? []
   if (!draft.currentAggregateId) return <EmptyState title='No compatibility diff' description='Run analysis to compare a current aggregate with the base schema.' />
   if (review.diff.error) return <Alert title='Could not load diff' message={errorMessage(review.diff.error)} />
-  return <div className='stack'><div className='form-grid'><FieldLabel label='Compatibility'><select value={compatibility} onChange={(event) => setCompatibility(event.target.value as 'ALL' | Compatibility)}><option>ALL</option><option>ADDITIVE</option><option>REVIEW_REQUIRED</option><option>BREAKING</option></select></FieldLabel><FieldLabel label='Operation'><select value={operation} onChange={(event) => setOperation(event.target.value)}><option>ALL</option>{operations.map((value) => <option key={value}>{value}</option>)}</select></FieldLabel></div>{changes.length ? changes.map((item) => <details className={`notice ${item.compatibility === 'BREAKING' ? 'danger' : item.compatibility === 'ADDITIVE' ? 'success' : 'warning'}`} key={`${item.coordinate}:${item.operation}`}><summary><strong>{item.coordinate}</strong> · {item.operation} · {item.compatibility}</summary><div className='grid two'><div><h4>Before</h4><pre className='output-preview'>{formatJson(item.before)}</pre></div><div><h4>After</h4><pre className='output-preview'>{formatJson(item.after)}</pre></div></div></details>) : <EmptyState title='No matching changes' description='Adjust the compatibility or operation filters.' />}</div>
+  if (!review.diff.data) return <p>Loading compatibility diff…</p>
+  return <SchemaDiffReview changes={review.diff.data.changes} />
 }

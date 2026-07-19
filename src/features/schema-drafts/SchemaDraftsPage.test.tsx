@@ -1,5 +1,5 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
@@ -108,7 +108,10 @@ describe('SchemaDraftsPage', () => {
     expect(screen.getByLabelText('Mock structured JSON data')).toHaveValue(JSON.stringify({ nodes: [{ label: 'Customer' }] }, null, 2))
 
     await user.click(screen.getByRole('tab', { name: 'Diff' }))
-    expect((await screen.findAllByText(/CHANGE_TYPE/)).length).toBeGreaterThan(0)
+    const diffCoordinate = await screen.findByText('Customer.age')
+    expect(within(diffCoordinate.closest('summary')!).getByText('Change type')).toBeInTheDocument()
+    expect(screen.queryByText('Before')).not.toBeInTheDocument()
+    await user.click(diffCoordinate)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
   })
