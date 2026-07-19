@@ -31,12 +31,14 @@ import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { StructuredPayloadEditor } from '../../shared/ui/StructuredPayloadEditor'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
-import type { Compatibility, DraftGuidance, DraftResponse } from './schemaDraftTypes'
+import type { CandidateKind, Compatibility, DraftGuidance, DraftResponse, EvidenceOrigin, RecommendationState } from './schemaDraftTypes'
 import { emptyDraftGuidance, isTerminalAnalysisStatus } from './schemaDraftTypes'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import { CandidateReviewItem } from './CandidateReviewItem'
 import { ConflictReviewItem } from './ConflictReviewItem'
 import { organizeCandidates } from './organizeCandidates'
+import { candidateKindLabel, recommendationLabel } from './candidatePresentation'
+import { defaultCandidateFilters, filterCandidates, type CandidateFilters, type CandidateReviewFilter } from './filterCandidates'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
 const formatJson = (value: unknown) => JSON.stringify(value, null, 2)
@@ -302,18 +304,33 @@ function Pager({ page, size, total, onPage }: { page: number; size: number; tota
 }
 
 const candidatePageSize = 25
+const candidateKinds: CandidateKind[] = ['NODE', 'NODE_PROPERTY', 'NODE_KEY', 'RELATIONSHIP', 'RELATIONSHIP_PROPERTY']
+const recommendationStates: RecommendationState[] = ['RECOMMENDED', 'LOW_SUPPORT', 'REVIEW_REQUIRED', 'SUPPRESSED']
+const reviewStates: Array<{ value: CandidateReviewFilter; label: string }> = [
+  { value: 'ALL', label: 'All review states' },
+  { value: 'UNREVIEWED', label: 'Unreviewed' },
+  { value: 'ACCEPTED', label: 'Accepted' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'MODIFIED', label: 'Modified' },
+  { value: 'PINNED', label: 'Pinned' },
+]
+const evidenceOrigins: EvidenceOrigin[] = ['OBSERVED', 'GUIDED', 'INFERRED', 'EXISTING']
+const originLabel = (origin: EvidenceOrigin) => ({ OBSERVED: 'Observed', GUIDED: 'Guided', INFERRED: 'Inferred', EXISTING: 'Existing' })[origin]
 
 function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boolean }) {
   const [page, setPage] = useState(0)
+  const [filters, setFilters] = useState<CandidateFilters>(defaultCandidateFilters)
   const candidates = useSchemaDraftCandidatesQuery(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const review = useSchemaDraftReviewQueries(draft.knowledgeBaseId, draft.id, Boolean(draft.currentAggregateId))
   const workflow = useSchemaDraftWorkflowMutations()
   const [historyOpen, setHistoryOpen] = useState(false)
   const [requestedDecisionId, setRequestedDecisionId] = useState<string | null>(null)
   const organizedCandidates = useMemo(() => organizeCandidates(candidates.data ?? []), [candidates.data])
-  const lastPage = Math.max(0, Math.ceil(organizedCandidates.length / candidatePageSize) - 1)
+  const filteredCandidates = useMemo(() => filterCandidates(organizedCandidates, filters), [filters, organizedCandidates])
+  const filtersActive = Boolean(filters.text.trim()) || filters.kind !== 'ALL' || filters.recommendation !== 'ALL' || filters.reviewState !== 'ALL' || filters.origin !== 'ALL'
+  const lastPage = Math.max(0, Math.ceil(filteredCandidates.length / candidatePageSize) - 1)
   const currentPage = Math.min(page, lastPage)
-  const visibleCandidates = organizedCandidates.slice(currentPage * candidatePageSize, (currentPage + 1) * candidatePageSize)
+  const visibleCandidates = filteredCandidates.slice(currentPage * candidatePageSize, (currentPage + 1) * candidatePageSize)
   const requestedDecision = requestedDecisionId ? review.decisions.data?.find((item) => item.id === requestedDecisionId) : null
   const historyNavigationMessage = requestedDecisionId && review.decisions.data && !requestedDecision
     ? 'The latest decision is not present in the loaded decision history.'
@@ -328,11 +345,38 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
     setHistoryOpen(true)
   }
 
+  const setFilter = <Key extends keyof CandidateFilters>(key: Key, value: CandidateFilters[Key]) => {
+    setFilters((current) => ({ ...current, [key]: value }))
+    setPage(0)
+  }
+
+  const clearFilters = () => {
+    setFilters(defaultCandidateFilters)
+    setPage(0)
+  }
+
   if (!draft.currentAggregateId) return <EmptyState title='No current aggregate' description='Add active sources and run analysis before reviewing candidates.' />
   return <div className='stack-lg'>
     {candidates.error ? <Alert title='Candidate contract error' message={`${errorMessage(candidates.error)} Decision actions are disabled for this payload.`} /> : null}
     <MutationError error={workflow.decide.error} />
-    <div className='candidate-review-queue'>{visibleCandidates.map((candidate) => <CandidateReviewItem
+    <section className='candidate-filter-toolbar' aria-label='Candidate filters'>
+      <div className='candidate-filter-controls'>
+        <div className='candidate-definition-filters'>
+          <FieldLabel label='Search text'><Input type='search' value={filters.text} placeholder='Definition or coordinate' onChange={(event) => setFilter('text', event.target.value)} /></FieldLabel>
+          <FieldLabel label='Candidate kind'><select value={filters.kind} onChange={(event) => setFilter('kind', event.target.value as CandidateFilters['kind'])}><option value='ALL'>All candidate kinds</option>{candidateKinds.map((kind) => <option key={kind} value={kind}>{candidateKindLabel(kind)}</option>)}</select></FieldLabel>
+        </div>
+        <div className='candidate-signal-filters'>
+          <FieldLabel label='Analyzer recommendation'><select value={filters.recommendation} onChange={(event) => setFilter('recommendation', event.target.value as CandidateFilters['recommendation'])}><option value='ALL'>All recommendations</option>{recommendationStates.map((state) => <option key={state} value={state}>{recommendationLabel(state)}</option>)}</select></FieldLabel>
+          <FieldLabel label='Review state'><select value={filters.reviewState} onChange={(event) => setFilter('reviewState', event.target.value as CandidateReviewFilter)}>{reviewStates.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}</select></FieldLabel>
+          <FieldLabel label='Origin'><select value={filters.origin} onChange={(event) => setFilter('origin', event.target.value as CandidateFilters['origin'])}><option value='ALL'>All origins</option>{evidenceOrigins.map((origin) => <option key={origin} value={origin}>{originLabel(origin)}</option>)}</select></FieldLabel>
+        </div>
+      </div>
+      <div className='candidate-filter-context'>
+        <p role='status'>{filtersActive ? `${filteredCandidates.length} matching ${filteredCandidates.length === 1 ? 'candidate' : 'candidates'} · ${organizedCandidates.length} candidates total` : `Showing all ${organizedCandidates.length} candidates`}</p>
+        <Button type='button' variant='ghost' disabled={!filtersActive} onClick={clearFilters}>Clear filters</Button>
+      </div>
+    </section>
+    {filtersActive && !filteredCandidates.length ? <EmptyState title='No matching candidates' description='Adjust the candidate filters or clear them to return to the complete queue.' /> : <div className='candidate-review-queue'>{visibleCandidates.map((candidate) => <CandidateReviewItem
       key={candidate.identity}
       candidate={candidate}
       readOnly={readOnly}
@@ -340,8 +384,8 @@ function Candidates({ draft, readOnly }: { draft: DraftResponse; readOnly: boole
       isPending={workflow.decide.isPending}
       onDecide={(value, type, resultingValue, rationale) => workflow.decide.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: draft.revision, type, candidateIdentity: value.identity, resultingValue, rationale } })}
       onShowDecision={showDecision}
-    />)}</div>
-    <Pager page={currentPage} size={candidatePageSize} total={organizedCandidates.length} onPage={setPage} />
+    />)}</div>}
+    <Pager page={currentPage} size={candidatePageSize} total={filteredCandidates.length} onPage={setPage} />
     <details className='decision-history' open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary><strong>Append-only decision history</strong></summary><div className='stack'>
       {historyNavigationMessage ? <p className='inline-state' role='status'>{historyNavigationMessage}</p> : null}
       {review.decisions.data?.length ? <div className='table-wrap'><table aria-label='Append-only decision history'><thead><tr>{['Sequence', 'Decision', 'Candidate', 'Review state', 'Rationale', 'Created'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{review.decisions.data.map((item) => <tr id={`decision-${item.id}`} tabIndex={-1} key={item.id}><td>{item.sequence}</td><td>{item.type}</td><td>{item.candidateIdentity}</td><td>{item.reviewState}</td><td>{item.rationale ?? '—'}</td><td>{formatDate(item.createdAt)}</td></tr>)}</tbody></table></div> : <p>No decisions yet.</p>}

@@ -27,6 +27,14 @@ const conflictFixture = (overrides: Partial<ConflictResponse> = {}): ConflictRes
   ...overrides,
 })
 
+const draftCandidate = (identity: string, overrides: Partial<CandidateResponse> = {}): CandidateResponse => ({
+  ...candidateFixture,
+  identity,
+  evidence: [],
+  latestDecisionId: null,
+  ...overrides,
+})
+
 describe('SchemaDraftsPage', () => {
   it('does not request drafts without a selected knowledge base', () => {
     const fetchMock = stubFetch(() => jsonResponse(500, {}))
@@ -245,6 +253,119 @@ describe('SchemaDraftsPage', () => {
     const history = screen.getByRole('table', { name: 'Append-only decision history' })
     expect(history).toBeVisible()
     expect(document.getElementById('decision-decision-4')).toHaveFocus()
+  })
+
+  it('filters candidates with accessible composable controls, clears criteria, and resets defaults on remount', async () => {
+    const values = [
+      draftCandidate('node:Customer', { kind: 'NODE', label: 'Customer', property: null, propertyType: null, recommendationState: 'RECOMMENDED', effectiveReviewState: null, origins: ['OBSERVED'] }),
+      draftCandidate('node-property:Customer:accountNumber', { label: 'Customer', property: 'accountNumber', originalProperty: 'account_no', recommendationState: 'LOW_SUPPORT', effectiveReviewState: 'PENDING', origins: ['GUIDED'] }),
+      draftCandidate('node-key:Customer:customerId', { kind: 'NODE_KEY', label: 'Customer', property: null, propertyType: null, keys: ['customerId'], recommendationState: 'REVIEW_REQUIRED', effectiveReviewState: 'ACCEPTED', origins: ['INFERRED'] }),
+      draftCandidate('relationship:Customer:OWNS:Account', { kind: 'RELATIONSHIP', label: null, property: null, propertyType: null, relationshipType: 'OWNS', fromLabel: 'Customer', toLabel: 'Account', recommendationState: 'SUPPRESSED', effectiveReviewState: 'REJECTED', origins: ['EXISTING'] }),
+      draftCandidate('relationship-property:Customer:OWNS:Account:since', { kind: 'RELATIONSHIP_PROPERTY', label: null, property: 'since', propertyType: 'DATE', relationshipType: 'OWNS', fromLabel: 'Customer', toLabel: 'Account', recommendationState: 'RECOMMENDED', effectiveReviewState: 'MODIFIED', origins: ['GUIDED', 'EXISTING'] }),
+    ]
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/candidates')) return jsonResponse(200, { page: 0, size: 50, totalElements: values.length, content: values })
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
+
+    const search = screen.getByRole('searchbox', { name: 'Search text' })
+    const kind = screen.getByRole('combobox', { name: 'Candidate kind' })
+    const recommendation = screen.getByRole('combobox', { name: 'Analyzer recommendation' })
+    const reviewState = screen.getByRole('combobox', { name: 'Review state' })
+    const origin = screen.getByRole('combobox', { name: 'Origin' })
+    expect(search).toHaveValue('')
+    expect(kind).toHaveValue('ALL')
+    expect(recommendation).toHaveValue('ALL')
+    expect(reviewState).toHaveValue('ALL')
+    expect(origin).toHaveValue('ALL')
+    expect(screen.getByText('Showing all 5 candidates')).toBeInTheDocument()
+
+    await user.type(search, 'ACCOUNT_NO')
+    expect(screen.getByText('Customer.accountNumber')).toBeInTheDocument()
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+
+    await user.selectOptions(kind, 'RELATIONSHIP_PROPERTY')
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await user.selectOptions(recommendation, 'SUPPRESSED')
+    expect(screen.getByText('Customer —[OWNS]→ Account')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await user.selectOptions(reviewState, 'UNREVIEWED')
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    await user.selectOptions(origin, 'EXISTING')
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(2)
+
+    await user.selectOptions(kind, 'RELATIONSHIP_PROPERTY')
+    expect(screen.getByText('1 matching candidate · 5 candidates total')).toBeInTheDocument()
+    expect(screen.getByText('OWNS.since')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+    expect(screen.getByText('Showing all 5 candidates')).toBeInTheDocument()
+
+    await user.selectOptions(kind, 'NODE')
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    await user.click(screen.getByRole('tab', { name: 'Candidates' }))
+    expect(screen.getByRole('searchbox', { name: 'Search text' })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: 'Candidate kind' })).toHaveValue('ALL')
+    expect(screen.getByText('Showing all 5 candidates')).toBeInTheDocument()
+  })
+
+  it('filters before pagination, resets page boundaries, and removes stale rows for zero matches', async () => {
+    const values = [
+      ...Array.from({ length: 26 }, (_, index) => draftCandidate(`node:Match${index}`, {
+        kind: 'NODE',
+        label: `Match ${String(index).padStart(2, '0')}`,
+        property: null,
+        propertyType: null,
+        origins: index < 2 ? ['GUIDED'] : ['OBSERVED'],
+      })),
+      ...Array.from({ length: 4 }, (_, index) => draftCandidate(`node:Other${index}`, {
+        kind: 'NODE',
+        label: `Other ${index}`,
+        property: null,
+        propertyType: null,
+        origins: ['OBSERVED'],
+      })),
+    ]
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/candidates')) return jsonResponse(200, { page: 0, size: 50, totalElements: values.length, content: values })
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Candidates' }))
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search text' }), 'Match')
+    expect(screen.getByText('26 matching candidates · 30 candidates total')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 · 26 items total')).toBeInTheDocument()
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(25)
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('Page 2 · 26 items total')).toBeInTheDocument()
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Origin' }), 'GUIDED')
+    expect(screen.getByText('Page 1 · 2 items total')).toBeInTheDocument()
+    expect(screen.getByText('2 matching candidates · 30 candidates total')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+
+    const search = screen.getByRole('searchbox', { name: 'Search text' })
+    await user.clear(search)
+    await user.type(search, 'Nothing matches this')
+    expect(screen.getByText('No matching candidates')).toBeInTheDocument()
+    expect(screen.getByText(/adjust the candidate filters or clear them/i)).toBeInTheDocument()
+    expect(document.querySelectorAll('.candidate-review-item')).toHaveLength(0)
+    expect(screen.getByText('Page 1 · 0 items total')).toBeInTheDocument()
   })
 
   it('reports candidate contract errors without exposing decision actions', async () => {
