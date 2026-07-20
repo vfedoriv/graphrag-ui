@@ -43,6 +43,15 @@ describe('SchemaDraftsPage', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('presents each draft target as an identifiable link to its workbench', async () => {
+    stubFetch((url) => jsonResponse(200, url.endsWith('/schema-drafts') ? [draftFixture] : []))
+    renderRoute('/schema-drafts', 'kb-1')
+
+    const targetLink = await screen.findByRole('link', { name: 'Support v2' })
+    expect(targetLink).toHaveAttribute('href', '/schema-drafts/draft-1')
+    expect(targetLink).toHaveClass('schema-draft-target-link')
+  })
+
   it('renders a published deep link as read-only', async () => {
     stubFetch((url) => jsonResponse(200, url.endsWith('/draft-1') ? { ...draftFixture, status: 'PUBLISHED' } : []))
     renderRoute('/schema-drafts/draft-1', 'kb-1')

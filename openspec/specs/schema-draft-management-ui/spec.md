@@ -19,6 +19,19 @@ The system SHALL provide a dedicated Schema Drafts page that lists drafts owned 
 - **WHEN** the user changes the global knowledge-base selection while viewing a draft owned by the prior knowledge base
 - **THEN** the system SHALL clear the incompatible draft detail context and load the new knowledge base's draft list
 
+### Requirement: Draft targets clearly expose detail navigation
+The system SHALL present each target in the Schema Drafts table as a visually identifiable link to that draft's workbench, using a persistent non-color affordance and distinct hover and keyboard-focus feedback.
+
+#### Scenario: Recognize and open a listed draft
+- **WHEN** a knowledge base has one or more schema drafts
+- **THEN** each target name and version SHALL be visually distinguishable from non-interactive table values without requiring pointer hover
+- **AND** activating the target link SHALL navigate to that draft's existing workbench route
+
+#### Scenario: Focus a draft target with the keyboard
+- **WHEN** keyboard navigation moves focus to a target link
+- **THEN** the system SHALL show a visible focus indicator
+- **AND** the link SHALL retain the target name and version as its accessible name
+
 ### Requirement: Users can create and revise open drafts
 The system SHALL allow creating an open draft with target name and version, optional associated base schema, and structured guidance, and SHALL submit later target or guidance mutations with the current backend draft revision.
 

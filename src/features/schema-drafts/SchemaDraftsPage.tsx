@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { ArrowRight } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError } from '../../api/types'
 import { useDocumentsQuery } from '../../api/documents'
@@ -105,7 +106,10 @@ function SchemaDraftList() {
       <div className='stack'>
         {drafts.error ? <Alert title='Could not load schema drafts' message={errorMessage(drafts.error)} /> : null}
         {drafts.isPending ? <p>Loading schema drafts…</p> : drafts.data?.length ? <Table ariaLabel='Schema drafts' headers={['Target', 'Lifecycle', 'Revision', 'Base', 'Publication', 'Updated']} rows={drafts.data.map((draft) => [
-          <Link to={`/schema-drafts/${draft.id}`}>{draft.targetName} v{draft.targetVersion}</Link>,
+          <Link className='schema-draft-target-link' to={`/schema-drafts/${draft.id}`}>
+            <span>{draft.targetName} v{draft.targetVersion}</span>
+            <ArrowRight aria-hidden='true' focusable='false' size={16} strokeWidth={2} />
+          </Link>,
           <StatusBadge label={draft.status} tone={draft.status === 'PUBLISHED' ? 'success' : 'neutral'} />,
           draft.revision,
           draft.baseSchemaId ?? 'No base schema',

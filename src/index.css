@@ -542,6 +542,37 @@ textarea:focus-visible,
   border-bottom: 0;
 }
 
+.schema-draft-target-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.schema-draft-target-link:hover {
+  color: color-mix(in oklch, var(--accent) 82%, var(--fg));
+  text-decoration-thickness: 2px;
+}
+
+.schema-draft-target-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.schema-draft-target-link svg {
+  flex: 0 0 auto;
+  transition: transform 120ms ease;
+}
+
+.schema-draft-target-link:hover svg {
+  transform: translateX(2px);
+}
+
 .table-wrap tr.is-selected td {
   background: color-mix(in oklch, var(--success) 7%, var(--interaction-base));
 }
