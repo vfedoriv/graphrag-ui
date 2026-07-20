@@ -150,6 +150,21 @@ select {
   padding: 9px 10px;
 }
 
+.choice-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 8px;
+}
+
+.choice-label > input[type='checkbox'],
+.choice-label > input[type='radio'] {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
 textarea {
   min-height: 128px;
   resize: vertical;
