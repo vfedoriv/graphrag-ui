@@ -3,7 +3,7 @@ import { Button } from '../../shared/ui/Button'
 import { EmptyState } from '../../shared/ui/EmptyState'
 import { FieldLabel } from '../../shared/ui/FieldLabel'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
-import type { Compatibility, DiffItem } from './schemaDraftTypes'
+import type { Compatibility, DecisionResponse, DiffBaseline, DiffItem, DiffResponse } from './schemaDraftTypes'
 
 type CompatibilityFilter = 'ALL' | Compatibility
 
@@ -33,7 +33,7 @@ function DiffValue({ label, value }: { label: 'Before' | 'After'; value: unknown
   </section>
 }
 
-function DiffReviewItem({ item }: { item: DiffItem }) {
+function DiffReviewItem({ item, explicitlyRejected }: { item: DiffItem; explicitlyRejected: boolean }) {
   const [open, setOpen] = useState(false)
   return <details className={`diff-review-item ${item.compatibility.toLowerCase()}`} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary className='diff-review-summary'>
@@ -42,7 +42,10 @@ function DiffReviewItem({ item }: { item: DiffItem }) {
         <strong>{item.coordinate}</strong>
         <small>{humanizeEnum(item.operation)}</small>
       </span>
-      <StatusBadge label={humanizeEnum(item.compatibility)} tone={compatibilityTone(item.compatibility)} />
+      <span className='diff-review-labels'>
+        <StatusBadge label={humanizeEnum(item.compatibility)} tone={compatibilityTone(item.compatibility)} />
+        {explicitlyRejected ? <StatusBadge label='Explicitly rejected' /> : null}
+      </span>
     </summary>
     {open ? <div className='diff-review-body' role='group' aria-label={`Change values for ${item.coordinate}`}>
       <DiffValue label='Before' value={item.before} />
@@ -51,7 +54,29 @@ function DiffReviewItem({ item }: { item: DiffItem }) {
   </details>
 }
 
-export function SchemaDiffReview({ changes }: { changes: DiffItem[] }) {
+const baselineDescription = (baseline: DiffBaseline) => baseline.type === 'BASE_SCHEMA'
+  ? `Base schema ${baseline.id ?? 'identifier unavailable'}`
+  : baseline.type === 'PREVIOUS_AGGREGATE'
+    ? `Previous aggregate ${baseline.id ?? 'identifier unavailable'}`
+    : 'Empty starting point'
+
+function ComparisonSummary({ diff }: { diff: DiffResponse }) {
+  return <section className='diff-comparison-summary' aria-labelledby='diff-comparison-title'>
+    <div>
+      <h3 id='diff-comparison-title'>Comparison baseline</h3>
+      <p>{diff.baseline
+        ? <>Current aggregate <strong>{diff.aggregateRevisionId}</strong> is compared with {baselineDescription(diff.baseline)}.</>
+        : <>Current aggregate <strong>{diff.aggregateRevisionId}</strong> has comparison baseline metadata unavailable.</>}</p>
+    </div>
+    <dl className='diff-comparison-audit'>
+      <div><dt>Draft revision</dt><dd>{diff.draftRevision ?? 'Unavailable'}</dd></div>
+      {diff.baseline ? <div><dt>Baseline content hash</dt><dd>{diff.baseline.contentHash}</dd></div> : null}
+    </dl>
+  </section>
+}
+
+export function SchemaDiffReview({ diff, decisions = [] }: { diff: DiffResponse; decisions?: DecisionResponse[] }) {
+  const { changes } = diff
   const [compatibility, setCompatibility] = useState<CompatibilityFilter>('ALL')
   const [operation, setOperation] = useState('ALL')
   const operations = useMemo(() => [...new Set(changes.map((item) => item.operation))], [changes])
@@ -60,6 +85,14 @@ export function SchemaDiffReview({ changes }: { changes: DiffItem[] }) {
     (compatibility === 'ALL' || item.compatibility === compatibility) &&
     (operation === 'ALL' || item.operation === operation),
   ), [changes, compatibility, operation])
+  const latestDecisions = useMemo(() => {
+    const byIdentity = new Map<string, DecisionResponse>()
+    decisions.forEach((decision) => {
+      const current = byIdentity.get(decision.candidateIdentity)
+      if (!current || decision.sequence > current.sequence) byIdentity.set(decision.candidateIdentity, decision)
+    })
+    return byIdentity
+  }, [decisions])
   const filtersActive = compatibility !== 'ALL' || operation !== 'ALL'
   const clearFilters = () => {
     setCompatibility('ALL')
@@ -67,6 +100,7 @@ export function SchemaDiffReview({ changes }: { changes: DiffItem[] }) {
   }
 
   return <div className='diff-review stack'>
+    <ComparisonSummary diff={diff} />
     <section className='diff-review-overview' aria-labelledby='diff-overview-title'>
       <div>
         <h3 id='diff-overview-title'>Compatibility overview</h3>
@@ -102,10 +136,10 @@ export function SchemaDiffReview({ changes }: { changes: DiffItem[] }) {
     </section>
 
     {visibleChanges.length ? <div className='diff-review-queue'>
-      {visibleChanges.map((item, index) => <DiffReviewItem item={item} key={`${item.coordinate}:${item.operation}:${index}`} />)}
+      {visibleChanges.map((item, index) => <DiffReviewItem item={item} explicitlyRejected={latestDecisions.get(item.coordinate)?.type === 'REJECT'} key={`${item.coordinate}:${item.operation}:${index}`} />)}
     </div> : <EmptyState
       title={filtersActive ? 'No matching changes' : 'No schema changes'}
-      description={filtersActive ? 'Clear or adjust the filters to see other compatibility changes.' : 'The current aggregate does not change the base schema.'}
+      description={filtersActive ? 'Clear or adjust the filters to see other compatibility changes.' : 'The current aggregate does not change the selected comparison baseline.'}
     />}
   </div>
 }

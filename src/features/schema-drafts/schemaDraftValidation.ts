@@ -87,7 +87,17 @@ const conflict = z.object({
   createdAt: z.string(), resolvedAt: nullableString,
 }).strict()
 const projection = z.object({ aggregateRevisionId: z.string(), draftRevision: z.number().int(), schema: z.unknown(), publicationReady: z.boolean() }).strict()
-const diff = z.object({ aggregateRevisionId: z.string(), changes: z.array(z.object({ coordinate: z.string(), compatibility: z.string(), operation: z.string(), before: z.unknown(), after: z.unknown() }).strict()) }).strict()
+const diffBaseline = z.object({
+  type: z.enum(['BASE_SCHEMA', 'PREVIOUS_AGGREGATE', 'EMPTY']),
+  id: nullableString,
+  contentHash: z.string(),
+}).strict()
+const diff = z.object({
+  aggregateRevisionId: z.string(),
+  draftRevision: z.number().int().optional(),
+  baseline: diffBaseline.optional(),
+  changes: z.array(z.object({ coordinate: z.string(), compatibility: z.string(), operation: z.string(), before: z.unknown(), after: z.unknown() }).strict()),
+}).strict()
 
 function parse<T>(schema: z.ZodType, value: unknown, resource: string): T {
   const result = schema.safeParse(value)

@@ -775,6 +775,44 @@ textarea:focus-visible,
   min-width: 0;
 }
 
+.diff-comparison-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+  gap: 16px;
+  min-width: 0;
+  border: 1px solid color-mix(in oklch, var(--focus) 28%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--focus) 7%, var(--surface-2));
+  padding: 14px;
+}
+
+.diff-comparison-summary p {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.diff-comparison-audit {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.diff-comparison-audit > div {
+  min-width: 0;
+}
+
+.diff-comparison-audit dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.diff-comparison-audit dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  font: 12px/1.45 var(--font-mono);
+}
+
 .diff-review-overview {
   display: flex;
   align-items: center;
@@ -902,6 +940,15 @@ textarea:focus-visible,
   min-width: 0;
   padding: 9px 12px 9px 10px;
   cursor: pointer;
+}
+
+.diff-review-labels {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
 }
 
 .diff-review-summary::-webkit-details-marker {
@@ -1915,6 +1962,10 @@ textarea {
     display: grid;
   }
 
+  .diff-comparison-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .diff-review-body {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1986,8 +2037,9 @@ textarea {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .diff-review-summary .status {
+  .diff-review-labels {
     grid-column: 2;
+    justify-content: flex-start;
   }
 
   .candidate-definition-filters,

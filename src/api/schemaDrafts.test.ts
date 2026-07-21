@@ -5,7 +5,7 @@ import { createElement, type ReactNode } from 'react'
 import { loadAllSchemaDraftCandidates, schemaDraftsApi, useSchemaDraftWorkflowMutations } from './schemaDrafts'
 import { ApiError } from './types'
 import { queryKeys } from './queryKeys'
-import { analysisDetailFixture, analysisHistoryFixture, candidatePageFixture, draftFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
+import { analysisDetailFixture, analysisHistoryFixture, baseSchemaDiffFixture, candidatePageFixture, draftFixture, rolloutCompatibleDiffFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
 import { isTerminalAnalysisStatus, type ConflictResponse } from '../features/schema-drafts/schemaDraftTypes'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
 
@@ -50,6 +50,23 @@ describe('schemaDraftsApi', () => {
     expect(history.content).toHaveLength(4)
     expect(detail.sourceOutcomes.totalElements).toBe(3)
     expect(detail.sourceOutcomes.content[0].reused).toBe(true)
+  })
+
+  it('accepts expanded and rollout-compatible compatibility diff responses', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, baseSchemaDiffFixture))
+    await expect(schemaDraftsApi.diff('kb-1', 'draft-1')).resolves.toEqual(baseSchemaDiffFixture)
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(200, rolloutCompatibleDiffFixture)))
+    await expect(schemaDraftsApi.diff('kb-1', 'draft-1')).resolves.toEqual(rolloutCompatibleDiffFixture)
+  })
+
+  it('keeps expanded compatibility diff objects strict at both levels', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, { ...baseSchemaDiffFixture, unrelated: true }))
+    await expect(schemaDraftsApi.diff('kb-1', 'draft-1')).rejects.toMatchObject({ message: 'Compatibility diff response has unexpected shape' })
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(200, {
+      ...baseSchemaDiffFixture,
+      baseline: { ...baseSchemaDiffFixture.baseline, unrelated: true },
+    })))
+    await expect(schemaDraftsApi.diff('kb-1', 'draft-1')).rejects.toMatchObject({ message: 'Compatibility diff response has unexpected shape' })
   })
 
   it('rejects removed parallel candidate count fields', async () => {

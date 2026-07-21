@@ -436,5 +436,5 @@ function Diff({ draft }: { draft: DraftResponse }) {
   if (!draft.currentAggregateId) return <EmptyState title='No compatibility diff' description='Run analysis to compare a current aggregate with the base schema.' />
   if (review.diff.error) return <Alert title='Could not load diff' message={errorMessage(review.diff.error)} />
   if (!review.diff.data) return <p>Loading compatibility diff…</p>
-  return <SchemaDiffReview changes={review.diff.data.changes} />
+  return <SchemaDiffReview diff={review.diff.data} decisions={review.decisions.data ?? []} />
 }

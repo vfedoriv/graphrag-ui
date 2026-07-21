@@ -16,6 +16,7 @@ export type RecommendationState = 'RECOMMENDED' | 'LOW_SUPPORT' | 'REVIEW_REQUIR
 export type ReviewState = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'MODIFIED' | 'PINNED'
 export type DecisionType = 'ACCEPT' | 'REJECT' | 'MODIFY' | 'PIN' | 'RESOLVE'
 export type Compatibility = 'ADDITIVE' | 'REVIEW_REQUIRED' | 'BREAKING'
+export type DiffBaselineType = 'BASE_SCHEMA' | 'PREVIOUS_AGGREGATE' | 'EMPTY'
 
 export type ConceptRule = { name: string; description: string | null; identityKeys: string[] }
 export type NamingRules = {
@@ -237,7 +238,17 @@ export type DiffItem = {
   before: unknown
   after: unknown
 }
-export type DiffResponse = { aggregateRevisionId: string; changes: DiffItem[] }
+export type DiffBaseline = {
+  type: DiffBaselineType
+  id: string | null
+  contentHash: string
+}
+export type DiffResponse = {
+  aggregateRevisionId: string
+  draftRevision?: number
+  baseline?: DiffBaseline
+  changes: DiffItem[]
+}
 
 export const emptyDraftGuidance = (): DraftGuidance => ({
   additionalInstructions: null,

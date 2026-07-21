@@ -1,4 +1,4 @@
-import type { AnalysisRunResponse, AnalysisRunSummaryResponse, CandidateResponse, DraftResponse, PageResponse } from './schemaDraftTypes'
+import type { AnalysisRunResponse, AnalysisRunSummaryResponse, CandidateResponse, DiffResponse, DraftResponse, PageResponse } from './schemaDraftTypes'
 import { emptyDraftGuidance } from './schemaDraftTypes'
 import type { EligibilityPage, EvaluationRun, EvaluationRunSummary, Publication, PublicationReadiness, ReprocessingPlan, ReprocessingPlanSummary } from './schemaDraftReleaseTypes'
 
@@ -55,6 +55,23 @@ export const candidateFixture: CandidateResponse = {
   evidence: [{ sourceId: 'source-1', sourceFingerprint: 'source-sha', chunkId: 'chunk-2', documentId: 'document-1', origins: ['OBSERVED'] }],
 }
 export const candidatePageFixture: PageResponse<CandidateResponse> = { page: 0, size: 50, totalElements: 1, content: [candidateFixture] }
+
+const diffChanges: DiffResponse['changes'] = [
+  { coordinate: 'Customer.age', compatibility: 'BREAKING', operation: 'CHANGE_TYPE', before: 'STRING', after: 'INTEGER' },
+]
+export const baseSchemaDiffFixture: DiffResponse = {
+  aggregateRevisionId: 'aggregate-1', draftRevision: 7,
+  baseline: { type: 'BASE_SCHEMA', id: 'schema-1', contentHash: 'base-schema-sha' }, changes: diffChanges,
+}
+export const previousAggregateDiffFixture: DiffResponse = {
+  aggregateRevisionId: 'aggregate-1', draftRevision: 7,
+  baseline: { type: 'PREVIOUS_AGGREGATE', id: 'aggregate-0', contentHash: 'previous-aggregate-sha' }, changes: diffChanges,
+}
+export const emptyBaselineDiffFixture: DiffResponse = {
+  aggregateRevisionId: 'aggregate-1', draftRevision: 7,
+  baseline: { type: 'EMPTY', id: null, contentHash: 'empty-schema-sha' }, changes: diffChanges,
+}
+export const rolloutCompatibleDiffFixture: DiffResponse = { aggregateRevisionId: 'aggregate-1', changes: diffChanges }
 
 const candidateVariant = (identity: string, overrides: Partial<CandidateResponse>): CandidateResponse => ({
   ...candidateFixture,

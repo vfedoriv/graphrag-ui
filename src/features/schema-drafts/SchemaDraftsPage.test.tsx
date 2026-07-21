@@ -76,7 +76,7 @@ describe('SchemaDraftsPage', () => {
       if (path.endsWith('/decisions')) return jsonResponse(200, [decision])
       if (path.endsWith('/conflicts')) return jsonResponse(200, [conflict])
       if (path.endsWith('/projection')) return jsonResponse(200, { aggregateRevisionId: 'aggregate-1', draftRevision: 7, schema: { nodes: [{ label: 'Customer' }] }, publicationReady: false })
-      if (path.endsWith('/diff')) return jsonResponse(200, { aggregateRevisionId: 'aggregate-1', changes: [{ coordinate: 'Customer.age', compatibility: 'BREAKING', operation: 'CHANGE_TYPE', before: 'STRING', after: 'INTEGER' }] })
+      if (path.endsWith('/diff')) return jsonResponse(200, { aggregateRevisionId: 'aggregate-1', draftRevision: 7, baseline: { type: 'BASE_SCHEMA', id: 'schema-1', contentHash: 'base-schema-sha' }, changes: [{ coordinate: 'Customer.age', compatibility: 'BREAKING', operation: 'CHANGE_TYPE', before: 'STRING', after: 'INTEGER' }] })
       return jsonResponse(200, [])
     })
     const user = userEvent.setup()
@@ -119,6 +119,7 @@ describe('SchemaDraftsPage', () => {
     expect(screen.getByLabelText('Mock structured JSON data')).toHaveValue(JSON.stringify({ nodes: [{ label: 'Customer' }] }, null, 2))
 
     await user.click(screen.getByRole('tab', { name: 'Diff' }))
+    expect(await screen.findByText(/Base schema schema-1/)).toBeInTheDocument()
     const diffCoordinate = await screen.findByText('Customer.age')
     expect(within(diffCoordinate.closest('summary')!).getByText('Change type')).toBeInTheDocument()
     expect(screen.queryByText('Before')).not.toBeInTheDocument()
