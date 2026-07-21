@@ -88,11 +88,17 @@ export const validationProblemFixture = {
 }
 
 export const eligibilityFixture: EligibilityPage = {
-  draftRevision: 7, currentAggregateId: 'aggregate-1', page: 0, size: 20, totalElements: 2,
+  draftRevision: 7, currentAggregateId: 'aggregate-1', readiness: 'READY', blockingReason: null, page: 0, size: 20, totalElements: 2,
   content: [
     { documentId: 'held-out-1', filename: 'held-out.txt', contentType: 'text/plain', sizeBytes: 120, sha256: 'held-out-sha', uploadedAt: '2026-07-15T07:00:00Z', eligible: true, ineligibilityReason: null },
     { documentId: 'document-1', filename: 'discovery.txt', contentType: 'text/plain', sizeBytes: 240, sha256: 'discovery-sha', uploadedAt: '2026-07-15T07:01:00Z', eligible: false, ineligibilityReason: 'ACTIVE_DISCOVERY_EVIDENCE' },
   ],
+}
+export const analysisRequiredEligibilityFixture: EligibilityPage = {
+  ...eligibilityFixture,
+  readiness: 'NOT_READY',
+  blockingReason: 'DRAFT_ANALYSIS_REQUIRED',
+  content: eligibilityFixture.content.map((item) => ({ ...item, eligible: false, ineligibilityReason: 'DRAFT_ANALYSIS_REQUIRED' })),
 }
 const metrics = {
   rates: [

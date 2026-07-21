@@ -11,6 +11,8 @@ export type MetricIdentifier =
   | 'MISSING_REQUIRED_PROPERTIES' | 'LOW_SUPPORT_CANDIDATES' | 'GUIDED_WITHOUT_EVIDENCE_CANDIDATES'
 export type AdvisoryExecutionStatus = 'NOT_REQUESTED' | 'COMPLETED' | 'COMPLETED_WITHOUT_MODEL_JUDGMENT' | 'FAILED'
 export type QuestionCoverage = 'SUPPORTED' | 'PARTIALLY_SUPPORTED' | 'UNSUPPORTED' | 'UNASSESSED'
+export type EvaluationReadiness = 'READY' | 'NOT_READY'
+export type EvaluationIneligibilityReason = 'ACTIVE_DISCOVERY_EVIDENCE' | 'DRAFT_ANALYSIS_REQUIRED'
 
 export type MetricEvidence = { coordinate: string }
 export type RateMetric = { metric: MetricIdentifier; numerator: number; denominator: number; value: number | null; applicability: MetricApplicability; evidence: MetricEvidence[] }
@@ -32,9 +34,14 @@ export type AdvisoryAssessment = {
 
 export type EligibleDocument = {
   documentId: string; filename: string; contentType: string; sizeBytes: number; sha256: string; uploadedAt: string
-  eligible: boolean; ineligibilityReason: 'ACTIVE_DISCOVERY_EVIDENCE' | null
+  eligible: boolean; ineligibilityReason: EvaluationIneligibilityReason | null
 }
-export type EligibilityPage = PageResponse<EligibleDocument> & { draftRevision: number; currentAggregateId: string | null }
+export type EligibilityPage = PageResponse<EligibleDocument> & {
+  draftRevision: number
+  currentAggregateId: string | null
+  readiness: EvaluationReadiness
+  blockingReason: EvaluationIneligibilityReason | null
+}
 export type StartEvaluationRequest = { revision: number; documentIds: string[]; advisoryEnabled: boolean }
 export type StartEvaluationResponse = { runId: string; status: EvaluationStatus; statusLocation: string }
 export type EvaluationOutcome = {

@@ -17,10 +17,14 @@ import { Table } from '../../shared/ui/Table'
 import { ProcessingOptionsEditor } from '../documents/DocumentProcessingOptionsWorkflow'
 import { buildProcessingOptionDraft, serializeMutableProcessingOptions, type ProcessingOptionDraft } from '../documents/processingOptions'
 import type { DraftResponse } from './schemaDraftTypes'
-import type { EvaluationMetrics } from './schemaDraftReleaseTypes'
+import type { EvaluationIneligibilityReason, EvaluationMetrics } from './schemaDraftReleaseTypes'
 
 const formatDate = (value: string | null) => value ? new Date(value).toLocaleString() : '—'
 const message = (error: unknown) => error instanceof Error ? error.message : 'Request failed'
+const evaluationIneligibilityMessages: Record<EvaluationIneligibilityReason, string> = {
+  ACTIVE_DISCOVERY_EVIDENCE: 'Contributed active discovery evidence.',
+  DRAFT_ANALYSIS_REQUIRED: 'Current draft analysis is required before held-out evaluation.',
+}
 
 export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) {
   const queryClient = useQueryClient()
@@ -69,8 +73,10 @@ export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) 
   }, [draft.id, draft.knowledgeBaseId, plan.data, planHistoryPage, queryClient])
 
   const eligibilityStale = Boolean(eligibility.data && (eligibility.data.draftRevision !== draft.revision || eligibility.data.currentAggregateId !== draft.currentAggregateId))
+  const eligibilityReady = eligibility.data?.readiness === 'READY'
   const noEligibleDocumentsOnPage = Boolean(eligibility.data && eligibility.data.content.every((item) => !item.eligible))
   const hasCurrentAggregate = Boolean(draft.currentAggregateId)
+  const hasSelectedEligibleDocument = Boolean(selectedEvaluationDocuments.length && eligibility.data?.content.every((item) => !selectedEvaluationDocuments.includes(item.documentId) || item.eligible))
   const publishedSchemaId = publication.data?.schemaId ?? draft.publicationSchemaId
   const publishedActive = Boolean(publishedSchemaId && activeSchemaId === publishedSchemaId)
   const selectedPlanSummary = planHistory.data?.content.find((item) => item.id === plan.data?.id)
@@ -79,7 +85,7 @@ export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) 
     release.publish.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: readiness.data.draftRevision, projectionContentHash: readiness.data.projectionContentHash } })
   }
   const startEvaluation = () => {
-    if (!eligibility.data || eligibilityStale || !selectedEvaluationDocuments.length) return
+    if (!eligibility.data || !eligibilityReady || eligibilityStale || !hasCurrentAggregate || !hasSelectedEligibleDocument) return
     if (!window.confirm(`Evaluate ${selectedEvaluationDocuments.length} held-out document(s) against draft revision ${eligibility.data.draftRevision}?`)) return
     release.startEvaluation.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, payload: { revision: eligibility.data.draftRevision, documentIds: selectedEvaluationDocuments, advisoryEnabled } }, { onSuccess: (result) => setRunId(result.runId) })
   }
@@ -102,18 +108,19 @@ export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) 
       {eligibilityStale ? <><Alert tone='info' title='Eligibility snapshot is stale' message='The draft revision or current aggregate changed. Refresh eligibility before starting evaluation.' /><Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.schemaDraftEvaluationEligibility(draft.knowledgeBaseId, draft.id, eligibilityPage, 10) })}>Refresh eligibility</Button></> : null}
       {eligibility.data ? <>
         <div className='button-row'><StatusBadge label={`Draft revision ${eligibility.data.draftRevision}`} /><StatusBadge label={`Aggregate ${eligibility.data.currentAggregateId ?? 'none'}`} /></div>
+        {!eligibilityReady ? <Alert tone='info' title='Held-out evaluation not ready' message={eligibility.data.blockingReason ? evaluationIneligibilityMessages[eligibility.data.blockingReason] : 'Held-out evaluation is not ready.'} /> : null}
         {noEligibleDocumentsOnPage ? <Alert tone='info' title='No eligible held-out documents on this page' message='Use Documents to upload and process a separate normal document, keep it out of this draft’s sources, then return to Release. Existing ineligibility reasons remain listed below.' /> : null}
         {eligibility.data.content.length ? <Table ariaLabel='Evaluation eligible documents' headers={['Select', 'Document', 'Snapshot', 'Eligibility']} rows={eligibility.data.content.map((item) => [
-          <input aria-label={`Select ${item.filename}`} type='checkbox' disabled={!item.eligible || eligibilityStale || !hasCurrentAggregate} checked={selectedEvaluationDocuments.includes(item.documentId)} onChange={(event) => setSelectedEvaluationDocuments((current) => event.target.checked ? [...current, item.documentId] : current.filter((id) => id !== item.documentId))} />,
+          <input aria-label={`Select ${item.filename}`} type='checkbox' disabled={!eligibilityReady || !item.eligible || eligibilityStale || !hasCurrentAggregate} checked={selectedEvaluationDocuments.includes(item.documentId)} onChange={(event) => setSelectedEvaluationDocuments((current) => event.target.checked ? [...current, item.documentId] : current.filter((id) => id !== item.documentId))} />,
           <span>{item.filename}<small className='block'>{item.documentId} · {item.contentType} · {item.sizeBytes.toLocaleString()} bytes</small></span>,
           <span>{item.sha256}<small className='block'>{formatDate(item.uploadedAt)}</small></span>,
-          item.eligible ? <StatusBadge label='Eligible' tone='success' /> : <span><StatusBadge label='Ineligible' tone='warning' /><small className='block'>Contributed active discovery evidence.</small></span>,
+          item.eligible ? <StatusBadge label='Eligible' tone='success' /> : <span><StatusBadge label='Ineligible' tone='warning' /><small className='block'>{item.ineligibilityReason ? evaluationIneligibilityMessages[item.ineligibilityReason] : 'Unavailable for held-out evaluation.'}</small></span>,
         ])} rowKeys={eligibility.data.content.map((item) => item.documentId)} /> : <EmptyState title='No held-out documents' description='Upload a separate document that did not contribute active discovery evidence.' />}
         <Pager page={eligibilityPage} size={eligibility.data.size} total={eligibility.data.totalElements} onPage={setEligibilityPage} />
       </> : null}
       <label className='choice-label'><input type='checkbox' checked={advisoryEnabled} onChange={(event) => setAdvisoryEnabled(event.target.checked)} /> Include advisory model assessment</label>
       <p className='text-xs'>Advisory question coverage and schema-noise judgments are model-generated and never replace deterministic validation.</p>
-      <Button variant='primary' disabled={!selectedEvaluationDocuments.length || eligibilityStale || !hasCurrentAggregate} isPending={release.startEvaluation.isPending} onClick={startEvaluation}>Start held-out evaluation</Button>
+      <Button variant='primary' disabled={!eligibilityReady || eligibilityStale || !hasCurrentAggregate || !hasSelectedEligibleDocument} isPending={release.startEvaluation.isPending} onClick={startEvaluation}>Start held-out evaluation</Button>
       <RequestError error={release.startEvaluation.error ?? release.retryEvaluation.error} />
       {evaluation.error ? <Alert title='Could not load evaluation details' message={message(evaluation.error)} /> : null}
       {evaluation.data ? <EvaluationResult metrics={evaluation.data.metrics} advisory={evaluation.data.advisoryAssessment} run={evaluation.data} onRetry={() => { if (window.confirm(`Retry evaluation against current draft revision ${draft.revision}?`)) release.retryEvaluation.mutate({ knowledgeBaseId: draft.knowledgeBaseId, draftId: draft.id, runId: evaluation.data.id, revision: draft.revision }, { onSuccess: (result) => setRunId(result.runId) }) }} /> : null}

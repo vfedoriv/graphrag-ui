@@ -7,6 +7,8 @@ import type {
 } from './schemaDraftReleaseTypes'
 
 const nullableString = z.string().nullable()
+const evaluationReadiness = z.enum(['READY', 'NOT_READY'])
+const evaluationIneligibilityReason = z.enum(['ACTIVE_DISCOVERY_EVIDENCE', 'DRAFT_ANALYSIS_REQUIRED'])
 const page = <T extends z.ZodType>(item: T) => z.object({
   page: z.number().int().nonnegative(), size: z.number().int().nonnegative(), totalElements: z.number().int().nonnegative(), content: z.array(item),
 }).strict()
@@ -38,9 +40,12 @@ const evaluationRun = z.object({ ...evaluationBase, metrics, advisoryAssessment:
 const evaluationSummary = z.object({ ...evaluationBase, current: z.boolean(), statusLocation: z.string() }).strict()
 const eligibleDocument = z.object({
   documentId: z.string(), filename: z.string(), contentType: z.string(), sizeBytes: z.number().int(), sha256: z.string(), uploadedAt: z.string(),
-  eligible: z.boolean(), ineligibilityReason: nullableString,
+  eligible: z.boolean(), ineligibilityReason: evaluationIneligibilityReason.nullable(),
 }).strict()
-const eligibility = page(eligibleDocument).extend({ draftRevision: z.number().int(), currentAggregateId: nullableString }).strict()
+const eligibility = page(eligibleDocument).extend({
+  draftRevision: z.number().int(), currentAggregateId: nullableString,
+  readiness: evaluationReadiness, blockingReason: evaluationIneligibilityReason.nullable(),
+}).strict()
 const readiness = z.object({
   ready: z.boolean(), draftRevision: z.number().int(), aggregateRevisionId: z.string(), projectionContentHash: z.string(),
   targetName: z.string(), targetVersion: z.number().int(), blockingReasons: z.array(z.object({ id: z.string(), category: z.string(), detail: z.string() }).strict()),

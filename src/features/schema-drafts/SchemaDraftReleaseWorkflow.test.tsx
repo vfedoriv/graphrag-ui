@@ -4,7 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import {
-  draftFixture, eligibilityFixture, evaluationFixture, evaluationHistoryFixture, planFixture,
+  analysisRequiredEligibilityFixture, draftFixture, eligibilityFixture, evaluationFixture, evaluationHistoryFixture, planFixture,
   planHistoryFixture, publicationFixture, readinessFixture,
 } from './schemaDraftFixtures'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
@@ -50,6 +50,7 @@ describe('SchemaDraftReleaseWorkflow', () => {
     expect(screen.getByRole('link', { name: 'Open Documents' })).toHaveAttribute('href', '/documents')
     expect(screen.getByText(/upload and process a normal document.*do not add it as a draft source.*return to Release/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Select discovery.txt' })).toBeDisabled()
+    expect(screen.getByText('Contributed active discovery evidence.')).toBeInTheDocument()
     await user.click(eligible)
     const advisory = screen.getByRole('checkbox', { name: 'Include advisory model assessment' })
     expect(advisory).not.toBeChecked()
@@ -58,6 +59,16 @@ describe('SchemaDraftReleaseWorkflow', () => {
     expect(advisory).toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Start held-out evaluation' }))
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/evaluation-runs') && init?.method === 'POST' && init.body === JSON.stringify({ revision: 7, documentIds: ['held-out-1'], advisoryEnabled: true }))).toBe(true))
+  })
+
+  it('blocks an analysis-required eligibility page with accurate page and row explanations', async () => {
+    setup(null, false, draftFixture, { eligibility: analysisRequiredEligibilityFixture })
+
+    expect(await screen.findByText('Held-out evaluation not ready')).toBeInTheDocument()
+    expect(screen.getAllByText('Current draft analysis is required before held-out evaluation.')).toHaveLength(3)
+    expect(screen.getByRole('checkbox', { name: 'Select held-out.txt' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'Select discovery.txt' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Start held-out evaluation' })).toBeDisabled()
   })
 
   it('keeps ineligible rows and disabled evaluation controls while explaining the current page handoff', async () => {

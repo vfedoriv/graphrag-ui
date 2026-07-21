@@ -29,7 +29,7 @@ describe('schemaDraftReleaseApi', () => {
     const eligibility = await schemaDraftReleaseApi.eligibility('kb-1', 'draft-1')
     const history = await schemaDraftReleaseApi.evaluations('kb-1', 'draft-1')
     const run = await schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'evaluation-partial')
-    expect(eligibility).toMatchObject({ draftRevision: 7, currentAggregateId: 'aggregate-1' })
+    expect(eligibility).toMatchObject({ draftRevision: 7, currentAggregateId: 'aggregate-1', readiness: 'READY', blockingReason: null })
     expect(history.content.some((item) => item.contractRevision === 'schema-draft-evaluation-v1')).toBe(true)
     expect(run.outcomes.content[0]).toMatchObject({ reused: true, status: 'SUCCEEDED' })
     expect(run.outcomes.content[1]).toMatchObject({ status: 'STALE_SOURCE', metrics: null, failureCategory: 'SOURCE_CHANGED' })
