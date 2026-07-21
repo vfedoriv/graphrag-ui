@@ -2,7 +2,7 @@ import type { DocumentProcessingOptionValue } from '../../api/types'
 import type { PageResponse } from './schemaDraftTypes'
 
 export type EvaluationStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED'
-export type EvaluationOutcomeStatus = 'SUCCEEDED' | 'FAILED' | 'STALE_SOURCE' | 'INTERRUPTED'
+export type EvaluationOutcomeStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'REUSED' | 'FAILED' | 'STALE_SOURCE' | 'INTERRUPTED'
 export type MetricApplicability = 'APPLICABLE' | 'NOT_APPLICABLE'
 export type MetricIdentifier =
   | 'RECOGNIZED_ENTITY_RATE' | 'DROPPED_RELATIONSHIP_RATE' | 'KEY_AVAILABILITY_RATE'
@@ -53,7 +53,7 @@ export type EvaluationRun = {
   id: string; status: EvaluationStatus; draftRevision: number; aggregateRevisionId: string; projectionContentHash: string
   aiProfileId: string; aiProfileRevision: number; promptRevision: string; contractRevision: string; retryOfRunId: string | null
   totalDocuments: number; succeededDocuments: number; failedDocuments: number; staleDocuments: number
-  metrics: EvaluationMetrics; advisoryAssessment: AdvisoryAssessment; failureCategory: string | null; retryable: boolean
+  metrics: EvaluationMetrics | null; advisoryAssessment: AdvisoryAssessment | null; failureCategory: string | null; retryable: boolean
   createdAt: string; startedAt: string | null; completedAt: string | null; outcomes: PageResponse<EvaluationOutcome>
 }
 export type EvaluationRunSummary = Omit<EvaluationRun, 'metrics' | 'advisoryAssessment' | 'outcomes'> & { current: boolean; statusLocation: string }

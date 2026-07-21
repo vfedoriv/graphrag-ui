@@ -1,9 +1,7 @@
 ## Purpose
 
 This specification defines the required behavior for evaluating schema drafts against held-out documents in the GraphRAG admin UI.
-
 ## Requirements
-
 ### Requirement: Held-out evaluation uses explicit eligible document selection
 The system SHALL load a paged backend eligibility resource for documents owned by the current knowledge base, SHALL validate and retain its authoritative draft-wide readiness and nullable blocking reason, SHALL explain that the checkboxes select unseen normal documents for held-out evaluation, SHALL allow selection only when the page is ready and a row is marked eligible, SHALL send the authoritative current draft revision with the selection and advisory flag, and SHALL provide a direct route to the normal Documents workflow for obtaining a separate held-out document.
 
@@ -43,11 +41,28 @@ The system SHALL load a paged backend eligibility resource for documents owned b
 - **THEN** the system SHALL invalidate the eligibility page and disable evaluation start until refreshed
 
 ### Requirement: Evaluation progress and outcomes are polled from server state
-The system SHALL poll active evaluation runs, display aggregate document counts and per-document outcomes from the nested standard page envelope, and stop polling at `COMPLETED`, `PARTIAL`, `FAILED`, or `INTERRUPTED`.
+The system SHALL accept evaluation status resources whose run-level metrics and advisory assessment are nullable while results are unavailable, SHALL poll active evaluation runs, SHALL display aggregate document counts and per-document outcomes from the nested standard page envelope independently of result availability, and SHALL stop polling at `COMPLETED`, `PARTIAL`, `FAILED`, or `INTERRUPTED`.
 
 #### Scenario: Start evaluation
 - **WHEN** a user starts evaluation with valid held-out documents
 - **THEN** the system SHALL poll the returned run resource while it is `QUEUED` or `RUNNING`
+
+#### Scenario: Active evaluation results are not yet available
+- **WHEN** a `QUEUED` or `RUNNING` evaluation response contains null run-level metrics and advisory assessment
+- **THEN** the system SHALL accept the response without showing a response-shape error
+- **AND** SHALL show the run status, aggregate progress, and paged outcomes
+- **AND** SHALL continue polling the run
+- **AND** SHALL identify the detailed results as still in progress
+
+#### Scenario: Active per-document outcomes are displayed
+- **WHEN** an evaluation response contains outcomes with `QUEUED` or `RUNNING` status
+- **THEN** the system SHALL accept and display those declared statuses
+
+#### Scenario: Interrupted evaluation has no aggregated results
+- **WHEN** an evaluation becomes `INTERRUPTED` before run-level metrics or advisory assessment are produced
+- **THEN** the system SHALL accept the nullable result fields and stop polling
+- **AND** SHALL retain the run progress and per-document outcomes
+- **AND** SHALL identify unavailable result sections without presenting the response as malformed
 
 #### Scenario: Evaluation partially completes
 - **WHEN** the run becomes `PARTIAL`
@@ -57,7 +72,7 @@ The system SHALL poll active evaluation runs, display aggregate document counts 
 #### Scenario: Evaluation is retried
 - **WHEN** a terminal run is retryable and the user confirms retry
 - **THEN** the system SHALL send the latest draft revision to the retry endpoint
-- **AND** SHALL identify reused outcomes separately from new outcomes
+- **AND** SHALL identify `REUSED` outcomes separately from newly executed outcomes
 
 ### Requirement: Evaluation distinguishes deterministic and advisory results
 The system SHALL present deterministic extraction and validation metrics separately from optional advisory model assessments and SHALL show not-applicable rate values without converting them to zero.

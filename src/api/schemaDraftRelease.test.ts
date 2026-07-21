@@ -6,7 +6,7 @@ import { schemaDraftReleaseApi, useSchemaDraftReleaseMutations } from './schemaD
 import { queryKeys } from './queryKeys'
 import { ApiError } from './types'
 import {
-  eligibilityFixture, evaluationFixture, evaluationHistoryFixture, planFixture, planHistoryFixture,
+  activeEvaluationFixture, eligibilityFixture, evaluationFixture, evaluationHistoryFixture, interruptedEvaluationFixture, planFixture, planHistoryFixture,
   publicationFixture, readinessFixture,
 } from '../features/schema-drafts/schemaDraftFixtures'
 import { isEvaluationTerminal, isPlanTerminal } from '../features/schema-drafts/schemaDraftReleaseTypes'
@@ -39,6 +39,24 @@ describe('schemaDraftReleaseApi', () => {
   it('rejects removed parallel evaluation count fields', async () => {
     stubFetch(() => jsonResponse(200, { ...evaluationFixture, outcomeCount: evaluationFixture.outcomes.totalElements }))
     await expect(schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'evaluation-partial')).rejects.toMatchObject({ status: 200, message: 'Evaluation run response has unexpected shape' })
+  })
+
+  it('accepts active and interrupted evaluations before aggregated results are available', async () => {
+    stubFetch((url) => jsonResponse(200, url.includes('evaluation-interrupted') ? interruptedEvaluationFixture : activeEvaluationFixture))
+    const active = await schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'evaluation-running')
+    const interrupted = await schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'evaluation-interrupted')
+    expect(active).toMatchObject({ status: 'RUNNING', metrics: null, advisoryAssessment: null })
+    expect(active.outcomes.content.map((item) => item.status)).toEqual(['RUNNING', 'QUEUED'])
+    expect(interrupted).toMatchObject({ status: 'INTERRUPTED', metrics: null, advisoryAssessment: null })
+    expect(interrupted.outcomes.content.map((item) => item.status)).toEqual(['REUSED', 'INTERRUPTED'])
+  })
+
+  it('rejects undeclared evaluation run and outcome statuses', async () => {
+    stubFetch((url) => jsonResponse(200, url.includes('outcome-status')
+      ? { ...activeEvaluationFixture, outcomes: { ...activeEvaluationFixture.outcomes, content: [{ ...activeEvaluationFixture.outcomes.content[0], status: 'WAITING' }] } }
+      : { ...activeEvaluationFixture, status: 'WAITING' }))
+    await expect(schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'run-status')).rejects.toMatchObject({ status: 200, message: 'Evaluation run response has unexpected shape' })
+    await expect(schemaDraftReleaseApi.evaluation('kb-1', 'draft-1', 'outcome-status')).rejects.toMatchObject({ status: 200, message: 'Evaluation run response has unexpected shape' })
   })
 
   it('publishes only an exact readiness revision and projection hash', async () => {

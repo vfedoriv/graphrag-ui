@@ -7,6 +7,8 @@ import type {
 } from './schemaDraftReleaseTypes'
 
 const nullableString = z.string().nullable()
+const evaluationStatus = z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'])
+const evaluationOutcomeStatus = z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'REUSED', 'FAILED', 'STALE_SOURCE', 'INTERRUPTED'])
 const evaluationReadiness = z.enum(['READY', 'NOT_READY'])
 const evaluationIneligibilityReason = z.enum(['ACTIVE_DISCOVERY_EVIDENCE', 'DRAFT_ANALYSIS_REQUIRED'])
 const page = <T extends z.ZodType>(item: T) => z.object({
@@ -27,16 +29,16 @@ const advisory = z.object({
   reproducibility: z.object({ profileId: z.string(), profileRevision: z.number().int(), promptRevision: z.string(), contractRevision: z.string() }).strict(),
 }).strict()
 const evaluationOutcome = z.object({
-  id: z.string(), documentId: z.string(), documentSha256: z.string(), status: z.string(), reused: z.boolean(), chunkCount: z.number().int(),
+  id: z.string(), documentId: z.string(), documentSha256: z.string(), status: evaluationOutcomeStatus, reused: z.boolean(), chunkCount: z.number().int(),
   metrics: metrics.nullable(), evidenceCoordinates: z.array(z.string()), failureCategory: nullableString, retryable: z.boolean(), startedAt: nullableString, completedAt: nullableString,
 }).strict()
 const evaluationBase = {
-  id: z.string(), status: z.string(), draftRevision: z.number().int(), aggregateRevisionId: z.string(), projectionContentHash: z.string(),
+  id: z.string(), status: evaluationStatus, draftRevision: z.number().int(), aggregateRevisionId: z.string(), projectionContentHash: z.string(),
   aiProfileId: z.string(), aiProfileRevision: z.number().int(), promptRevision: z.string(), contractRevision: z.string(), retryOfRunId: nullableString,
   totalDocuments: z.number().int(), succeededDocuments: z.number().int(), failedDocuments: z.number().int(), staleDocuments: z.number().int(),
   failureCategory: nullableString, retryable: z.boolean(), createdAt: z.string(), startedAt: nullableString, completedAt: nullableString,
 }
-const evaluationRun = z.object({ ...evaluationBase, metrics, advisoryAssessment: advisory, outcomes: page(evaluationOutcome) }).strict()
+const evaluationRun = z.object({ ...evaluationBase, metrics: metrics.nullable(), advisoryAssessment: advisory.nullable(), outcomes: page(evaluationOutcome) }).strict()
 const evaluationSummary = z.object({ ...evaluationBase, current: z.boolean(), statusLocation: z.string() }).strict()
 const eligibleDocument = z.object({
   documentId: z.string(), filename: z.string(), contentType: z.string(), sizeBytes: z.number().int(), sha256: z.string(), uploadedAt: z.string(),
@@ -75,7 +77,7 @@ function parse<T>(schema: z.ZodType, value: unknown, resource: string): T {
 
 export const schemaDraftReleaseValidation = {
   eligibility: (value: unknown) => parse<EligibilityPage>(eligibility, value, 'Evaluation eligibility'),
-  startEvaluation: (value: unknown) => parse<StartEvaluationResponse>(z.object({ runId: z.string(), status: z.string(), statusLocation: z.string() }).strict(), value, 'Evaluation start'),
+  startEvaluation: (value: unknown) => parse<StartEvaluationResponse>(z.object({ runId: z.string(), status: evaluationStatus, statusLocation: z.string() }).strict(), value, 'Evaluation start'),
   evaluation: (value: unknown) => parse<EvaluationRun>(evaluationRun, value, 'Evaluation run'),
   evaluations: (value: unknown) => parse<PageResponse<EvaluationRunSummary>>(page(evaluationSummary), value, 'Evaluation history'),
   readiness: (value: unknown) => parse<PublicationReadiness>(readiness, value, 'Publication readiness'),

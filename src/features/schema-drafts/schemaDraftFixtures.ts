@@ -148,6 +148,22 @@ export const evaluationFixture: EvaluationRun = {
     { id: 'evaluation-outcome-2', documentId: 'held-out-2', documentSha256: 'held-out-2-sha', status: 'STALE_SOURCE', reused: false, chunkCount: 0, metrics: null, evidenceCoordinates: [], failureCategory: 'SOURCE_CHANGED', retryable: true, startedAt: null, completedAt: '2026-07-15T10:00:32Z' },
   ] },
 }
+export const activeEvaluationFixture: EvaluationRun = {
+  ...evaluationBase, id: 'evaluation-running', status: 'RUNNING', totalDocuments: 2, succeededDocuments: 0, failedDocuments: 0,
+  metrics: null, advisoryAssessment: null, startedAt: '2026-07-15T10:00:01Z', completedAt: null,
+  outcomes: { page: 0, size: 20, totalElements: 2, content: [
+    { id: 'evaluation-outcome-running', documentId: 'held-out-1', documentSha256: 'held-out-sha', status: 'RUNNING', reused: false, chunkCount: 0, metrics: null, evidenceCoordinates: [], failureCategory: null, retryable: true, startedAt: '2026-07-15T10:00:01Z', completedAt: null },
+    { id: 'evaluation-outcome-queued', documentId: 'held-out-2', documentSha256: 'held-out-2-sha', status: 'QUEUED', reused: false, chunkCount: 0, metrics: null, evidenceCoordinates: [], failureCategory: null, retryable: true, startedAt: null, completedAt: null },
+  ] },
+}
+export const interruptedEvaluationFixture: EvaluationRun = {
+  ...evaluationBase, id: 'evaluation-interrupted', status: 'INTERRUPTED', totalDocuments: 2, succeededDocuments: 1, failedDocuments: 1,
+  metrics: null, advisoryAssessment: null, failureCategory: 'APPLICATION_RESTART', retryable: true, completedAt: '2026-07-15T10:00:30Z',
+  outcomes: { page: 0, size: 20, totalElements: 2, content: [
+    { id: 'evaluation-outcome-reused', documentId: 'held-out-1', documentSha256: 'held-out-sha', status: 'REUSED', reused: true, chunkCount: 4, metrics, evidenceCoordinates: ['nodes.Customer'], failureCategory: null, retryable: false, startedAt: '2026-07-15T10:00:01Z', completedAt: '2026-07-15T10:00:20Z' },
+    { id: 'evaluation-outcome-interrupted', documentId: 'held-out-2', documentSha256: 'held-out-2-sha', status: 'INTERRUPTED', reused: false, chunkCount: 0, metrics: null, evidenceCoordinates: [], failureCategory: 'APPLICATION_RESTART', retryable: true, startedAt: '2026-07-15T10:00:21Z', completedAt: '2026-07-15T10:00:30Z' },
+  ] },
+}
 export const evaluationHistoryFixture: PageResponse<EvaluationRunSummary> = { page: 0, size: 20, totalElements: 3, content: [
   { ...evaluationBase, id: 'evaluation-partial', status: 'PARTIAL', current: true, statusLocation: '/evaluation-runs/evaluation-partial' },
   { ...evaluationBase, id: 'evaluation-failed', status: 'FAILED', current: false, succeededDocuments: 0, failedDocuments: 2, failureCategory: 'PROVIDER_ERROR', statusLocation: '/evaluation-runs/evaluation-failed' },

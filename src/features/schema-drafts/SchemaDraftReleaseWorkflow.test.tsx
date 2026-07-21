@@ -4,8 +4,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import {
-  analysisRequiredEligibilityFixture, draftFixture, eligibilityFixture, evaluationFixture, evaluationHistoryFixture, planFixture,
-  planHistoryFixture, publicationFixture, readinessFixture,
+  activeEvaluationFixture, analysisRequiredEligibilityFixture, draftFixture, eligibilityFixture, evaluationFixture, evaluationHistoryFixture,
+  interruptedEvaluationFixture, planFixture, planHistoryFixture, publicationFixture, readinessFixture,
 } from './schemaDraftFixtures'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
@@ -14,13 +14,13 @@ afterEach(() => vi.restoreAllMocks())
 const document = { id: 'document-1', knowledgeBaseId: 'kb-1', originalFilename: 'document.txt', contentType: 'text/plain', sizeBytes: 100, sha256: 'sha', contentUri: 'memory://document-1', status: 'PROCESSED', uploadedAt: '2026-07-15T08:00:00Z', processedAt: '2026-07-15T08:01:00Z', errorMessage: null }
 const options = { documentId: 'document-1', parserId: 'text', fileFormat: 'txt', savedDefaults: null, savedDefaultsUpdatedAt: null, options: [{ key: 'chunkSize', valueType: 'INTEGER', defaultValue: 400, mutable: true, label: 'Chunk size', description: null, constraints: { min: 100, max: 1000 } }] }
 
-function setup(activeSchemaId: string | null, published = false, draftOverride = draftFixture, overrides: { drifted?: boolean; stalePublish?: boolean; eligibility?: typeof eligibilityFixture } = {}) {
+function setup(activeSchemaId: string | null, published = false, draftOverride = draftFixture, overrides: { drifted?: boolean; stalePublish?: boolean; eligibility?: typeof eligibilityFixture; evaluation?: typeof evaluationFixture } = {}) {
   const fetchMock = stubFetch((url, init) => {
     if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-1', name: 'KB', activeSchemaId, createdAt: '2026-07-15T08:00:00Z' }])
     if (url.endsWith('/documents')) return jsonResponse(200, [document])
     if (url.includes('/processing-options')) return jsonResponse(200, options)
     if (url.includes('/evaluation-eligible-documents')) return jsonResponse(200, overrides.eligibility ?? eligibilityFixture)
-    if (url.includes('/evaluation-runs/evaluation-partial')) return jsonResponse(200, evaluationFixture)
+    if (url.includes('/evaluation-runs/')) return jsonResponse(200, overrides.evaluation ?? evaluationFixture)
     if (url.includes('/evaluation-runs')) {
       if (init?.method === 'POST') return jsonResponse(202, { runId: 'evaluation-partial', status: 'QUEUED', statusLocation: '/evaluation-runs/evaluation-partial' })
       return jsonResponse(200, evaluationHistoryFixture)
@@ -92,6 +92,29 @@ describe('SchemaDraftReleaseWorkflow', () => {
     expect(screen.getByText('Not applicable')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Advisory model assessment' })).toBeInTheDocument()
     expect(screen.getByText('Reused prior success')).toBeInTheDocument()
+  })
+
+  it('renders active progress with nullable results and continues polling', async () => {
+    const draft = { ...draftFixture, latestEvaluation: { id: 'evaluation-running', status: 'RUNNING' as const, current: true, latest: true, statusLocation: '/evaluation-runs/evaluation-running' } }
+    const fetchMock = setup(null, false, draft, { evaluation: activeEvaluationFixture })
+    expect(await screen.findByText('Evaluation in progress')).toBeInTheDocument()
+    expect(screen.getByText('Detailed evaluation results will appear as processing completes.')).toBeInTheDocument()
+    expect(screen.getAllByText('RUNNING')).toHaveLength(2)
+    expect(screen.getByText('QUEUED')).toBeInTheDocument()
+    expect(screen.queryByText('Could not load evaluation details')).not.toBeInTheDocument()
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/evaluation-runs/evaluation-running')).length).toBeGreaterThanOrEqual(2), { timeout: 2500 })
+  })
+
+  it('renders interrupted progress and unavailable results without polling or a shape error', async () => {
+    const draft = { ...draftFixture, latestEvaluation: { id: 'evaluation-interrupted', status: 'INTERRUPTED' as const, current: true, latest: true, statusLocation: '/evaluation-runs/evaluation-interrupted' } }
+    const fetchMock = setup(null, false, draft, { evaluation: interruptedEvaluationFixture })
+    expect(await screen.findByText('Deterministic metrics unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Advisory assessment unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Reused prior success')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry evaluation' })).toBeInTheDocument()
+    expect(screen.queryByText('Could not load evaluation details')).not.toBeInTheDocument()
+    await new Promise((resolve) => window.setTimeout(resolve, 1600))
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/evaluation-runs/evaluation-interrupted'))).toHaveLength(1)
   })
 
   it('publishes exact readiness authority and keeps activation separate', async () => {
