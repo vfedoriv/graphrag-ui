@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaDraftReleaseWorkflow } from './SchemaDraftReleaseWorkflow'
 import {
@@ -14,12 +14,12 @@ afterEach(() => vi.restoreAllMocks())
 const document = { id: 'document-1', knowledgeBaseId: 'kb-1', originalFilename: 'document.txt', contentType: 'text/plain', sizeBytes: 100, sha256: 'sha', contentUri: 'memory://document-1', status: 'PROCESSED', uploadedAt: '2026-07-15T08:00:00Z', processedAt: '2026-07-15T08:01:00Z', errorMessage: null }
 const options = { documentId: 'document-1', parserId: 'text', fileFormat: 'txt', savedDefaults: null, savedDefaultsUpdatedAt: null, options: [{ key: 'chunkSize', valueType: 'INTEGER', defaultValue: 400, mutable: true, label: 'Chunk size', description: null, constraints: { min: 100, max: 1000 } }] }
 
-function setup(activeSchemaId: string | null, published = false, draftOverride = draftFixture, overrides: { drifted?: boolean; stalePublish?: boolean } = {}) {
+function setup(activeSchemaId: string | null, published = false, draftOverride = draftFixture, overrides: { drifted?: boolean; stalePublish?: boolean; eligibility?: typeof eligibilityFixture } = {}) {
   const fetchMock = stubFetch((url, init) => {
     if (url.endsWith('/knowledge-bases')) return jsonResponse(200, [{ id: 'kb-1', name: 'KB', activeSchemaId, createdAt: '2026-07-15T08:00:00Z' }])
     if (url.endsWith('/documents')) return jsonResponse(200, [document])
     if (url.includes('/processing-options')) return jsonResponse(200, options)
-    if (url.includes('/evaluation-eligible-documents')) return jsonResponse(200, eligibilityFixture)
+    if (url.includes('/evaluation-eligible-documents')) return jsonResponse(200, overrides.eligibility ?? eligibilityFixture)
     if (url.includes('/evaluation-runs/evaluation-partial')) return jsonResponse(200, evaluationFixture)
     if (url.includes('/evaluation-runs')) {
       if (init?.method === 'POST') return jsonResponse(202, { runId: 'evaluation-partial', status: 'QUEUED', statusLocation: '/evaluation-runs/evaluation-partial' })
@@ -47,6 +47,8 @@ describe('SchemaDraftReleaseWorkflow', () => {
     const fetchMock = setup(null)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const eligible = await screen.findByRole('checkbox', { name: 'Select held-out.txt' })
+    expect(screen.getByRole('link', { name: 'Open Documents' })).toHaveAttribute('href', '/documents')
+    expect(screen.getByText(/upload and process a normal document.*do not add it as a draft source.*return to Release/i)).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Select discovery.txt' })).toBeDisabled()
     await user.click(eligible)
     const advisory = screen.getByRole('checkbox', { name: 'Include advisory model assessment' })
@@ -56,6 +58,20 @@ describe('SchemaDraftReleaseWorkflow', () => {
     expect(advisory).toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Start held-out evaluation' }))
     await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/evaluation-runs') && init?.method === 'POST' && init.body === JSON.stringify({ revision: 7, documentIds: ['held-out-1'], advisoryEnabled: true }))).toBe(true))
+  })
+
+  it('keeps ineligible rows and disabled evaluation controls while explaining the current page handoff', async () => {
+    setup(null, false, draftFixture, {
+      eligibility: { ...eligibilityFixture, content: eligibilityFixture.content.filter((item) => !item.eligible), size: 10, totalElements: 11 },
+    })
+
+    expect(await screen.findByText('No eligible held-out documents on this page')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open Documents' })).toHaveAttribute('href', '/documents')
+    expect(screen.getByRole('checkbox', { name: 'Select discovery.txt' })).toBeDisabled()
+    expect(screen.getByText('Contributed active discovery evidence.')).toBeInTheDocument()
+    const eligibilityPager = screen.getByText('Page 1 · 11 items total').parentElement!
+    expect(within(eligibilityPager).getByRole('button', { name: 'Next' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Start held-out evaluation' })).toBeDisabled()
   })
 
   it('keeps deterministic and advisory results separate and renders not-applicable and reused outcomes', async () => {

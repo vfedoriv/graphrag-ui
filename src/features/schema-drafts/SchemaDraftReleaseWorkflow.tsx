@@ -69,6 +69,7 @@ export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) 
   }, [draft.id, draft.knowledgeBaseId, plan.data, planHistoryPage, queryClient])
 
   const eligibilityStale = Boolean(eligibility.data && (eligibility.data.draftRevision !== draft.revision || eligibility.data.currentAggregateId !== draft.currentAggregateId))
+  const noEligibleDocumentsOnPage = Boolean(eligibility.data && eligibility.data.content.every((item) => !item.eligible))
   const hasCurrentAggregate = Boolean(draft.currentAggregateId)
   const publishedSchemaId = publication.data?.schemaId ?? draft.publicationSchemaId
   const publishedActive = Boolean(publishedSchemaId && activeSchemaId === publishedSchemaId)
@@ -91,11 +92,17 @@ export function SchemaDraftReleaseWorkflow({ draft }: { draft: DraftResponse }) 
 
   return <div className='stack-lg'>
     <Stage title='1. Held-out evaluation' description='Server-owned eligibility and durable results. Deterministic metrics remain separate from optional advisory judgments.'>
+      <p>Select eligible normal Documents that were not used as active discovery evidence. Discovery-source documents are disabled because held-out evaluation must use unseen material.</p>
+      <div className='stack'>
+        <p className='text-xs'>Need a separate held-out document? Upload and process a normal document in the current workspace, do not add it as a draft source, then return to Release and select it when eligible.</p>
+        <div><Link className='button' to='/documents'>Open Documents</Link></div>
+      </div>
       {!hasCurrentAggregate ? <Alert tone='info' title='Current analysis required' message='Complete analysis and review to produce a current aggregate before starting held-out evaluation.' /> : null}
       {eligibility.error ? <Alert title='Could not load evaluation eligibility' message={message(eligibility.error)} /> : null}
       {eligibilityStale ? <><Alert tone='info' title='Eligibility snapshot is stale' message='The draft revision or current aggregate changed. Refresh eligibility before starting evaluation.' /><Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.schemaDraftEvaluationEligibility(draft.knowledgeBaseId, draft.id, eligibilityPage, 10) })}>Refresh eligibility</Button></> : null}
       {eligibility.data ? <>
         <div className='button-row'><StatusBadge label={`Draft revision ${eligibility.data.draftRevision}`} /><StatusBadge label={`Aggregate ${eligibility.data.currentAggregateId ?? 'none'}`} /></div>
+        {noEligibleDocumentsOnPage ? <Alert tone='info' title='No eligible held-out documents on this page' message='Use Documents to upload and process a separate normal document, keep it out of this draft’s sources, then return to Release. Existing ineligibility reasons remain listed below.' /> : null}
         {eligibility.data.content.length ? <Table ariaLabel='Evaluation eligible documents' headers={['Select', 'Document', 'Snapshot', 'Eligibility']} rows={eligibility.data.content.map((item) => [
           <input aria-label={`Select ${item.filename}`} type='checkbox' disabled={!item.eligible || eligibilityStale || !hasCurrentAggregate} checked={selectedEvaluationDocuments.includes(item.documentId)} onChange={(event) => setSelectedEvaluationDocuments((current) => event.target.checked ? [...current, item.documentId] : current.filter((id) => id !== item.documentId))} />,
           <span>{item.filename}<small className='block'>{item.documentId} · {item.contentType} · {item.sizeBytes.toLocaleString()} bytes</small></span>,

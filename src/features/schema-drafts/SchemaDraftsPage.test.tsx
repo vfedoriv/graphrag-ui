@@ -1,5 +1,5 @@
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
@@ -123,6 +123,36 @@ describe('SchemaDraftsPage', () => {
     await user.click(diffCoordinate)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
+  })
+
+  it('explains discovery evidence before upload and preserves the draft file-source request', async () => {
+    const source = { id: 'source-file', type: 'FILE', status: 'ACTIVE', revision: 1, documentId: null, name: 'evidence.txt', contentType: 'text/plain', sizeBytes: 8, sha256: 'sha', analyzed: false, createdAt: '2026-07-15T08:00:00Z', updatedAt: '2026-07-15T08:00:00Z' }
+    const fetchMock = stubFetch((url, init) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1/sources/files') && init?.method === 'POST') return jsonResponse(200, source)
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)
+      if (path.endsWith('/schema-drafts/draft-1/sources')) return jsonResponse(200, [])
+      if (path.endsWith('/documents')) return jsonResponse(200, [])
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Sources' }))
+
+    expect(screen.getByRole('heading', { name: 'Discovery evidence file' })).toBeInTheDocument()
+    expect(screen.getByText(/influences schema discovery.*stays private.*does not enter Documents/i)).toBeInTheDocument()
+    expect(screen.getByText(/cannot be used as a held-out evaluation document/i)).toBeInTheDocument()
+
+    const file = new File(['evidence'], 'evidence.txt', { type: 'text/plain' })
+    await user.upload(screen.getByLabelText('Discovery evidence file'), file)
+    await user.click(screen.getByRole('button', { name: 'Upload discovery evidence' }))
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/schema-drafts/draft-1/sources/files?revision=7') && init?.method === 'POST')
+      expect(call).toBeDefined()
+      expect(call?.[1]?.body).toBeInstanceOf(FormData)
+      expect((call?.[1]?.body as FormData).get('file')).toBe(file)
+    })
   })
 
   it('shows projection guidance without requesting projection data when no current aggregate exists', async () => {
