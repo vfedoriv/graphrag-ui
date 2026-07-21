@@ -213,6 +213,8 @@ export type ConflictResponse = {
   resolved: boolean
   selectedAlternative: string | null
   customResolution: unknown
+  aggregateRevisionId: string
+  current: boolean
   createdAt: string
   resolvedAt: string | null
 }

@@ -22,6 +22,8 @@ const conflictFixture = (overrides: Partial<ConflictResponse> = {}): ConflictRes
   resolved: false,
   selectedAlternative: null,
   customResolution: null,
+  aggregateRevisionId: 'aggregate-1',
+  current: true,
   createdAt: '2026-07-15T08:03:00Z',
   resolvedAt: null,
   ...overrides,
@@ -62,7 +64,7 @@ describe('SchemaDraftsPage', () => {
   it('loads each workbench section with scalable server-owned data', async () => {
     const source = { id: 'source-1', type: 'DOCUMENT', status: 'STALE', revision: 1, documentId: 'doc-1', name: 'Document one', contentType: 'text/plain', sizeBytes: 42, sha256: 'sha', analyzed: true, createdAt: '2026-07-15T08:00:00Z', updatedAt: '2026-07-15T08:01:00Z' }
     const decision = { id: 'decision-4', sequence: 4, draftRevision: 7, type: 'PIN', reviewState: 'PINNED', candidateIdentity: candidatePageFixture.content[0].identity, priorValue: null, resultingValue: candidatePageFixture.content[0], rationale: 'Stable identifier', createdAt: '2026-07-15T08:02:00Z' }
-    const conflict = { id: 'conflict-1', type: 'PROPERTY_TYPE', coordinate: 'Customer.age', alternatives: ['STRING', 'INTEGER'], evidence: [], resolved: false, selectedAlternative: null, customResolution: null, createdAt: '2026-07-15T08:03:00Z', resolvedAt: null }
+    const conflict = { id: 'conflict-1', type: 'PROPERTY_TYPE', coordinate: 'Customer.age', alternatives: ['STRING', 'INTEGER'], evidence: [], resolved: false, selectedAlternative: null, customResolution: null, aggregateRevisionId: 'aggregate-1', current: true, createdAt: '2026-07-15T08:03:00Z', resolvedAt: null }
     stubFetch((url) => {
       const path = new URL(url, 'http://test').pathname
       if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draftFixture)

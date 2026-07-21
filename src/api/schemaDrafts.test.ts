@@ -6,10 +6,25 @@ import { loadAllSchemaDraftCandidates, schemaDraftsApi, useSchemaDraftWorkflowMu
 import { ApiError } from './types'
 import { queryKeys } from './queryKeys'
 import { analysisDetailFixture, analysisHistoryFixture, candidatePageFixture, draftFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
-import { isTerminalAnalysisStatus } from '../features/schema-drafts/schemaDraftTypes'
+import { isTerminalAnalysisStatus, type ConflictResponse } from '../features/schema-drafts/schemaDraftTypes'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
 
 afterEach(() => vi.restoreAllMocks())
+
+const conflictResponseFixture: ConflictResponse = {
+  id: 'conflict-1',
+  type: 'PROPERTY_TYPE',
+  coordinate: 'Customer.age',
+  alternatives: ['STRING', 'INTEGER'],
+  evidence: [],
+  resolved: false,
+  selectedAlternative: null,
+  customResolution: null,
+  aggregateRevisionId: 'aggregate-1',
+  current: true,
+  createdAt: '2026-07-15T08:03:00Z',
+  resolvedAt: null,
+}
 
 describe('schemaDraftsApi', () => {
   it('sends canonical guidance JSON for lifecycle mutations', async () => {
@@ -46,6 +61,29 @@ describe('schemaDraftsApi', () => {
     stubFetch(() => jsonResponse(200, candidatePageFixture))
     const page = await schemaDraftsApi.candidates('kb-1', 'draft-1')
     expect(page.content[0]).toMatchObject({ recommendationState: 'RECOMMENDED', effectiveReviewState: 'PINNED', latestDecisionId: 'decision-4' })
+  })
+
+  it('accepts conflict lineage fields from the default current scope', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, [conflictResponseFixture]))
+
+    await expect(schemaDraftsApi.conflicts('kb-1', 'draft-1')).resolves.toEqual([conflictResponseFixture])
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/knowledge-bases/kb-1/schema-drafts/draft-1/conflicts')
+  })
+
+  it('accepts conflict lineage fields after successful resolution', async () => {
+    const resolvedConflict = {
+      ...conflictResponseFixture,
+      resolved: true,
+      selectedAlternative: 'INTEGER',
+      resolvedAt: '2026-07-15T09:00:00Z',
+    }
+    const fetchMock = stubFetch(() => jsonResponse(200, resolvedConflict))
+
+    await expect(schemaDraftsApi.resolveConflict('kb-1', 'draft-1', 'conflict-1', { revision: 7, selectedAlternative: 'INTEGER' })).resolves.toEqual(resolvedConflict)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/knowledge-bases/kb-1/schema-drafts/draft-1/conflicts/conflict-1/resolution',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ revision: 7, selectedAlternative: 'INTEGER' }) }),
+    )
   })
 
   it('accepts candidates that have not received a persistent review decision', async () => {

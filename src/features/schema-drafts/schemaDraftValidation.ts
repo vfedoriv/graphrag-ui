@@ -83,7 +83,8 @@ const decision = z.object({
 }).strict()
 const conflict = z.object({
   id: z.string(), type: z.string(), coordinate: z.string(), alternatives: z.unknown(), evidence: z.unknown(), resolved: z.boolean(),
-  selectedAlternative: nullableString, customResolution: z.unknown(), createdAt: z.string(), resolvedAt: nullableString,
+  selectedAlternative: nullableString, customResolution: z.unknown(), aggregateRevisionId: z.string(), current: z.boolean(),
+  createdAt: z.string(), resolvedAt: nullableString,
 }).strict()
 const projection = z.object({ aggregateRevisionId: z.string(), draftRevision: z.number().int(), schema: z.unknown(), publicationReady: z.boolean() }).strict()
 const diff = z.object({ aggregateRevisionId: z.string(), changes: z.array(z.object({ coordinate: z.string(), compatibility: z.string(), operation: z.string(), before: z.unknown(), after: z.unknown() }).strict()) }).strict()
