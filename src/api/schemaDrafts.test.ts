@@ -5,7 +5,7 @@ import { createElement, type ReactNode } from 'react'
 import { loadAllSchemaDraftCandidates, schemaDraftsApi, useSchemaDraftWorkflowMutations } from './schemaDrafts'
 import { ApiError } from './types'
 import { queryKeys } from './queryKeys'
-import { analysisDetailFixture, analysisHistoryFixture, baseSchemaDiffFixture, candidatePageFixture, draftFixture, rolloutCompatibleDiffFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
+import { analysisDetailFixture, analysisHistoryFixture, baseSchemaDiffFixture, candidatePageFixture, draftFixture, legacyAnalysisDetailFixture, legacyAnalysisHistoryFixture, rolloutCompatibleDiffFixture, validationProblemFixture } from '../features/schema-drafts/schemaDraftFixtures'
 import { isTerminalAnalysisStatus, type ConflictResponse } from '../features/schema-drafts/schemaDraftTypes'
 import { createTestQueryClient, jsonResponse, stubFetch } from '../test/helpers'
 
@@ -43,13 +43,35 @@ describe('schemaDraftsApi', () => {
     expect((fetchMock.mock.calls[0][1]?.body as FormData).get('file')).toBe(file)
   })
 
-  it('accepts standard analysis and nested outcome pages', async () => {
+  it('accepts current analysis contracts and nested outcome pages', async () => {
     stubFetch((url) => jsonResponse(200, url.includes('run-partial') ? analysisDetailFixture : analysisHistoryFixture))
     const history = await schemaDraftsApi.analysisHistory('kb-1', 'draft-1')
     const detail = await schemaDraftsApi.analysisRun('kb-1', 'draft-1', 'run-partial')
     expect(history.content).toHaveLength(4)
     expect(detail.sourceOutcomes.totalElements).toBe(3)
     expect(detail.sourceOutcomes.content[0].reused).toBe(true)
+    expect(detail.effectiveSourceConcurrency).toBe(4)
+    expect(detail.canRetry).toBe(true)
+    expect(detail.sourceOutcomes.content[1].failureCode).toBe('SOURCE_DEADLINE_EXCEEDED')
+  })
+
+  it('accepts legacy null analysis metadata', async () => {
+    stubFetch((url) => jsonResponse(200, url.includes('run-legacy') ? legacyAnalysisDetailFixture : legacyAnalysisHistoryFixture))
+    await expect(schemaDraftsApi.analysisHistory('kb-1', 'draft-1')).resolves.toEqual(legacyAnalysisHistoryFixture)
+    await expect(schemaDraftsApi.analysisRun('kb-1', 'draft-1', 'run-legacy')).resolves.toEqual(legacyAnalysisDetailFixture)
+  })
+
+  it('keeps expanded analysis contracts strict', async () => {
+    const fetchMock = stubFetch(() => jsonResponse(200, { ...analysisDetailFixture, unrelated: true }))
+    await expect(schemaDraftsApi.analysisRun('kb-1', 'draft-1', 'run-partial')).rejects.toMatchObject({ message: 'Analysis run response has unexpected shape' })
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(200, {
+      ...analysisDetailFixture,
+      sourceOutcomes: {
+        ...analysisDetailFixture.sourceOutcomes,
+        content: [{ ...analysisDetailFixture.sourceOutcomes.content[0], unrelated: true }],
+      },
+    })))
+    await expect(schemaDraftsApi.analysisRun('kb-1', 'draft-1', 'run-partial')).rejects.toMatchObject({ message: 'Analysis run response has unexpected shape' })
   })
 
   it('accepts expanded and rollout-compatible compatibility diff responses', async () => {
@@ -173,6 +195,34 @@ describe('schemaDraftsApi', () => {
   it('identifies every polling terminal state', () => {
     expect(isTerminalAnalysisStatus('RUNNING')).toBe(false)
     expect(['COMPLETED', 'PARTIAL', 'FAILED'].every((status) => isTerminalAnalysisStatus(status as 'COMPLETED'))).toBe(true)
+  })
+
+  it('refreshes draft, history, and selected analysis after retry success', async () => {
+    stubFetch(() => jsonResponse(202, { runId: 'run-retry', status: 'RUNNING', statusLocation: '/runs/run-retry' }))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children)
+    const { result } = renderHook(useSchemaDraftWorkflowMutations, { wrapper })
+
+    await act(() => result.current.retryAnalysis.mutateAsync({ knowledgeBaseId: 'kb-1', draftId: 'draft-1', runId: 'run-partial', revision: 7 }))
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.schemaDraft('kb-1', 'draft-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schema-drafts', 'kb-1', 'draft-1'] })
+  })
+
+  it.each([400, 409])('refreshes authoritative analysis state after a %s retry rejection', async (status) => {
+    stubFetch(() => jsonResponse(status, { status, title: 'Retry rejected', detail: 'Retry eligibility changed' }))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children)
+    const { result } = renderHook(useSchemaDraftWorkflowMutations, { wrapper })
+
+    await act(async () => {
+      await expect(result.current.retryAnalysis.mutateAsync({ knowledgeBaseId: 'kb-1', draftId: 'draft-1', runId: 'run-partial', revision: 7 })).rejects.toMatchObject({ status, message: 'Retry eligibility changed' })
+    })
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.schemaDraft('kb-1', 'draft-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['schema-drafts', 'kb-1', 'draft-1'] })
   })
 
   it('removes deleted detail state without refetching the missing draft', async () => {

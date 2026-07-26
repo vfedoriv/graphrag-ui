@@ -3,8 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { SchemaDraftsPage } from './SchemaDraftsPage'
-import { analysisDetailFixture, analysisHistoryFixture, candidateFixture, candidatePageFixture, draftFixture } from './schemaDraftFixtures'
-import type { CandidateResponse, ConflictResponse } from './schemaDraftTypes'
+import { analysisDetailFixture, analysisHistoryFixture, candidateFixture, candidatePageFixture, draftFixture, legacyAnalysisDetailFixture } from './schemaDraftFixtures'
+import type { AnalysisRunResponse, AnalysisRunSummaryResponse, CandidateResponse, ConflictResponse, DraftResponse, PageResponse } from './schemaDraftTypes'
 import { jsonResponse, renderWithProviders, stubFetch } from '../../test/helpers'
 
 afterEach(() => vi.restoreAllMocks())
@@ -36,6 +36,37 @@ const draftCandidate = (identity: string, overrides: Partial<CandidateResponse> 
   latestDecisionId: null,
   ...overrides,
 })
+
+function stubAnalysisWorkbench(
+  detail: AnalysisRunResponse,
+  draftOverrides: Partial<DraftResponse> = {},
+  historyItems: AnalysisRunSummaryResponse[] = [{
+    ...analysisHistoryFixture.content[1],
+    id: detail.id,
+    status: detail.status,
+    retryable: detail.retryable,
+    canRetry: detail.canRetry,
+  }],
+) {
+  const draft = {
+    ...draftFixture,
+    currentAnalysis: { id: detail.id, status: detail.status, current: detail.currentResult, statusLocation: `/runs/${detail.id}` },
+    ...draftOverrides,
+  }
+  const history: PageResponse<AnalysisRunSummaryResponse> = {
+    page: 0,
+    size: 10,
+    totalElements: historyItems.length,
+    content: historyItems,
+  }
+  return stubFetch((url) => {
+    const path = new URL(url, 'http://test').pathname
+    if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draft)
+    if (path.endsWith('/analysis-runs')) return jsonResponse(200, history)
+    if (path.includes('/analysis-runs/')) return jsonResponse(200, detail)
+    return jsonResponse(200, [])
+  })
+}
 
 describe('SchemaDraftsPage', () => {
   it('does not request drafts without a selected knowledge base', () => {
@@ -126,6 +157,89 @@ describe('SchemaDraftsPage', () => {
     await user.click(diffCoordinate)
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('After')).toBeInTheDocument()
+  })
+
+  it.each([
+    { retryable: true, canRetry: true, shown: true },
+    { retryable: false, canRetry: true, shown: true },
+    { retryable: true, canRetry: false, shown: false },
+    { retryable: false, canRetry: false, shown: false },
+  ])('uses canRetry=$canRetry for Retry while preserving retryable=$retryable diagnostics', async ({ retryable, canRetry, shown }) => {
+    const detail = { ...analysisDetailFixture, retryable, canRetry }
+    stubAnalysisWorkbench(detail)
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Analysis' }))
+
+    await screen.findByText('Captured execution policy')
+    expect(screen.queryByRole('button', { name: 'Retry analysis' }) !== null).toBe(shown)
+    const diagnostic = retryable ? 'No failure category · retryable' : 'No failure category · not retryable'
+    expect(screen.getByText((_, element) => element?.tagName === 'SMALL' && element.textContent === diagnostic)).toBeInTheDocument()
+  })
+
+  it('keeps Start unavailable after selecting history while another analysis is active', async () => {
+    const activeSummary = { ...analysisHistoryFixture.content[0], canRetry: false }
+    const historicalSummary = { ...analysisHistoryFixture.content[1], canRetry: false }
+    const historicalDetail = { ...analysisDetailFixture, canRetry: false }
+    const draft = {
+      ...draftFixture,
+      currentAnalysis: { id: activeSummary.id, status: 'RUNNING' as const, current: true, statusLocation: `/runs/${activeSummary.id}` },
+    }
+    const history = { ...analysisHistoryFixture, size: 10, totalElements: 2, content: [activeSummary, historicalSummary] }
+    stubFetch((url) => {
+      const path = new URL(url, 'http://test').pathname
+      if (path.endsWith('/schema-drafts/draft-1')) return jsonResponse(200, draft)
+      if (path.endsWith('/analysis-runs')) return jsonResponse(200, history)
+      if (path.endsWith(`/analysis-runs/${historicalSummary.id}`)) return jsonResponse(200, historicalDetail)
+      if (path.endsWith(`/analysis-runs/${activeSummary.id}`)) return jsonResponse(200, { ...analysisDetailFixture, id: activeSummary.id, status: 'RUNNING', canRetry: false, completedAt: null })
+      return jsonResponse(200, [])
+    })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Analysis' }))
+    await user.click(await screen.findByRole('button', { name: historicalSummary.id }))
+
+    expect(await screen.findByText(`Run ${historicalDetail.id} · current`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start analysis' })).toBeDisabled()
+    expect(screen.getByText('Analysis active')).toBeInTheDocument()
+  })
+
+  it('shows captured budgets and detailed deadline failure diagnostics', async () => {
+    stubAnalysisWorkbench(analysisDetailFixture)
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Analysis' }))
+
+    expect((await screen.findAllByText('4 sources at a time')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('1 minute').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('3 minutes').length).toBeGreaterThan(0)
+    expect(screen.getByText('TIMEOUT')).toBeInTheDocument()
+    expect(screen.getByText((_, element) => element?.tagName === 'SMALL' && element.textContent === 'Source deadline exceeded (SOURCE_DEADLINE_EXCEEDED) · Retryable failure')).toBeInTheDocument()
+  })
+
+  it('shows unavailable legacy budgets and failure codes without substituting settings', async () => {
+    stubAnalysisWorkbench(legacyAnalysisDetailFixture)
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Analysis' }))
+
+    expect((await screen.findAllByText('Unavailable for legacy run')).length).toBeGreaterThanOrEqual(3)
+    expect(screen.getByText((_, element) => element?.tagName === 'SMALL' && element.textContent === 'Unavailable for legacy outcome · Retryable failure')).toBeInTheDocument()
+  })
+
+  it('falls back safely for an unknown future source failure code', async () => {
+    const sourceOutcomes = {
+      ...analysisDetailFixture.sourceOutcomes,
+      content: analysisDetailFixture.sourceOutcomes.content.map((outcome, index) => index === 1
+        ? { ...outcome, failureCode: 'FUTURE_PROVIDER_SIGNAL' }
+        : outcome),
+    }
+    stubAnalysisWorkbench({ ...analysisDetailFixture, sourceOutcomes })
+    const user = userEvent.setup()
+    renderRoute('/schema-drafts/draft-1', 'kb-1')
+    await user.click(await screen.findByRole('tab', { name: 'Analysis' }))
+
+    expect(await screen.findByText((_, element) => element?.tagName === 'SMALL' && element.textContent === 'Future provider signal (FUTURE_PROVIDER_SIGNAL) · Retryable failure')).toBeInTheDocument()
   })
 
   it('explains discovery evidence before upload and preserves the draft file-source request', async () => {

@@ -55,19 +55,23 @@ const source = z.object({
 }).strict()
 const outcome = z.object({
   id: z.string(), sourceId: z.string(), sourceRevision: z.number().int(), status: z.string(), reused: z.boolean(),
-  failureCategory: nullableString, retryable: z.boolean(), chunkCount: z.number().int(), completedAt: nullableString,
+  failureCategory: nullableString, failureCode: nullableString, retryable: z.boolean(), chunkCount: z.number().int(), completedAt: nullableString,
 }).strict()
 const run = z.object({
   id: z.string(), status: z.string(), draftRevision: z.number().int(), guidanceRevision: z.number().int(), aiProfileId: z.string(),
   aiProfileRevision: z.number().int(), promptRevision: z.string(), candidateRevision: z.string(), totalSources: z.number().int(),
-  succeededSources: z.number().int(), failedSources: z.number().int(), currentResult: z.boolean(), aggregateRevisionId: nullableString,
-  failureCategory: nullableString, retryable: z.boolean(), retryOfRunId: nullableString, createdAt: z.string(), startedAt: nullableString,
+  succeededSources: z.number().int(), failedSources: z.number().int(), effectiveSourceConcurrency: z.number().int().nullable(),
+  effectiveSourceTimeoutMillis: z.number().int().nullable(), effectiveRequestTimeoutMillis: z.number().int().nullable(),
+  currentResult: z.boolean(), aggregateRevisionId: nullableString,
+  failureCategory: nullableString, retryable: z.boolean(), canRetry: z.boolean(), retryOfRunId: nullableString, createdAt: z.string(), startedAt: nullableString,
   completedAt: nullableString, sourceOutcomes: page(outcome),
 }).strict()
 const runSummary = z.object({
   id: z.string(), status: z.string(), draftRevision: z.number().int(), guidanceRevision: z.number().int(), totalSources: z.number().int(),
-  succeededSources: z.number().int(), failedSources: z.number().int(), current: z.boolean(), aggregateRevisionId: nullableString,
-  failureCategory: nullableString, retryable: z.boolean(), retryOfRunId: nullableString, createdAt: z.string(), startedAt: nullableString,
+  succeededSources: z.number().int(), failedSources: z.number().int(), effectiveSourceConcurrency: z.number().int().nullable(),
+  effectiveSourceTimeoutMillis: z.number().int().nullable(), effectiveRequestTimeoutMillis: z.number().int().nullable(),
+  current: z.boolean(), aggregateRevisionId: nullableString,
+  failureCategory: nullableString, retryable: z.boolean(), canRetry: z.boolean(), retryOfRunId: nullableString, createdAt: z.string(), startedAt: nullableString,
   completedAt: nullableString, statusLocation: z.string(),
 }).strict()
 const evidence = z.object({ sourceId: z.string(), sourceFingerprint: z.string(), chunkId: nullableString, documentId: nullableString, origins: z.array(z.string()) }).strict()

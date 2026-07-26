@@ -127,6 +127,7 @@ export type SourceOutcomeResponse = {
   status: SourceResultStatus
   reused: boolean
   failureCategory: string | null
+  failureCode: string | null
   retryable: boolean
   chunkCount: number
   completedAt: string | null
@@ -143,10 +144,14 @@ export type AnalysisRunResponse = {
   totalSources: number
   succeededSources: number
   failedSources: number
+  effectiveSourceConcurrency: number | null
+  effectiveSourceTimeoutMillis: number | null
+  effectiveRequestTimeoutMillis: number | null
   currentResult: boolean
   aggregateRevisionId: string | null
   failureCategory: string | null
   retryable: boolean
+  canRetry: boolean
   retryOfRunId: string | null
   createdAt: string
   startedAt: string | null

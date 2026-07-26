@@ -158,9 +158,10 @@ export function useUpdateSchemaDraftGuidanceMutation() {
 function useWorkflowMutation<T>(
   fn: (variables: T & { knowledgeBaseId: string; draftId: string }) => Promise<unknown>,
   refresh: (knowledgeBaseId: string, draftId: string) => Promise<void>,
+  refreshOnBadRequest = false,
 ) {
   return useMutation({ mutationFn: fn, onSuccess: (_result, variables) => refresh(variables.knowledgeBaseId, variables.draftId), onError: (error, variables) => {
-    if (error && typeof error === 'object' && 'status' in error && error.status === 409) void refresh(variables.knowledgeBaseId, variables.draftId)
+    if (error && typeof error === 'object' && 'status' in error && (error.status === 409 || (refreshOnBadRequest && error.status === 400))) void refresh(variables.knowledgeBaseId, variables.draftId)
   } })
 }
 
@@ -198,8 +199,8 @@ export function useSchemaDraftWorkflowMutations() {
     refreshSource: useWorkflowMutation(({ knowledgeBaseId, draftId, sourceId, revision }: { knowledgeBaseId: string; draftId: string; sourceId: string; revision: number }) => schemaDraftsApi.refreshSource(knowledgeBaseId, draftId, sourceId, revision), refresh),
     removeSource: useWorkflowMutation(({ knowledgeBaseId, draftId, sourceId, revision }: { knowledgeBaseId: string; draftId: string; sourceId: string; revision: number }) => schemaDraftsApi.removeSource(knowledgeBaseId, draftId, sourceId, revision), refresh),
     restoreSource: useWorkflowMutation(({ knowledgeBaseId, draftId, sourceId, revision }: { knowledgeBaseId: string; draftId: string; sourceId: string; revision: number }) => schemaDraftsApi.restoreSource(knowledgeBaseId, draftId, sourceId, revision), refresh),
-    startAnalysis: useWorkflowMutation(({ knowledgeBaseId, draftId, revision }: { knowledgeBaseId: string; draftId: string; revision: number }) => schemaDraftsApi.startAnalysis(knowledgeBaseId, draftId, revision), refresh),
-    retryAnalysis: useWorkflowMutation(({ knowledgeBaseId, draftId, runId, revision }: { knowledgeBaseId: string; draftId: string; runId: string; revision: number }) => schemaDraftsApi.retryAnalysis(knowledgeBaseId, draftId, runId, revision), refresh),
+    startAnalysis: useWorkflowMutation(({ knowledgeBaseId, draftId, revision }: { knowledgeBaseId: string; draftId: string; revision: number }) => schemaDraftsApi.startAnalysis(knowledgeBaseId, draftId, revision), refresh, true),
+    retryAnalysis: useWorkflowMutation(({ knowledgeBaseId, draftId, runId, revision }: { knowledgeBaseId: string; draftId: string; runId: string; revision: number }) => schemaDraftsApi.retryAnalysis(knowledgeBaseId, draftId, runId, revision), refresh, true),
     decide: useWorkflowMutation(({ knowledgeBaseId, draftId, payload }: { knowledgeBaseId: string; draftId: string; payload: DecisionRequest }) => schemaDraftsApi.decide(knowledgeBaseId, draftId, payload), refresh),
     resolveConflict: useWorkflowMutation(({ knowledgeBaseId, draftId, conflictId, payload }: { knowledgeBaseId: string; draftId: string; conflictId: string; payload: ResolveConflictRequest }) => schemaDraftsApi.resolveConflict(knowledgeBaseId, draftId, conflictId, payload), refresh),
   }

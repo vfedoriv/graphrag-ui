@@ -28,12 +28,13 @@ export const draftFixture: DraftResponse = {
 
 const runBase = {
   draftRevision: 7, guidanceRevision: 3, totalSources: 3, succeededSources: 2, failedSources: 1,
-  aggregateRevisionId: 'aggregate-1', failureCategory: null, retryable: false, retryOfRunId: null,
+  effectiveSourceConcurrency: 4, effectiveSourceTimeoutMillis: 60_000, effectiveRequestTimeoutMillis: 180_000,
+  aggregateRevisionId: 'aggregate-1', failureCategory: null, retryable: false, canRetry: true, retryOfRunId: null,
   createdAt: '2026-07-15T08:00:00Z', startedAt: '2026-07-15T08:00:01Z', completedAt: '2026-07-15T08:01:00Z',
 }
 export const analysisHistoryFixture: PageResponse<AnalysisRunSummaryResponse> = {
   page: 0, size: 20, totalElements: 4, content: [
-    { ...runBase, id: 'run-running', status: 'RUNNING', current: true, succeededSources: 1, failedSources: 0, aggregateRevisionId: null, completedAt: null, statusLocation: '/runs/run-running' },
+    { ...runBase, id: 'run-running', status: 'RUNNING', current: true, succeededSources: 1, failedSources: 0, aggregateRevisionId: null, canRetry: false, completedAt: null, statusLocation: '/runs/run-running' },
     { ...runBase, id: 'run-partial', status: 'PARTIAL', current: true, retryable: true, statusLocation: '/runs/run-partial' },
     { ...runBase, id: 'run-failed', status: 'FAILED', current: false, succeededSources: 0, failedSources: 3, aggregateRevisionId: null, failureCategory: 'PROVIDER_ERROR', retryable: true, statusLocation: '/runs/run-failed' },
     { ...runBase, id: 'run-retry', status: 'COMPLETED', current: false, succeededSources: 3, failedSources: 0, retryOfRunId: 'run-partial', statusLocation: '/runs/run-retry' },
@@ -43,9 +44,36 @@ export const analysisDetailFixture: AnalysisRunResponse = {
   ...runBase, id: 'run-partial', status: 'PARTIAL', aiProfileId: 'profile-1', aiProfileRevision: 2,
   promptRevision: 'prompt-v1', candidateRevision: 'candidate-v1', currentResult: true, retryable: true,
   sourceOutcomes: { page: 0, size: 20, totalElements: 3, content: [
-    { id: 'outcome-1', sourceId: 'source-1', sourceRevision: 1, status: 'SUCCEEDED', reused: true, failureCategory: null, retryable: false, chunkCount: 8, completedAt: '2026-07-15T08:00:30Z' },
-    { id: 'outcome-2', sourceId: 'source-2', sourceRevision: 1, status: 'FAILED', reused: false, failureCategory: 'TIMEOUT', retryable: true, chunkCount: 0, completedAt: '2026-07-15T08:00:45Z' },
+    { id: 'outcome-1', sourceId: 'source-1', sourceRevision: 1, status: 'SUCCEEDED', reused: true, failureCategory: null, failureCode: null, retryable: false, chunkCount: 8, completedAt: '2026-07-15T08:00:30Z' },
+    { id: 'outcome-2', sourceId: 'source-2', sourceRevision: 1, status: 'FAILED', reused: false, failureCategory: 'TIMEOUT', failureCode: 'SOURCE_DEADLINE_EXCEEDED', retryable: true, chunkCount: 0, completedAt: '2026-07-15T08:00:45Z' },
   ] },
+}
+
+export const legacyAnalysisDetailFixture: AnalysisRunResponse = {
+  ...analysisDetailFixture,
+  id: 'run-legacy',
+  effectiveSourceConcurrency: null,
+  effectiveSourceTimeoutMillis: null,
+  effectiveRequestTimeoutMillis: null,
+  canRetry: false,
+  sourceOutcomes: {
+    ...analysisDetailFixture.sourceOutcomes,
+    content: analysisDetailFixture.sourceOutcomes.content.map((outcome) => ({ ...outcome, failureCode: null })),
+  },
+}
+
+export const legacyAnalysisHistoryFixture: PageResponse<AnalysisRunSummaryResponse> = {
+  page: 0,
+  size: 20,
+  totalElements: 1,
+  content: [{
+    ...analysisHistoryFixture.content[1],
+    id: 'run-legacy',
+    effectiveSourceConcurrency: null,
+    effectiveSourceTimeoutMillis: null,
+    effectiveRequestTimeoutMillis: null,
+    canRetry: false,
+  }],
 }
 
 export const candidateFixture: CandidateResponse = {
