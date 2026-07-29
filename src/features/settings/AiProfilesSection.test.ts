@@ -9,7 +9,7 @@ const profile: AiProfile = {
   embeddingModel: 'text-embedding-3-small',
   embeddingDimensions: 1536,
   timeoutSeconds: 60,
-  retryCount: 3,
+  maxRetries: 3,
   defaultProfile: true,
   revision: 1,
   apiKeyConfigured: true,
@@ -30,7 +30,7 @@ describe('AI profile form conversion', () => {
       embeddingModel: 'embed',
       embeddingDimensions: '768',
       timeoutSeconds: '30',
-      retryCount: '2',
+      maxRetries: '2',
       defaultProfile: true,
     }
 
@@ -43,7 +43,7 @@ describe('AI profile form conversion', () => {
       embeddingModel: 'embed',
       embeddingDimensions: 768,
       timeoutSeconds: 30,
-      retryCount: 2,
+      maxRetries: 2,
       defaultProfile: true,
     })
     expect(toUpdateProfilePayload(form)).toEqual({
@@ -53,7 +53,7 @@ describe('AI profile form conversion', () => {
       embeddingModel: 'embed',
       embeddingDimensions: 768,
       timeoutSeconds: 30,
-      retryCount: 2,
+      maxRetries: 2,
       defaultProfile: true,
     })
   })
@@ -68,8 +68,9 @@ describe('AI profile form conversion', () => {
       embeddingModel: 'text-embedding-3-small',
       embeddingDimensions: '1536',
       timeoutSeconds: '60',
-      retryCount: '3',
+      maxRetries: '3',
       defaultProfile: true,
     })
+    expect(profileToForm({ ...profile, maxRetries: 0 }).maxRetries).toBe('0')
   })
 })

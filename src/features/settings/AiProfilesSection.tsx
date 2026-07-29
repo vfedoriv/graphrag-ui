@@ -133,7 +133,7 @@ export function AiProfilesSection({
               </div>,
               <div className='stack'>
                 <span>Timeout {profile.timeoutSeconds}s</span>
-                <small>Retries {profile.retryCount} · Revision {profile.revision ?? 'n/a'}</small>
+                <small>Retries {profile.maxRetries} · Revision {profile.revision ?? 'n/a'}</small>
                 <small>{profile.updatedAt ?? profile.createdAt ?? 'No timestamp'}</small>
               </div>,
               <div className='row-actions'>
@@ -228,8 +228,8 @@ function ProfileFields({
         <Input value={form.timeoutSeconds} onChange={(event) => set('timeoutSeconds', event.target.value)} type='number' required />
       </label>
       <label>
-        Retry count
-        <Input value={form.retryCount} onChange={(event) => set('retryCount', event.target.value)} type='number' required />
+        Max retries
+        <Input value={form.maxRetries} onChange={(event) => set('maxRetries', event.target.value)} type='number' min={0} required />
       </label>
       <label className='check-row'>
         <input checked={form.defaultProfile} onChange={(event) => set('defaultProfile', event.target.checked)} type='checkbox' />

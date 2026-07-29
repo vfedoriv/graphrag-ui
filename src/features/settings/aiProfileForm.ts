@@ -9,7 +9,7 @@ export type ProfileForm = {
   embeddingModel: string
   embeddingDimensions: string
   timeoutSeconds: string
-  retryCount: string
+  maxRetries: string
   defaultProfile: boolean
 }
 
@@ -22,7 +22,7 @@ export const emptyProfileForm: ProfileForm = {
   embeddingModel: '',
   embeddingDimensions: '1536',
   timeoutSeconds: '60',
-  retryCount: '3',
+  maxRetries: '3',
   defaultProfile: false,
 }
 
@@ -36,7 +36,7 @@ export function toCreateProfilePayload(form: ProfileForm): CreateAiProfileReques
     embeddingModel: form.embeddingModel,
     embeddingDimensions: Number(form.embeddingDimensions),
     timeoutSeconds: Number(form.timeoutSeconds),
-    retryCount: Number(form.retryCount),
+    maxRetries: Number(form.maxRetries),
     defaultProfile: form.defaultProfile,
   }
 }
@@ -49,7 +49,7 @@ export function toUpdateProfilePayload(form: ProfileForm): UpdateAiProfileReques
     embeddingModel: form.embeddingModel,
     embeddingDimensions: Number(form.embeddingDimensions),
     timeoutSeconds: Number(form.timeoutSeconds),
-    retryCount: Number(form.retryCount),
+    maxRetries: Number(form.maxRetries),
     defaultProfile: form.defaultProfile,
   }
 }
@@ -64,7 +64,7 @@ export function profileToForm(profile: AiProfile): ProfileForm {
     embeddingModel: profile.embeddingModel,
     embeddingDimensions: String(profile.embeddingDimensions),
     timeoutSeconds: String(profile.timeoutSeconds),
-    retryCount: String(profile.retryCount),
+    maxRetries: String(profile.maxRetries),
     defaultProfile: profile.defaultProfile,
   }
 }

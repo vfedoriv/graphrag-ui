@@ -17,7 +17,7 @@ const profile = {
   embeddingModel: 'text-embedding-3-small',
   embeddingDimensions: 1536,
   timeoutSeconds: 60,
-  retryCount: 3,
+  maxRetries: 3,
   defaultProfile: true,
   apiKeyConfigured: true,
 }

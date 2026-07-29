@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Database, FileClock, FileText, GitBranch, House, Settings, Spline, Waypoints } from 'lucide-react'
+import { Bot, Database, FileClock, FileText, GitBranch, House, Settings, Spline, Waypoints } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useKnowledgeBasesQuery } from '../api/knowledgeBases'
 import { useSelectedKnowledgeBase } from '../shared/state/useSelectedKnowledgeBase'
@@ -16,6 +16,7 @@ const navItems = [
   { to: '/schema-drafts', label: 'Schema Drafts', icon: FileClock },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/queries', label: 'Queries', icon: Waypoints },
+  { to: '/ai-providers', label: 'AI Providers', icon: Bot },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

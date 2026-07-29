@@ -189,7 +189,7 @@ export function RuntimeSettingsSection({
                 <strong>{setting.label ?? setting.key}</strong>
                 <code>{setting.key}</code>
                 {setting.description ? <small>{setting.description}</small> : null}
-                {isProfileManaged(setting) ? <a href='#ai-profiles-section'>Manage through AI profiles</a> : null}
+                {isProfileManaged(setting) ? <a href='/ai-providers#ai-profiles-section'>Manage through AI profiles</a> : null}
               </div>,
               <RuntimeSettingValueCell
                 setting={setting}

@@ -89,7 +89,7 @@ export type AiProfile = {
   embeddingModel: string
   embeddingDimensions: number
   timeoutSeconds: number
-  retryCount: number
+  maxRetries: number
   defaultProfile: boolean
   revision?: number | null
   apiKeyConfigured: boolean
@@ -107,7 +107,7 @@ export type CreateAiProfileRequest = {
   embeddingModel: string
   embeddingDimensions: number
   timeoutSeconds: number
-  retryCount: number
+  maxRetries: number
   defaultProfile: boolean
 }
 

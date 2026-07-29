@@ -40,6 +40,8 @@ export function RuntimeContextSummary({
             tone='neutral'
           />
         ))}
+        <a href='/ai-providers'>Manage AI providers</a>
+        <a href='/settings'>Manage runtime properties</a>
       </span>
     </Notice>
   )

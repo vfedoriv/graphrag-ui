@@ -1,12 +1,11 @@
-import { useAiProfilesQuery } from '../../api/aiProfiles'
 import { useKnowledgeBasesQuery } from '../../api/knowledgeBases'
 import { useRuntimeSettingsQuery } from '../../api/runtimeSettings'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
 import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimitives'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
-import { AiProfilesSection } from './AiProfilesSection'
 import { RuntimeSettingsSection } from './RuntimeSettingsSection'
+import { isAiProviderRuntimeSetting } from './runtimeSettingsHelpers'
 
 const apiBasePath = '/api/v1'
 const devProxyTarget = import.meta.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080'
@@ -16,18 +15,18 @@ export function SettingsPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const activeKb = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null
   const runtimeSettingsQuery = useRuntimeSettingsQuery()
-  const aiProfilesQuery = useAiProfilesQuery()
+  const settings = (runtimeSettingsQuery.data ?? []).filter((setting) => !isAiProviderRuntimeSetting(setting))
 
   return (
     <ControllerPage
       title='Settings'
       eyebrow='Runtime control plane'
-      description='Inspect and manage live backend runtime properties, AI profiles, and API gateway context.'
+      description='Inspect and manage general backend runtime properties and API gateway context.'
       workspaceStrip={
         <WorkspaceStrip
           items={[
             { label: 'Selected workspace', value: activeKb?.name ?? selectedKnowledgeBaseId ?? 'None selected' },
-            { label: 'Active AI profile', value: activeKb?.activeAiProfileId ?? 'None assigned' },
+            { label: 'Runtime properties', value: runtimeSettingsQuery.isLoading ? 'Loading' : `${settings.length} available` },
             { label: 'API base', value: apiBasePath },
           ]}
         />
@@ -43,20 +42,14 @@ export function SettingsPage() {
               { eyebrow: 'Gateway', title: apiBasePath, body: 'All frontend API calls are routed through the same-origin API base path.' },
               { eyebrow: 'Development proxy', title: devProxyTarget, body: 'Local /api traffic is proxied to this target by Vite.' },
               { eyebrow: 'Workspace', title: activeKb?.name ?? 'None selected', body: activeKb?.id ?? 'Select a knowledge base to scope controller requests.' },
-              { eyebrow: 'AI profile', title: activeKb?.activeAiProfileId ?? 'None assigned', body: 'Knowledge-base workflows use their active profile when one is assigned.' },
+              { eyebrow: 'Catalog scope', title: `${settings.length} properties`, body: 'AI provider properties are managed from the dedicated AI Providers workspace.' },
             ]}
           />
 
           <RuntimeSettingsSection
-            settings={runtimeSettingsQuery.data ?? []}
+            settings={settings}
             isLoading={runtimeSettingsQuery.isLoading}
             error={runtimeSettingsQuery.error as Error | null}
-          />
-
-          <AiProfilesSection
-            profiles={aiProfilesQuery.data ?? []}
-            isLoading={aiProfilesQuery.isLoading}
-            error={aiProfilesQuery.error as Error | null}
           />
         </div>
       }

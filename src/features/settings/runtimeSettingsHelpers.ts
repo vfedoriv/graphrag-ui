@@ -1,5 +1,10 @@
 import type { RuntimeSetting } from '../../api/types'
 
+export function isAiProviderRuntimeSetting(setting: RuntimeSetting) {
+  return setting.category.trim().toLowerCase() === 'provider'
+    || normalizeRuntimeMetadata(setting.updateMode) === 'profilemanaged'
+}
+
 export function isRuntimeSettingEditable(setting: RuntimeSetting) {
   return setting.mutable && !setting.sensitive && !isProfileManaged(setting)
 }
@@ -46,4 +51,8 @@ export function isJsonSetting(setting: RuntimeSetting) {
 export function constraintNumber(setting: RuntimeSetting, key: 'min' | 'max') {
   const value = setting.constraints?.[key]
   return typeof value === 'number' ? value : undefined
+}
+
+function normalizeRuntimeMetadata(value: string) {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, '')
 }

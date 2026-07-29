@@ -69,6 +69,27 @@ describe('app shell', () => {
     expect(screen.getByRole('link', { name: /Dashboard/i })).toBeInTheDocument()
   })
 
+  it('navigates to AI Providers and marks its primary destination active', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const link = await screen.findByRole('link', { name: /AI Providers/i })
+    await user.click(link)
+
+    expect(await screen.findByRole('heading', { name: 'AI Providers' })).toBeInTheDocument()
+    expect(link).toHaveClass('active')
+    expect(window.location.pathname).toBe('/ai-providers')
+  })
+
+  it('renders direct AI Providers URLs through the application shell', async () => {
+    window.history.pushState({}, '', '/ai-providers')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'AI Providers' })).toBeInTheDocument()
+    expect(screen.getByText('GraphRAG UI')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /AI Providers/i })).toHaveClass('active')
+  })
+
   it('navigates to schema builder from the sidebar', async () => {
     const user = userEvent.setup()
     render(<App />)
