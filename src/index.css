@@ -557,6 +557,23 @@ textarea:focus-visible,
   border-bottom: 0;
 }
 
+.query-result-null {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-style: italic;
+}
+
+.query-result-structured {
+  width: min(100%, 640px);
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  color: inherit;
+  font: 12px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .schema-draft-target-link {
   display: inline-flex;
   align-items: center;

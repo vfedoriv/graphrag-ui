@@ -25,7 +25,28 @@ describe('queries workflows', () => {
         return jsonResponse(200, { valid: true, cypher: 'MATCH (n) RETURN n', parameters: {}, errors: [], maxRows: 10, timeoutSeconds: 5 })
       }
       if (url.endsWith('/queries/execute')) {
-        return jsonResponse(200, { cypher: '', parameters: {}, validation: { valid: true, cypher: '', parameters: {}, errors: [], maxRows: 10, timeoutSeconds: 5 }, columns: ['name'], rows: [{ name: 'A' }], rowCount: 1, executionTimeMs: 1 })
+        return jsonResponse(200, {
+          cypher: '',
+          parameters: {},
+          validation: { valid: true, cypher: '', parameters: {}, errors: [], maxRows: 10, timeoutSeconds: 5 },
+          columns: ['name', 'score', 'active', 'optional', 'details', 'tags', 'node'],
+          rows: [{
+            name: 'Ada',
+            score: 42,
+            active: true,
+            optional: null,
+            details: { role: 'Engineer', contact: { city: 'London', verified: false } },
+            tags: ['graph', { level: 3 }],
+            node: {
+              _type: 'node',
+              elementId: 'person-1',
+              labels: ['Person', 'Engineer'],
+              properties: { name: 'Ada', tenure: 7 },
+            },
+          }],
+          rowCount: 1,
+          executionTimeMs: 1,
+        })
       }
       return jsonResponse(200, {})
     })
@@ -59,6 +80,26 @@ describe('queries workflows', () => {
       expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/queries/validate'))).toBe(true)
       expect(urls.some((u) => u.endsWith('/api/v1/knowledge-bases/kb-a/queries/execute'))).toBe(true)
     })
+
+    expect(within(executePanel).getByText('Ada')).toBeInTheDocument()
+    expect(within(executePanel).getByText('42')).toBeInTheDocument()
+    expect(within(executePanel).getByText('true')).toBeInTheDocument()
+    expect(within(executePanel).getByText('null')).toHaveClass('query-result-null')
+
+    const structuredCells = Array.from(executePanel.querySelectorAll('.query-result-structured'))
+    expect(structuredCells).toHaveLength(3)
+    expect(structuredCells[0].textContent).toBe(JSON.stringify({
+      role: 'Engineer',
+      contact: { city: 'London', verified: false },
+    }, null, 2))
+    expect(structuredCells[1].textContent).toBe(JSON.stringify(['graph', { level: 3 }], null, 2))
+    expect(structuredCells[2].textContent).toBe(JSON.stringify({
+      _type: 'node',
+      elementId: 'person-1',
+      labels: ['Person', 'Engineer'],
+      properties: { name: 'Ada', tenure: 7 },
+    }, null, 2))
+    expect(executePanel).not.toHaveTextContent('[object Object]')
   })
 
   it('runs hybrid search with selected knowledge base scope and renders evidence plus graph context', async () => {

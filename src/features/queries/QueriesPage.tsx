@@ -28,6 +28,30 @@ function formatJson(value: unknown) {
   return JSON.stringify(value ?? {}, null, 2)
 }
 
+function renderQueryResultCell(value: unknown) {
+  if (value === null) {
+    return <span className='query-result-null'>null</span>
+  }
+
+  if (typeof value === 'object') {
+    let serializedValue: string
+
+    try {
+      serializedValue = JSON.stringify(value, null, 2) ?? String(value)
+    } catch {
+      serializedValue = String(value)
+    }
+
+    return <pre className='query-result-structured'>{serializedValue}</pre>
+  }
+
+  if (value === undefined) {
+    return ''
+  }
+
+  return String(value)
+}
+
 function entityIdentifier(entity: HybridSearchGraphEntity) {
   return entity.id ?? entity.elementId ?? ''
 }
@@ -449,7 +473,7 @@ export function QueriesPage() {
           {execute.data && (
             <Table
               headers={execute.data.columns}
-              rows={execute.data.rows.map((row) => execute.data.columns.map((col) => String(row[col] ?? '')))}
+              rows={execute.data.rows.map((row) => execute.data.columns.map((col) => renderQueryResultCell(row[col])))}
             />
           )}
         </div>
