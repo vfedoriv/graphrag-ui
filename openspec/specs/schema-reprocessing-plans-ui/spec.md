@@ -31,7 +31,7 @@ The system SHALL require either all eligible documents or an explicit document s
 - **THEN** the system SHALL send those values in the plan `processingOptions` object using the existing option semantics
 
 ### Requirement: Plan progress and safety outcomes are observable
-The system SHALL poll queued or running plans, display aggregate counts, paginate `items` through the nested standard page envelope, and distinguish succeeded, failed, stale, blocked, interrupted, and skipped outcomes.
+The system SHALL poll queued or running plans, display aggregate counts, paginate `items` through the nested standard page envelope, and distinguish succeeded, failed, stale, blocked, target-changed, interrupted, and skipped outcomes.
 
 #### Scenario: Plan is running
 - **WHEN** a plan status is `QUEUED` or `RUNNING`
@@ -46,17 +46,26 @@ The system SHALL poll queued or running plans, display aggregate counts, paginat
 - **WHEN** an item becomes `STALE_SOURCE`
 - **THEN** the system SHALL identify the changed document and explain that it was not processed under the old snapshot
 
+#### Scenario: Migration target changes during a plan
+- **WHEN** an item becomes `BLOCKED_TARGET_CHANGED`
+- **THEN** the shared plan contract and presentation SHALL identify a snapshotted chunk/profile/embedding/schema target safety stop
+- **AND** SHALL preserve independently completed items
+
 ### Requirement: Plan retry makes resnapshot behavior explicit
-The system SHALL allow retry for retryable terminal plans and SHALL require the user to choose whether unresolved documents are resnapshotted.
+The system SHALL allow retry only for retryable terminal plans and SHALL resnapshot unresolved documents through the backend's closed `RESNAPSHOT_UNRESOLVED` retry mode while preserving prior successes.
 
-#### Scenario: Retry without resnapshot
-- **WHEN** the user retries and does not allow resnapshotting
-- **THEN** the system SHALL send `resnapshotUnresolvedDocuments: false` and explain that changed snapshots remain unresolved
+#### Scenario: Retry is not eligible
+- **WHEN** a plan is non-terminal or the backend reports `retryable: false`
+- **THEN** the system SHALL NOT enable the retry action
 
-#### Scenario: Retry with resnapshot
-- **WHEN** the user explicitly allows unresolved documents to be resnapshotted
-- **THEN** the system SHALL send `resnapshotUnresolvedDocuments: true`
+#### Scenario: Retry eligible unresolved work
+- **WHEN** the user explicitly confirms retry for a retryable terminal plan
+- **THEN** the system SHALL send `{ "mode": "RESNAPSHOT_UNRESOLVED" }`
 - **AND** SHALL show the new plan's retry lineage separately from prior successful items
+
+#### Scenario: Deprecated retry compatibility field
+- **WHEN** the frontend constructs a retry request
+- **THEN** it SHALL NOT send `resnapshotUnresolvedDocuments`
 
 ### Requirement: Plan progress is recoverable after reload
 The system SHALL rediscover the latest reprocessing plan from the draft workflow reference and expose knowledge-base plan history filtered by the owned draft after navigation or reload.

@@ -66,7 +66,7 @@ export function ChunkModeButton({
 }
 
 function DocumentChunkCard({ chunk }: { chunk: DocumentChunk }) {
-  const metadata = parseChunkMetadata(chunk.metadata)
+  const metadata = parseChunkMetadata(chunk.metadata ?? '')
   const source = typeof metadata.source === 'string' ? metadata.source : null
   const pageMetadata = getPageAwareChunkMetadata(metadata)
 

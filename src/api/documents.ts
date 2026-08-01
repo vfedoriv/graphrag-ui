@@ -3,6 +3,8 @@ import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
 import type {
   DocumentChunk,
+  DocumentChunkHierarchy,
+  DocumentChunkPage,
   DocumentProcessingOptionsResponse,
   DocumentUpload,
   ProcessDocumentWithOptionsRequest,
@@ -48,6 +50,22 @@ export const documentsApi = {
       body: toJsonBody(payload),
     }),
   chunks: (documentId: string) => apiFetch<DocumentChunk[]>(`/documents/${documentId}/chunks`),
+  chunkHierarchy: (documentId: string, page = 0, size = 20) =>
+    apiFetch<DocumentChunkHierarchy>(`/documents/${documentId}/chunks/hierarchy?page=${page}&size=${size}`),
+  chunkPage: (
+    documentId: string,
+    page = 0,
+    size = 20,
+    filters: { kind?: string | null; parentChunkId?: string | null; sectionIndex?: number | null } = {},
+  ) => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (filters.kind) params.set('kind', filters.kind)
+    if (filters.parentChunkId) params.set('parentChunkId', filters.parentChunkId)
+    if (filters.sectionIndex !== undefined && filters.sectionIndex !== null) params.set('sectionIndex', String(filters.sectionIndex))
+    return apiFetch<DocumentChunkPage>(`/documents/${documentId}/chunks/page?${params.toString()}`)
+  },
+  chunk: (documentId: string, chunkId: string) =>
+    apiFetch<DocumentChunk>(`/documents/${documentId}/chunks/${chunkId}`),
 }
 
 export function useDocumentsQuery(knowledgeBaseId: string | null) {
@@ -73,6 +91,46 @@ export function useDocumentChunksQuery(documentId: string | null) {
       return documentsApi.chunks(documentId)
     },
     enabled: Boolean(documentId),
+  })
+}
+
+export function useDocumentChunkHierarchyQuery(documentId: string | null, page = 0, size = 20) {
+  return useQuery({
+    queryKey: queryKeys.chunkHierarchyMaybe(documentId, page, size),
+    queryFn: () => {
+      if (!documentId) throw new Error('Cannot load chunk hierarchy without a selected document')
+      return documentsApi.chunkHierarchy(documentId, page, size)
+    },
+    enabled: Boolean(documentId),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useDocumentChunkPageQuery(
+  documentId: string | null,
+  page = 0,
+  size = 20,
+  filters: { kind?: string | null; parentChunkId?: string | null; sectionIndex?: number | null } = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.chunkPageMaybe(documentId, page, size, filters.kind, filters.parentChunkId, filters.sectionIndex),
+    queryFn: () => {
+      if (!documentId) throw new Error('Cannot load chunk page without a selected document')
+      return documentsApi.chunkPage(documentId, page, size, filters)
+    },
+    enabled: Boolean(documentId),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useDocumentChunkQuery(documentId: string | null, chunkId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.chunkDirectMaybe(documentId, chunkId),
+    queryFn: () => {
+      if (!documentId || !chunkId) throw new Error('Cannot load a chunk without document and chunk identifiers')
+      return documentsApi.chunk(documentId, chunkId)
+    },
+    enabled: Boolean(documentId && chunkId),
   })
 }
 

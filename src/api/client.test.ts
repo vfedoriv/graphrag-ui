@@ -125,4 +125,17 @@ describe('api client', () => {
     expect(err.message).toBe('Request failed')
     expect(err.status).toBe(500)
   })
+
+  it('preserves machine-readable readiness and migration conflict details', () => {
+    const problem = {
+      title: 'Advanced search is not ready',
+      detail: 'The active profile is unavailable',
+      blockers: [{ code: 'CHAT_CONFIGURATION_UNAVAILABLE', description: 'Configure a chat model.' }],
+      target: { expectedChunkerRevision: 'chunker-v2' },
+    }
+    const err = normalizeProblemDetail(409, problem)
+    expect(err.problemDetail).toEqual(problem)
+    expect(err.problemDetail?.blockers).toEqual(problem.blockers)
+    expect(err.status).toBe(409)
+  })
 })

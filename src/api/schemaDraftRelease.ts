@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
+import { reprocessingPlansApi } from './reprocessingPlans'
 import type {
   CreatePlanRequest, PublishDraftRequest, RetryPlanRequest, StartEvaluationRequest,
 } from '../features/schema-drafts/schemaDraftReleaseTypes'
@@ -8,7 +9,6 @@ import { isEvaluationTerminal, isPlanTerminal } from '../features/schema-drafts/
 import { schemaDraftReleaseValidation as validate } from '../features/schema-drafts/schemaDraftReleaseValidation'
 
 const draftBase = (knowledgeBaseId: string, draftId: string) => `/knowledge-bases/${knowledgeBaseId}/schema-drafts/${draftId}`
-const planBase = (knowledgeBaseId: string) => `/knowledge-bases/${knowledgeBaseId}/reprocessing-plans`
 const paging = (page: number, size: number) => `page=${page}&size=${size}`
 const parsed = async <T>(promise: Promise<unknown>, parser: (value: unknown) => T) => parser(await promise)
 
@@ -21,10 +21,10 @@ export const schemaDraftReleaseApi = {
   readiness: (knowledgeBaseId: string, draftId: string) => parsed(apiFetch<unknown>(`${draftBase(knowledgeBaseId, draftId)}/publication-readiness`), validate.readiness),
   publish: (knowledgeBaseId: string, draftId: string, payload: PublishDraftRequest) => parsed(apiFetch<unknown>(`${draftBase(knowledgeBaseId, draftId)}/publish`, { method: 'POST', body: toJsonBody(payload) }), validate.publication),
   publication: (knowledgeBaseId: string, draftId: string) => parsed(apiFetch<unknown>(`${draftBase(knowledgeBaseId, draftId)}/publication`), validate.publication),
-  createPlan: (knowledgeBaseId: string, payload: CreatePlanRequest) => parsed(apiFetch<unknown>(planBase(knowledgeBaseId), { method: 'POST', body: toJsonBody(payload) }), validate.startPlan),
-  plan: (knowledgeBaseId: string, planId: string, page = 0, size = 20) => parsed(apiFetch<unknown>(`${planBase(knowledgeBaseId)}/${planId}?${paging(page, size)}`), validate.plan),
-  plans: (knowledgeBaseId: string, draftId: string, page = 0, size = 20) => parsed(apiFetch<unknown>(`${planBase(knowledgeBaseId)}?draftId=${encodeURIComponent(draftId)}&${paging(page, size)}`), validate.plans),
-  retryPlan: (knowledgeBaseId: string, planId: string, payload: RetryPlanRequest) => parsed(apiFetch<unknown>(`${planBase(knowledgeBaseId)}/${planId}/retry`, { method: 'POST', body: toJsonBody(payload) }), validate.startPlan),
+  createPlan: (knowledgeBaseId: string, payload: CreatePlanRequest) => parsed(reprocessingPlansApi.create(knowledgeBaseId, payload), validate.startPlan),
+  plan: (knowledgeBaseId: string, planId: string, page = 0, size = 20) => parsed(reprocessingPlansApi.detail(knowledgeBaseId, planId, page, size), validate.plan),
+  plans: (knowledgeBaseId: string, draftId: string, page = 0, size = 20) => parsed(reprocessingPlansApi.history(knowledgeBaseId, { draftId }, page, size), validate.plans),
+  retryPlan: (knowledgeBaseId: string, planId: string, payload: RetryPlanRequest = { mode: 'RESNAPSHOT_UNRESOLVED' }) => parsed(reprocessingPlansApi.retry(knowledgeBaseId, planId, payload), validate.startPlan),
 }
 
 function requireIds(knowledgeBaseId: string | null, draftId: string | null) {

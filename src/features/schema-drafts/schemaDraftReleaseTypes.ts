@@ -1,5 +1,14 @@
-import type { DocumentProcessingOptionValue } from '../../api/types'
 import type { PageResponse } from './schemaDraftTypes'
+import type {
+  CreateReprocessingPlanRequest,
+  ReprocessingItemStatus as SharedReprocessingItemStatus,
+  ReprocessingPlanDetail,
+  ReprocessingPlanReason as SharedReprocessingPlanReason,
+  ReprocessingPlanStatus as SharedReprocessingPlanStatus,
+  ReprocessingPlanSummary as SharedReprocessingPlanSummary,
+  RetryReprocessingPlanRequest,
+  StartReprocessingPlanResponse,
+} from '../../api/types'
 
 export type EvaluationStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED'
 export type EvaluationOutcomeStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'REUSED' | 'FAILED' | 'STALE_SOURCE' | 'INTERRUPTED'
@@ -69,27 +78,15 @@ export type Publication = {
   currentSchemaContentHash: string; contentDrifted: boolean; active: boolean; publishedAt: string
 }
 
-export type ReprocessingPlanStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED'
-export type ReprocessingItemStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'STALE_SOURCE' | 'BLOCKED' | 'INTERRUPTED' | 'SKIPPED'
-export type CreatePlanRequest = {
-  draftId: string; schemaId: string; allDocuments: boolean; documentIds: string[] | null
-  processingOptions: Record<string, DocumentProcessingOptionValue> | null
-}
-export type RetryPlanRequest = { resnapshotUnresolvedDocuments: boolean }
-export type StartPlanResponse = { planId: string; status: ReprocessingPlanStatus; statusLocation: string }
-export type PlanItem = {
-  id: string; documentId: string; documentSha256: string; status: ReprocessingItemStatus; failureCategory: string | null
-  retryable: boolean; priorItemId: string | null; startedAt: string | null; completedAt: string | null
-}
-export type ReprocessingPlan = {
-  id: string; status: ReprocessingPlanStatus; draftId: string; knowledgeBaseId: string; schemaId: string; schemaContentHash: string
-  aiProfileId: string; aiProfileRevision: number; retryOfPlanId: string | null; totalDocuments: number; queuedDocuments: number
-  runningDocuments: number; succeededDocuments: number; failedDocuments: number; staleDocuments: number; blockedDocuments: number
-  createdAt: string; startedAt: string | null; completedAt: string | null; items: PageResponse<PlanItem>
-}
-export type ReprocessingPlanSummary = Omit<ReprocessingPlan, 'knowledgeBaseId' | 'aiProfileId' | 'aiProfileRevision' | 'items'> & {
-  latest: boolean; targetCurrent: boolean; retryable: boolean; statusLocation: string
-}
+export type ReprocessingPlanStatus = SharedReprocessingPlanStatus
+export type ReprocessingItemStatus = SharedReprocessingItemStatus
+export type CreatePlanRequest = CreateReprocessingPlanRequest
+export type RetryPlanRequest = RetryReprocessingPlanRequest
+export type StartPlanResponse = StartReprocessingPlanResponse
+export type PlanItem = ReprocessingPlanDetail['items']['content'][number]
+export type ReprocessingPlan = ReprocessingPlanDetail
+export type ReprocessingPlanSummary = SharedReprocessingPlanSummary
+export type ReprocessingPlanReason = SharedReprocessingPlanReason
 
 export const isEvaluationTerminal = (status: EvaluationStatus) => ['COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)
 export const isPlanTerminal = (status: ReprocessingPlanStatus) => ['COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)

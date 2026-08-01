@@ -32,6 +32,7 @@ export function normalizeProblemDetail(status: number, problem: ProblemDetail | 
     message: (problem?.detail ? String(problem.detail) : problem?.title ? String(problem.title) : 'Request failed'),
     fieldErrors,
     details,
+    problemDetail: problem,
   })
 }
 

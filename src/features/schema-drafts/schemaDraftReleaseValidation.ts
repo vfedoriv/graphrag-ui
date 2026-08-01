@@ -56,17 +56,21 @@ const publication = z.object({
   publicationId: z.string(), draftId: z.string(), schemaId: z.string(), draftRevision: z.number().int(), publicationContentHash: z.string(),
   currentSchemaContentHash: z.string(), contentDrifted: z.boolean(), active: z.boolean(), publishedAt: z.string(),
 }).strict()
+const planReason = z.enum(['SCHEMA_ACTIVATION', 'CHUNK_STRATEGY_MIGRATION'])
+const planSelection = z.enum(['OUTDATED_STRATEGY', 'DOCUMENT_IDS', 'ALL']).nullable()
+const planStatus = z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'])
+const planItemStatus = z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'STALE_SOURCE', 'BLOCKED_TARGET_CHANGED', 'BLOCKED', 'INTERRUPTED', 'SKIPPED'])
 const planItem = z.object({
-  id: z.string(), documentId: z.string(), documentSha256: z.string(), status: z.string(), failureCategory: nullableString,
+  id: z.string(), documentId: z.string(), documentSha256: z.string(), status: planItemStatus, failureCategory: nullableString,
   retryable: z.boolean(), priorItemId: nullableString, startedAt: nullableString, completedAt: nullableString,
 }).strict()
 const planBase = {
-  id: z.string(), status: z.string(), draftId: z.string(), schemaId: z.string(), schemaContentHash: z.string(), retryOfPlanId: nullableString,
+  id: z.string(), reason: planReason, selection: planSelection, expectedChunkerRevision: nullableString, status: planStatus, draftId: nullableString, schemaId: nullableString, schemaContentHash: nullableString, retryOfPlanId: nullableString,
   totalDocuments: z.number().int(), queuedDocuments: z.number().int(), runningDocuments: z.number().int(), succeededDocuments: z.number().int(),
   failedDocuments: z.number().int(), staleDocuments: z.number().int(), blockedDocuments: z.number().int(),
   createdAt: z.string(), startedAt: nullableString, completedAt: nullableString,
 }
-const plan = z.object({ ...planBase, knowledgeBaseId: z.string(), aiProfileId: z.string(), aiProfileRevision: z.number().int(), items: page(planItem) }).strict()
+const plan = z.object({ ...planBase, knowledgeBaseId: z.string(), aiProfileId: nullableString, aiProfileRevision: z.number().int().nullable(), items: page(planItem) }).strict()
 const planSummary = z.object({ ...planBase, latest: z.boolean(), targetCurrent: z.boolean(), retryable: z.boolean(), statusLocation: z.string() }).strict()
 
 function parse<T>(schema: z.ZodType, value: unknown, resource: string): T {
@@ -82,7 +86,7 @@ export const schemaDraftReleaseValidation = {
   evaluations: (value: unknown) => parse<PageResponse<EvaluationRunSummary>>(page(evaluationSummary), value, 'Evaluation history'),
   readiness: (value: unknown) => parse<PublicationReadiness>(readiness, value, 'Publication readiness'),
   publication: (value: unknown) => parse<Publication>(publication, value, 'Publication'),
-  startPlan: (value: unknown) => parse<StartPlanResponse>(z.object({ planId: z.string(), status: z.string(), statusLocation: z.string() }).strict(), value, 'Reprocessing plan start'),
+  startPlan: (value: unknown) => parse<StartPlanResponse>(z.object({ planId: z.string(), status: planStatus, statusLocation: z.string() }).strict(), value, 'Reprocessing plan start'),
   plan: (value: unknown) => parse<ReprocessingPlan>(plan, value, 'Reprocessing plan'),
   plans: (value: unknown) => parse<PageResponse<ReprocessingPlanSummary>>(page(planSummary), value, 'Reprocessing plan history'),
 }
