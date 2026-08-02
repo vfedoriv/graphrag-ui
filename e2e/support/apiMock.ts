@@ -12,7 +12,7 @@ import {
   schemaContent,
   schemasFixture,
 } from './fixtures'
-import type { DocumentUpload, KnowledgeBase, Schema } from '../../src/api/types'
+import type { AdvancedSearchRunDetail, DocumentUpload, KnowledgeBase, Schema } from '../../src/api/types'
 
 type ApiMockState = {
   knowledgeBases: KnowledgeBase[]
@@ -27,6 +27,8 @@ type ApiMockState = {
   migrationPlan: Record<string, unknown>
   migrationCreateBodies: unknown[]
   migrationRetryBodies: unknown[]
+  advancedSearchRuns: AdvancedSearchRunDetail[]
+  advancedSearchCreateBodies: unknown[]
 }
 
 export type GraphRagApiMock = ApiMockState & {
@@ -63,6 +65,8 @@ export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
     },
     migrationCreateBodies: [],
     migrationRetryBodies: [],
+    advancedSearchRuns: [],
+    advancedSearchCreateBodies: [],
   }
 
   await page.route('**/api/v1/**', async (route) => {
@@ -306,6 +310,64 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
     state.migrationRetryBodies.push(request.postDataJSON())
     await json(route, { planId: 'retry-plan', status: 'QUEUED', statusLocation: '/reprocessing-plans/retry-plan' }, 202)
     return
+  }
+
+  const advancedSearchReadinessMatch = path.match(/^\/knowledge-bases\/([^/]+)\/queries\/advanced-search-runs\/readiness$/)
+  if (advancedSearchReadinessMatch && method === 'GET') {
+    await json(route, {
+      knowledgeBaseId: advancedSearchReadinessMatch[1], ready: true, profileId: 'default', profileRevision: 1,
+      graphBranchAvailable: true, embeddedCorpusPresent: true, blockers: [], informational: [],
+    })
+    return
+  }
+
+  const advancedSearchCollectionMatch = path.match(/^\/knowledge-bases\/([^/]+)\/queries\/advanced-search-runs$/)
+  if (advancedSearchCollectionMatch && method === 'POST') {
+    const payload = request.postDataJSON() as { query: string; maximumEvidence?: number; includeEvidenceText: boolean }
+    state.advancedSearchCreateBodies.push(payload)
+    const run: AdvancedSearchRunDetail = {
+      id: `advanced-run-${state.advancedSearchRuns.length + 1}`,
+      knowledgeBaseId: advancedSearchCollectionMatch[1],
+      query: payload.query,
+      maximumEvidence: payload.maximumEvidence ?? 5,
+      includeEvidenceText: payload.includeEvidenceText,
+      status: 'RUNNING', stage: 'RETRIEVAL', completedBranches: 0, totalBranches: 1, evidenceCount: 0,
+      cancellationRequested: false, failureCategory: null, deadlineAt: '2026-05-06T15:00:00.000Z',
+      createdAt: '2026-05-06T14:00:00.000Z', startedAt: '2026-05-06T14:00:01.000Z', completedAt: null, links: {},
+    }
+    state.advancedSearchRuns.unshift(run)
+    await json(route, run, 201)
+    return
+  }
+
+  if (advancedSearchCollectionMatch && method === 'GET') {
+    const status = url.searchParams.get('status')
+    const content = state.advancedSearchRuns
+      .filter((run) => !status || run.status === status)
+      .map(({ query, ...run }) => ({ ...run, queryPreview: query }))
+    await json(route, { page: Number(url.searchParams.get('page') ?? '0'), size: Number(url.searchParams.get('size') ?? '10'), totalElements: content.length, content })
+    return
+  }
+
+  const advancedSearchRunMatch = path.match(/^\/knowledge-bases\/([^/]+)\/queries\/advanced-search-runs\/([^/]+)(?:\/(cancel|result))?$/)
+  if (advancedSearchRunMatch) {
+    const run = state.advancedSearchRuns.find((item) => item.id === advancedSearchRunMatch[2])
+    if (!run || run.knowledgeBaseId !== advancedSearchRunMatch[1]) {
+      await problem(route, 404, 'Not found', 'Advanced-search run was not found.')
+      return
+    }
+    if (advancedSearchRunMatch[3] === 'cancel' && method === 'POST') {
+      run.status = 'CANCELLED'
+      run.stage = 'TERMINAL'
+      run.cancellationRequested = true
+      run.completedAt = '2026-05-06T14:00:02.000Z'
+      await json(route, run)
+      return
+    }
+    if (!advancedSearchRunMatch[3] && method === 'GET') {
+      await json(route, run)
+      return
+    }
   }
 
   const queryMatch = path.match(/^\/knowledge-bases\/([^/]+)\/queries\/(ask|generate|validate|execute)$/)

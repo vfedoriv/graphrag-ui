@@ -113,6 +113,7 @@ describe('app shell', () => {
       'Schema Drafts',
       'Documents',
       'Chunking',
+      'Advanced Search',
       'Queries',
       'AI Providers',
       'Settings',

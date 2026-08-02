@@ -139,7 +139,10 @@ export function useUploadDocumentMutation() {
   return useMutation({
     mutationFn: ({ knowledgeBaseId, file }: { knowledgeBaseId: string; file: File }) =>
       documentsApi.upload(knowledgeBaseId, file),
-    onSuccess: (doc) => queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) }),
+    onSuccess: (doc) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(doc.knowledgeBaseId) })
+    },
   })
 }
 
@@ -152,6 +155,7 @@ export function useReplaceDocumentMutation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(doc.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(doc.knowledgeBaseId) })
     },
   })
 }
@@ -164,6 +168,7 @@ export function useProcessDocumentMutation() {
     onSuccess: (doc) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(doc.knowledgeBaseId) })
     },
   })
 }
@@ -199,6 +204,7 @@ export function useProcessDocumentWithOptionsMutation() {
     onSuccess: (doc) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(doc.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(doc.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(doc.knowledgeBaseId) })
     },
   })
 }
@@ -212,6 +218,7 @@ export function useDeleteDocumentMutation() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.documents(variables.knowledgeBaseId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.chunks(variables.documentId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.documentProcessingOptions(variables.documentId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(variables.knowledgeBaseId) })
     },
   })
 }

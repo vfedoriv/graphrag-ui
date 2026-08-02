@@ -46,6 +46,7 @@ export function useUpdateKnowledgeBaseMutation() {
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() })
       queryClient.setQueryData(queryKeys.knowledgeBase(updated.id), updated)
+      queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(updated.id) })
     },
   })
 }
@@ -54,7 +55,10 @@ export function useDeleteKnowledgeBaseMutation() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: knowledgeBaseApi.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() }),
+    onSuccess: (_result, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearch(id) })
+    },
   })
 }
 
@@ -76,6 +80,7 @@ export function useUpdateKnowledgeBaseActiveAiProfileMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase(variables.id) })
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBaseActiveAiProfile(variables.id) })
       queryClient.invalidateQueries({ queryKey: queryKeys.aiProfiles() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(variables.id) })
     },
   })
 }

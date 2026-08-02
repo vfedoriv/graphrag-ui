@@ -185,6 +185,7 @@ export function useActivateSchemaMutation() {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBase(vars.knowledgeBaseId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.schemasByKnowledgeBase(vars.knowledgeBaseId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledgeBases() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.advancedSearchReadiness(vars.knowledgeBaseId) })
     },
   })
 }

@@ -9,6 +9,7 @@ const SchemasPage = lazyPage(() => import('../features/schemas/SchemasPage'), 'S
 const SchemaBuilderPage = lazyPage(() => import('../features/schema-builder/SchemaBuilderPage'), 'SchemaBuilderPage')
 const DocumentsPage = lazyPage(() => import('../features/documents/DocumentsPage'), 'DocumentsPage')
 const ChunkingPage = lazyPage(() => import('../features/chunking/ChunkingPage'), 'ChunkingPage')
+const AdvancedSearchPage = lazyPage(() => import('../features/advanced-search/AdvancedSearchPage'), 'AdvancedSearchPage')
 const QueriesPage = lazyPage(() => import('../features/queries/QueriesPage'), 'QueriesPage')
 const SettingsPage = lazyPage(() => import('../features/settings/SettingsPage'), 'SettingsPage')
 const AiProvidersPage = lazyPage(() => import('../features/ai-providers/AiProvidersPage'), 'AiProvidersPage')
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
       { path: 'schema-drafts/:draftId', element: routeElement(SchemaDraftsPage) },
       { path: 'documents', element: routeElement(DocumentsPage) },
       { path: 'chunking', element: routeElement(ChunkingPage) },
+      { path: 'advanced-search', element: routeElement(AdvancedSearchPage) },
       { path: 'queries', element: routeElement(QueriesPage) },
       { path: 'ai-providers', element: routeElement(AiProvidersPage) },
       { path: 'settings', element: routeElement(SettingsPage) },

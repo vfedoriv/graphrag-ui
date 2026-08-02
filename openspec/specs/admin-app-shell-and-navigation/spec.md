@@ -3,7 +3,7 @@
 This specification defines the required behavior for admin app shell and navigation in the GraphRAG admin UI.
 ## Requirements
 ### Requirement: Admin shell provides stable navigation and context
-The system SHALL expose primary navigation entries by controller pages and dedicated workspaces (Dashboard, Knowledge Bases, Schemas, Schema Builder, Schema Drafts, Documents, Chunking, Queries, AI Providers, Settings), route each entry to its configured workspace, render the prototype-aligned brand/sidebar treatment, and provide shell-level action buttons with the shared interactive visual feedback states.
+The system SHALL expose primary navigation entries by controller pages and dedicated workspaces (Dashboard, Knowledge Bases, Schemas, Schema Builder, Schema Drafts, Documents, Chunking, Advanced Search, Queries, AI Providers, Settings), route each entry to its configured workspace, render the prototype-aligned brand/sidebar treatment, and provide shell-level action buttons with the shared interactive visual feedback states.
 
 #### Scenario: Navigate by controller
 - **WHEN** a user selects a controller or workspace from primary navigation
@@ -18,6 +18,11 @@ The system SHALL expose primary navigation entries by controller pages and dedic
 - **WHEN** a user selects Chunking from primary navigation
 - **THEN** the system SHALL lazy-load `/chunking`
 - **AND** SHALL place Chunking immediately after Documents and before Queries
+
+#### Scenario: Navigate to operational workspaces
+- **WHEN** a user views the primary navigation
+- **THEN** Documents, Chunking, Advanced Search, and Queries SHALL appear in that order
+- **AND** `/advanced-search` SHALL lazy-load its dedicated workspace
 
 #### Scenario: Identify current route
 - **WHEN** a user views a controller or dedicated workspace route
