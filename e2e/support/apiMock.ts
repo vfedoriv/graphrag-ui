@@ -22,6 +22,11 @@ type ApiMockState = {
   unhandled: string[]
   requests: string[]
   failOnceByRequest: Record<string, string>
+  migrationPreview: Record<string, unknown>
+  migrationHistory: Record<string, unknown>
+  migrationPlan: Record<string, unknown>
+  migrationCreateBodies: unknown[]
+  migrationRetryBodies: unknown[]
 }
 
 export type GraphRagApiMock = ApiMockState & {
@@ -44,6 +49,20 @@ export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
     unhandled: [],
     requests: [],
     failOnceByRequest: {},
+    migrationPreview: {
+      knowledgeBaseId: 'kb-alpha', selection: 'OUTDATED_STRATEGY', ready: true, blockers: [],
+      target: { schemaId: 'schema-customer', schemaContentHash: 'hash-customer', aiProfileId: 'default', aiProfileRevision: 1, embeddingSpaceId: 'embedding-test', expectedChunkerRevision: 'chunker-v2' },
+      classificationCounts: { noChunks: 0, outdated: 1, current: 0 }, selectedCount: 1,
+      selectedDocuments: { page: 0, size: 10, totalElements: 1, content: [{ id: 'doc-alpha', originalFilename: 'alpha-notes.txt', sha256: 'sha-alpha', uploadedAt: '2026-05-04T10:00:00.000Z', classification: 'OUTDATED', effectiveChunkerRevision: 'chunker-v1', parserRevision: 'parser-v1' }] },
+    },
+    migrationHistory: { page: 0, size: 10, totalElements: 0, content: [] },
+    migrationPlan: {
+      id: 'plan-1', reason: 'CHUNK_STRATEGY_MIGRATION', selection: 'OUTDATED_STRATEGY', expectedChunkerRevision: 'chunker-v2', status: 'PARTIAL', draftId: null, knowledgeBaseId: 'kb-alpha', schemaId: 'schema-customer', schemaContentHash: 'hash-customer', aiProfileId: 'default', aiProfileRevision: 1, retryOfPlanId: null,
+      totalDocuments: 1, queuedDocuments: 0, runningDocuments: 0, succeededDocuments: 0, failedDocuments: 0, staleDocuments: 1, blockedDocuments: 0, createdAt: '2026-05-06T14:00:00.000Z', startedAt: '2026-05-06T14:00:01.000Z', completedAt: '2026-05-06T14:01:00.000Z', targetCurrent: true, retryable: true,
+      items: { page: 0, size: 10, totalElements: 1, content: [{ id: 'migration-item-1', documentId: 'doc-alpha', documentSha256: 'sha-alpha', status: 'STALE_SOURCE', failureCategory: 'SOURCE_CHANGED', retryable: true, priorItemId: null, startedAt: null, completedAt: null }] },
+    },
+    migrationCreateBodies: [],
+    migrationRetryBodies: [],
   }
 
   await page.route('**/api/v1/**', async (route) => {
@@ -188,6 +207,12 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
     return
   }
 
+  const processingOptionsMatch = path.match(/^\/documents\/([^/]+)\/processing-options$/)
+  if (processingOptionsMatch && method === 'GET') {
+    await json(route, { documentId: processingOptionsMatch[1], parserId: 'text', fileFormat: 'txt', savedDefaults: null, savedDefaultsUpdatedAt: null, options: [] })
+    return
+  }
+
   if (documentsMatch && method === 'POST') {
     const kbId = documentsMatch[1]
     const uploaded: DocumentUpload = {
@@ -248,6 +273,38 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
 
   if (chunksMatch && method === 'GET') {
     await json(route, chunksFixture.map((chunk) => ({ ...chunk, documentId: chunksMatch[1] })))
+    return
+  }
+
+  const migrationPreviewMatch = path.match(/^\/knowledge-bases\/([^/]+)\/chunk-migrations\/preview$/)
+  if (migrationPreviewMatch && method === 'POST') {
+    const payload = request.postDataJSON() as { selection: string }
+    await json(route, { ...state.migrationPreview, knowledgeBaseId: migrationPreviewMatch[1], selection: payload.selection })
+    return
+  }
+
+  const reprocessingPlanMatch = path.match(/^\/knowledge-bases\/([^/]+)\/reprocessing-plans(?:\/([^/]+))?(?:\/retry)?$/)
+  if (reprocessingPlanMatch && method === 'GET') {
+    if (reprocessingPlanMatch[2]) {
+      await json(route, { ...state.migrationPlan, knowledgeBaseId: reprocessingPlanMatch[1], id: reprocessingPlanMatch[2] })
+    } else {
+      await json(route, { ...state.migrationHistory, content: state.migrationHistory.totalElements ? [state.migrationPlan] : [] })
+    }
+    return
+  }
+
+  const reprocessingPlansCollectionMatch = path.match(/^\/knowledge-bases\/([^/]+)\/reprocessing-plans$/)
+  if (reprocessingPlansCollectionMatch && method === 'POST') {
+    state.migrationCreateBodies.push(request.postDataJSON())
+    state.migrationHistory = { page: 0, size: 10, totalElements: 1, content: [{ ...state.migrationPlan, latest: true, targetCurrent: true, retryable: true, statusLocation: '/reprocessing-plans/plan-1' }] }
+    await json(route, { planId: 'plan-1', status: 'QUEUED', statusLocation: '/reprocessing-plans/plan-1' }, 202)
+    return
+  }
+
+  const reprocessingRetryMatch = path.match(/^\/knowledge-bases\/([^/]+)\/reprocessing-plans\/([^/]+)\/retry$/)
+  if (reprocessingRetryMatch && method === 'POST') {
+    state.migrationRetryBodies.push(request.postDataJSON())
+    await json(route, { planId: 'retry-plan', status: 'QUEUED', statusLocation: '/reprocessing-plans/retry-plan' }, 202)
     return
   }
 

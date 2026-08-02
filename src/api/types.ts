@@ -310,7 +310,7 @@ export type DocumentChunkHierarchy = PageResponse<DocumentChunkSummary> & { flat
 
 export type ReprocessingPlanReason = 'SCHEMA_ACTIVATION' | 'CHUNK_STRATEGY_MIGRATION'
 export type ChunkReprocessingSelection = 'OUTDATED_STRATEGY' | 'DOCUMENT_IDS' | 'ALL'
-export type ReprocessingPlanStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED'
+export type ReprocessingPlanStatus = 'QUEUED' | 'RUNNING' | 'BLOCKED' | 'COMPLETED' | 'PARTIAL' | 'FAILED' | 'INTERRUPTED'
 export type ReprocessingItemStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'STALE_SOURCE' | 'BLOCKED_TARGET_CHANGED' | 'BLOCKED' | 'INTERRUPTED' | 'SKIPPED'
 
 export type ReprocessingHistoryFilters = {
@@ -369,6 +369,9 @@ export type ReprocessingPlanDetail = {
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+  targetCurrent?: boolean
+  retryable?: boolean
+  statusLocation?: string
   items: PageResponse<ReprocessingPlanItem>
 }
 

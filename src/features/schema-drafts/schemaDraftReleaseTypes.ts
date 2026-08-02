@@ -89,4 +89,4 @@ export type ReprocessingPlanSummary = SharedReprocessingPlanSummary
 export type ReprocessingPlanReason = SharedReprocessingPlanReason
 
 export const isEvaluationTerminal = (status: EvaluationStatus) => ['COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)
-export const isPlanTerminal = (status: ReprocessingPlanStatus) => ['COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)
+export const isPlanTerminal = (status: ReprocessingPlanStatus) => ['BLOCKED', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)

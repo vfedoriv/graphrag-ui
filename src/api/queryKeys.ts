@@ -73,6 +73,10 @@ export const queryKeys = {
     ['reprocessing-plans', knowledgeBaseId, 'history', filters.draftId ?? 'none', filters.reason ?? 'none', filters.selection ?? 'none', filters.status ?? 'none', page, size] as const,
   reprocessingPlanHistoryFilteredMaybe: (knowledgeBaseId: string | null, filters: { draftId?: string | null; reason?: string | null; selection?: string | null; status?: string | null }, page: number, size: number) =>
     knowledgeBaseId ? queryKeys.reprocessingPlanHistoryFiltered(knowledgeBaseId, filters, page, size) : ['reprocessing-plans', 'none', 'history', filters.draftId ?? 'none', filters.reason ?? 'none', filters.selection ?? 'none', filters.status ?? 'none', page, size] as const,
+  chunkMigrationPreview: (knowledgeBaseId: string, selection: string, documentIds: string[] | null, processingOptions: Record<string, unknown> | null, page: number, size: number) =>
+    ['chunk-migrations', knowledgeBaseId, 'preview', selection, documentIds ?? 'none', processingOptions ?? 'none', page, size] as const,
+  chunkMigrationPreviewMaybe: (knowledgeBaseId: string | null, selection: string, documentIds: string[] | null, processingOptions: Record<string, unknown> | null, page: number, size: number) =>
+    knowledgeBaseId ? queryKeys.chunkMigrationPreview(knowledgeBaseId, selection, documentIds, processingOptions, page, size) : ['chunk-migrations', 'none', 'preview', selection, documentIds ?? 'none', processingOptions ?? 'none', page, size] as const,
   reprocessingPlan: (knowledgeBaseId: string, planId: string, page: number, size: number) => ['reprocessing-plans', knowledgeBaseId, planId, page, size] as const,
   reprocessingPlanMaybe: (knowledgeBaseId: string | null, planId: string | null, page: number, size: number) => knowledgeBaseId && planId ? queryKeys.reprocessingPlan(knowledgeBaseId, planId, page, size) : ['reprocessing-plans', 'none', 'none', page, size] as const,
   advancedSearch: (knowledgeBaseId: string) => ['advanced-search', knowledgeBaseId] as const,

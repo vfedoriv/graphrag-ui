@@ -27,7 +27,7 @@ function optionalParams(params: Record<string, string | null | undefined>) {
 }
 
 export function isReprocessingPlanTerminal(status: ReprocessingPlanStatus) {
-  return ['COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)
+  return ['BLOCKED', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'].includes(status)
 }
 
 export function isReprocessingPlanActive(status: ReprocessingPlanStatus) {
@@ -73,8 +73,8 @@ export function useChunkMigrationPreviewQuery(
 ) {
   return useQuery({
     queryKey: knowledgeBaseId && payload
-      ? ['chunk-migrations', knowledgeBaseId, 'preview', payload.selection, payload.documentIds ?? [], payload.processingOptions ?? {}, page, size]
-      : ['chunk-migrations', 'none', 'preview', page, size],
+      ? queryKeys.chunkMigrationPreview(knowledgeBaseId, payload.selection, payload.documentIds ?? null, payload.processingOptions ?? null, page, size)
+      : queryKeys.chunkMigrationPreviewMaybe(null, payload?.selection ?? 'none', payload?.documentIds ?? null, payload?.processingOptions ?? null, page, size),
     queryFn: () => {
       if (!knowledgeBaseId || !payload) throw new Error('Cannot preview migration without a knowledge base and selection')
       return reprocessingPlansApi.previewMigration(knowledgeBaseId, payload, page, size)

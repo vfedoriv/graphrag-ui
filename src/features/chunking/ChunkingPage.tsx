@@ -22,12 +22,16 @@ import {
 } from './chunkingStrategy'
 import { isRuntimeSettingEditable, isNumericSetting } from '../settings/runtimeSettingsHelpers'
 import { ChunkExplorer } from './ChunkExplorer'
+import { ChunkMigrationWorkflow } from './ChunkMigrationWorkflow'
 
 export function ChunkingPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const rawView = new URLSearchParams(typeof window === 'undefined' ? location.search : window.location.search).get('view')
+  const routeSearch = typeof window === 'undefined' ? location.search : window.location.search || location.search
+  const rawView = new URLSearchParams(routeSearch).get('view')
   const view = normalizeChunkingView(rawView)
+  const rawPlanId = new URLSearchParams(routeSearch).get('planId')
+  const planId = rawPlanId?.trim() || null
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const { data: knowledgeBases = [] } = useKnowledgeBasesQuery()
   const activeKb = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null
@@ -35,7 +39,10 @@ export function ChunkingPage() {
 
   useEffect(() => {
     if (rawView === view) return
-    const normalizedPath = `/chunking?view=${view}`
+    const params = new URLSearchParams(window.location.search)
+    params.set('view', view)
+    if (view !== 'reprocessing') params.delete('planId')
+    const normalizedPath = `/chunking?${params.toString()}`
     window.history.replaceState(window.history.state, '', normalizedPath)
     navigate(normalizedPath, { replace: true })
   }, [navigate, rawView, view])
@@ -65,6 +72,21 @@ export function ChunkingPage() {
   }
 
   if (view !== 'strategy') {
+    if (view === 'reprocessing') {
+      return <ChunkMigrationWorkflow
+        tabs={tabs}
+        activeKb={activeKb?.name ?? selectedKnowledgeBaseId ?? null}
+        knowledgeBaseId={selectedKnowledgeBaseId}
+        planId={planId}
+        onPlanIdChange={(nextPlanId) => {
+          const params = new URLSearchParams(routeSearch)
+          params.set('view', 'reprocessing')
+          if (nextPlanId) params.set('planId', nextPlanId)
+          else params.delete('planId')
+          navigate(`/chunking?${params.toString()}`, { replace: true })
+        }}
+      />
+    }
     return (
       <ControllerPage
         title='Chunking'

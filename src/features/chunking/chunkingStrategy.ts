@@ -8,7 +8,8 @@ import {
 export type ChunkingView = 'strategy' | 'chunks' | 'explorer' | 'reprocessing'
 
 export function normalizeChunkingView(value: string | null): ChunkingView {
-  return value === 'chunks' || value === 'explorer' || value === 'reprocessing' ? value : 'strategy'
+  if (value === 'migrations' || value === 'reprocessing') return 'reprocessing'
+  return value === 'chunks' || value === 'explorer' ? value : 'strategy'
 }
 
 export const CANONICAL_CHUNKING_CONTROLS = [

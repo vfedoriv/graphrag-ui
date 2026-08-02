@@ -23,7 +23,7 @@ export const schemaDraftReleaseApi = {
   publication: (knowledgeBaseId: string, draftId: string) => parsed(apiFetch<unknown>(`${draftBase(knowledgeBaseId, draftId)}/publication`), validate.publication),
   createPlan: (knowledgeBaseId: string, payload: CreatePlanRequest) => parsed(reprocessingPlansApi.create(knowledgeBaseId, payload), validate.startPlan),
   plan: (knowledgeBaseId: string, planId: string, page = 0, size = 20) => parsed(reprocessingPlansApi.detail(knowledgeBaseId, planId, page, size), validate.plan),
-  plans: (knowledgeBaseId: string, draftId: string, page = 0, size = 20) => parsed(reprocessingPlansApi.history(knowledgeBaseId, { draftId }, page, size), validate.plans),
+  plans: (knowledgeBaseId: string, draftId: string, page = 0, size = 20) => parsed(reprocessingPlansApi.history(knowledgeBaseId, { draftId, reason: 'SCHEMA_ACTIVATION' }, page, size), validate.plans),
   retryPlan: (knowledgeBaseId: string, planId: string, payload: RetryPlanRequest = { mode: 'RESNAPSHOT_UNRESOLVED' }) => parsed(reprocessingPlansApi.retry(knowledgeBaseId, planId, payload), validate.startPlan),
 }
 
@@ -48,7 +48,7 @@ export function usePublicationQuery(knowledgeBaseId: string | null, draftId: str
   return useQuery({ queryKey: queryKeys.schemaDraftPublicationMaybe(knowledgeBaseId, draftId), queryFn: () => { const ids = requireIds(knowledgeBaseId, draftId); return schemaDraftReleaseApi.publication(ids.knowledgeBaseId, ids.draftId) }, enabled: Boolean(knowledgeBaseId && draftId && enabled), retry: false })
 }
 export function usePlanHistoryQuery(knowledgeBaseId: string | null, draftId: string | null, page: number, size: number) {
-  return useQuery({ queryKey: queryKeys.reprocessingPlanHistoryMaybe(knowledgeBaseId, draftId, page, size), queryFn: () => { const ids = requireIds(knowledgeBaseId, draftId); return schemaDraftReleaseApi.plans(ids.knowledgeBaseId, ids.draftId, page, size) }, enabled: Boolean(knowledgeBaseId && draftId), placeholderData: keepPreviousData })
+  return useQuery({ queryKey: knowledgeBaseId && draftId ? queryKeys.reprocessingPlanHistory(knowledgeBaseId, draftId, page, size, 'SCHEMA_ACTIVATION') : queryKeys.reprocessingPlanHistoryMaybe(knowledgeBaseId, draftId, page, size), queryFn: () => { const ids = requireIds(knowledgeBaseId, draftId); return schemaDraftReleaseApi.plans(ids.knowledgeBaseId, ids.draftId, page, size) }, enabled: Boolean(knowledgeBaseId && draftId), placeholderData: keepPreviousData })
 }
 export function usePlanQuery(knowledgeBaseId: string | null, planId: string | null, page: number, size: number) {
   return useQuery({ queryKey: queryKeys.reprocessingPlanMaybe(knowledgeBaseId, planId, page, size), queryFn: () => { if (!knowledgeBaseId || !planId) throw new Error('Cannot load a reprocessing plan without identifiers'); return schemaDraftReleaseApi.plan(knowledgeBaseId, planId, page, size) }, enabled: Boolean(knowledgeBaseId && planId), placeholderData: keepPreviousData, refetchInterval: (query) => query.state.data && !isPlanTerminal(query.state.data.status) ? 1500 : false })

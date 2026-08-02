@@ -58,7 +58,7 @@ const publication = z.object({
 }).strict()
 const planReason = z.enum(['SCHEMA_ACTIVATION', 'CHUNK_STRATEGY_MIGRATION'])
 const planSelection = z.enum(['OUTDATED_STRATEGY', 'DOCUMENT_IDS', 'ALL']).nullable()
-const planStatus = z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'])
+const planStatus = z.enum(['QUEUED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'PARTIAL', 'FAILED', 'INTERRUPTED'])
 const planItemStatus = z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'STALE_SOURCE', 'BLOCKED_TARGET_CHANGED', 'BLOCKED', 'INTERRUPTED', 'SKIPPED'])
 const planItem = z.object({
   id: z.string(), documentId: z.string(), documentSha256: z.string(), status: planItemStatus, failureCategory: nullableString,
@@ -69,6 +69,7 @@ const planBase = {
   totalDocuments: z.number().int(), queuedDocuments: z.number().int(), runningDocuments: z.number().int(), succeededDocuments: z.number().int(),
   failedDocuments: z.number().int(), staleDocuments: z.number().int(), blockedDocuments: z.number().int(),
   createdAt: z.string(), startedAt: nullableString, completedAt: nullableString,
+  targetCurrent: z.boolean().optional(), retryable: z.boolean().optional(), statusLocation: z.string().optional(),
 }
 const plan = z.object({ ...planBase, knowledgeBaseId: z.string(), aiProfileId: nullableString, aiProfileRevision: z.number().int().nullable(), items: page(planItem) }).strict()
 const planSummary = z.object({ ...planBase, latest: z.boolean(), targetCurrent: z.boolean(), retryable: z.boolean(), statusLocation: z.string() }).strict()
