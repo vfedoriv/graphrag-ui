@@ -49,7 +49,6 @@ export const documentsApi = {
       method: 'POST',
       body: toJsonBody(payload),
     }),
-  chunks: (documentId: string) => apiFetch<DocumentChunk[]>(`/documents/${documentId}/chunks`),
   chunkHierarchy: (documentId: string, page = 0, size = 20) =>
     apiFetch<DocumentChunkHierarchy>(`/documents/${documentId}/chunks/hierarchy?page=${page}&size=${size}`),
   chunkPage: (
@@ -81,19 +80,6 @@ export function useDocumentsQuery(knowledgeBaseId: string | null) {
   })
 }
 
-export function useDocumentChunksQuery(documentId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.chunksMaybe(documentId),
-    queryFn: () => {
-      if (!documentId) {
-        throw new Error('Cannot load chunks without a selected document')
-      }
-      return documentsApi.chunks(documentId)
-    },
-    enabled: Boolean(documentId),
-  })
-}
-
 export function useDocumentChunkHierarchyQuery(documentId: string | null, page = 0, size = 20) {
   return useQuery({
     queryKey: queryKeys.chunkHierarchyMaybe(documentId, page, size),
@@ -111,6 +97,7 @@ export function useDocumentChunkPageQuery(
   page = 0,
   size = 20,
   filters: { kind?: string | null; parentChunkId?: string | null; sectionIndex?: number | null } = {},
+  options: { enabled?: boolean } = {},
 ) {
   return useQuery({
     queryKey: queryKeys.chunkPageMaybe(documentId, page, size, filters.kind, filters.parentChunkId, filters.sectionIndex),
@@ -118,7 +105,7 @@ export function useDocumentChunkPageQuery(
       if (!documentId) throw new Error('Cannot load chunk page without a selected document')
       return documentsApi.chunkPage(documentId, page, size, filters)
     },
-    enabled: Boolean(documentId),
+    enabled: Boolean(documentId) && options.enabled !== false,
     placeholderData: (previous) => previous,
   })
 }

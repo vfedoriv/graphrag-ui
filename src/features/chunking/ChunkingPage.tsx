@@ -21,6 +21,7 @@ import {
   validateRuntimeSettingDraft,
 } from './chunkingStrategy'
 import { isRuntimeSettingEditable, isNumericSetting } from '../settings/runtimeSettingsHelpers'
+import { ChunkExplorer } from './ChunkExplorer'
 
 export function ChunkingPage() {
   const location = useLocation()
@@ -30,6 +31,7 @@ export function ChunkingPage() {
   const { selectedKnowledgeBaseId } = useSelectedKnowledgeBase()
   const { data: knowledgeBases = [] } = useKnowledgeBasesQuery()
   const activeKb = knowledgeBases.find((kb) => kb.id === selectedKnowledgeBaseId) ?? null
+  const isExplorerView = view === 'chunks' || view === 'explorer'
 
   useEffect(() => {
     if (rawView === view) return
@@ -42,21 +44,25 @@ export function ChunkingPage() {
     <nav className='chunking-workspace-tabs' aria-label='Chunking workspace views'>
       {([
         ['strategy', 'Strategy'],
-        ['explorer', 'Chunk Explorer'],
+        ['chunks', 'Chunk Explorer'],
         ['reprocessing', 'Reprocessing'],
       ] as const).map(([tabView, label]) => (
         <Link
           key={tabView}
-          className={`tab ${view === tabView ? 'active' : ''}`}
+          className={`tab ${((tabView === 'chunks' && isExplorerView) || view === tabView) ? 'active' : ''}`}
           to={`/chunking?view=${tabView}`}
           role='tab'
-          aria-selected={view === tabView}
+          aria-selected={(tabView === 'chunks' && isExplorerView) || view === tabView}
         >
           {label}
         </Link>
       ))}
     </nav>
   )
+
+  if (view === 'chunks' || view === 'explorer') {
+    return <ChunkExplorer tabs={tabs} activeKb={activeKb?.name ?? selectedKnowledgeBaseId ?? null} />
+  }
 
   if (view !== 'strategy') {
     return (
@@ -65,10 +71,10 @@ export function ChunkingPage() {
         eyebrow='Global operations workspace'
         description='Inspect global chunk strategy and hand off knowledge-base operations when those views are available.'
         workspaceStrip={<WorkspaceStrip items={[{ label: 'Scope', value: 'Global strategy' }, { label: 'Selected workspace', value: activeKb?.name ?? selectedKnowledgeBaseId ?? 'None selected' }]} />}
-        topSectionTitle={view === 'explorer' ? 'Chunk Explorer' : 'Reprocessing'}
+        topSectionTitle='Reprocessing'
         topSectionDescription='This dependent view is reserved for the next chunking operations package.'
         topSectionStatus={<StatusBadge label='Not available yet' tone='warning' />}
-        topSection={<div className='stack'><Alert title={`${view === 'explorer' ? 'Chunk Explorer' : 'Reprocessing'} is not implemented`} message={selectedKnowledgeBaseId ? 'Return to Strategy to inspect global effective state. A later change will add this knowledge-base-scoped workflow.' : 'Select a knowledge base, then return here after the dependent workflow is available.'} tone='info' /><Link className='button' to='/chunking?view=strategy'>Back to Strategy</Link></div>}
+        topSection={<div className='stack'><Alert title='Reprocessing is not implemented' message={selectedKnowledgeBaseId ? 'Return to Strategy to inspect global effective state. A later change will add this knowledge-base-scoped workflow.' : 'Select a knowledge base, then return here after the dependent workflow is available.'} tone='info' /><Link className='button' to='/chunking?view=strategy'>Back to Strategy</Link></div>}
         tabs={tabs}
         tabsTitle='Chunking workspace'
         tabsDescription='Strategy is global; Explorer and Reprocessing will be knowledge-base scoped.'

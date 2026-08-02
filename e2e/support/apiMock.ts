@@ -222,6 +222,30 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
   }
 
   const chunksMatch = path.match(/^\/documents\/([^/]+)\/chunks$/)
+  const hierarchyMatch = path.match(/^\/documents\/([^/]+)\/chunks\/hierarchy$/)
+  if (hierarchyMatch && method === 'GET') {
+    await json(route, { page: Number(url.searchParams.get('page') ?? '0'), size: Number(url.searchParams.get('size') ?? '20'), totalElements: 0, content: [], flatChunkCount: chunksFixture.length })
+    return
+  }
+
+  const pageMatch = path.match(/^\/documents\/([^/]+)\/chunks\/page$/)
+  if (pageMatch && method === 'GET') {
+    const content = chunksFixture.map((chunk) => ({ ...chunk, documentId: pageMatch[1], kind: 'FLAT' }))
+    await json(route, { page: Number(url.searchParams.get('page') ?? '0'), size: Number(url.searchParams.get('size') ?? '20'), totalElements: content.length, content })
+    return
+  }
+
+  const directChunkMatch = path.match(/^\/documents\/([^/]+)\/chunks\/([^/]+)$/)
+  if (directChunkMatch && method === 'GET') {
+    const chunk = chunksFixture.find((item) => item.id === directChunkMatch[2])
+    if (!chunk) {
+      await problem(route, 404, 'Not found', 'Chunk was not found.')
+      return
+    }
+    await json(route, { ...chunk, documentId: directChunkMatch[1], kind: 'FLAT' })
+    return
+  }
+
   if (chunksMatch && method === 'GET') {
     await json(route, chunksFixture.map((chunk) => ({ ...chunk, documentId: chunksMatch[1] })))
     return

@@ -5,10 +5,10 @@ import {
   parseRuntimeValue,
 } from '../settings/runtimeSettingsHelpers'
 
-export type ChunkingView = 'strategy' | 'explorer' | 'reprocessing'
+export type ChunkingView = 'strategy' | 'chunks' | 'explorer' | 'reprocessing'
 
 export function normalizeChunkingView(value: string | null): ChunkingView {
-  return value === 'explorer' || value === 'reprocessing' ? value : 'strategy'
+  return value === 'chunks' || value === 'explorer' || value === 'reprocessing' ? value : 'strategy'
 }
 
 export const CANONICAL_CHUNKING_CONTROLS = [

@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import {
-  useDocumentChunksQuery,
   useDocumentProcessingOptionsQuery,
   useDocumentsQuery,
   useUploadDocumentMutation,
@@ -16,7 +15,6 @@ import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimiti
 import { RuntimeContextSummary } from '../../shared/ui/RuntimeContextSummary'
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { Table } from '../../shared/ui/Table'
-import { ChunkModeButton, DocumentChunksInspector, type ChunkViewMode } from './DocumentChunksInspector'
 import { DocumentProcessingOptionsWorkflow } from './DocumentProcessingOptionsWorkflow'
 import { DocumentSourceContext } from './DocumentSourceContext'
 import { isDocumentProcessingStatus } from './documentStatus'
@@ -26,7 +24,7 @@ import {
 } from './processingOptions'
 import { useDocumentWorkflowActions } from './useDocumentWorkflowActions'
 
-type SelectedDocumentPurpose = 'chunks' | 'processing-options'
+type SelectedDocumentPurpose = 'processing-options'
 type SelectedDocumentWorkflow = {
   documentId: string
   purpose: SelectedDocumentPurpose
@@ -38,14 +36,12 @@ export function DocumentsPage() {
   const uploadMutation = useUploadDocumentMutation()
   const [selectedWorkflow, setSelectedWorkflow] = useState<SelectedDocumentWorkflow | null>(null)
   const [selectedUploadFilename, setSelectedUploadFilename] = useState<string>('')
-  const [chunkViewMode, setChunkViewMode] = useState<ChunkViewMode>('readable')
   const [optionDraftOverride, setOptionDraftOverride] = useState<ProcessingOptionDraft | null>(null)
   const selectedDocumentId = selectedWorkflow?.documentId ?? null
   const selectedDocument = useMemo(
     () => documents.find((doc) => doc.id === selectedDocumentId) ?? null,
     [documents, selectedDocumentId],
   )
-  const chunksQuery = useDocumentChunksQuery(selectedWorkflow?.purpose === 'chunks' ? selectedWorkflow.documentId : null)
   const processingOptionsQuery = useDocumentProcessingOptionsQuery(
     selectedWorkflow?.purpose === 'processing-options' ? selectedWorkflow.documentId : null,
   )
@@ -57,7 +53,6 @@ export function DocumentsPage() {
   const clearSelectedDocumentIfNeeded = (documentId: string) => {
     if (selectedDocumentId === documentId) {
       setSelectedWorkflow(null)
-      setChunkViewMode('readable')
       setOptionDraftOverride(null)
     }
   }
@@ -95,7 +90,6 @@ export function DocumentsPage() {
     clearProcessingDefaultsMutation.isPending ||
     replaceMutation.isPending ||
     deleteMutation.isPending ||
-    chunksQuery.isLoading ||
     processingOptionsQuery.isLoading ||
     hasBackendProcessingDocument
 
@@ -127,8 +121,8 @@ export function DocumentsPage() {
         />,
         doc.errorMessage ? <span className='text-red-700'>{doc.errorMessage}</span> : '-',
         <DocumentRowActions
+          documentId={doc.id}
           isProcessing={processingDocumentIds.has(doc.id) || isDocumentProcessingStatus(doc.status)}
-          isLoadingChunks={chunksQuery.isLoading && selectedWorkflow?.documentId === doc.id}
           isLoadingOptions={processingOptionsQuery.isLoading && selectedWorkflow?.documentId === doc.id}
           isReplacing={replacingDocumentIds.has(doc.id)}
           isDeleting={deletingDocumentIds.has(doc.id)}
@@ -137,10 +131,6 @@ export function DocumentsPage() {
           }}
           onReplace={(file) => {
             void documentActions.handleReplaceDocument(doc.id, file)
-          }}
-          onViewChunks={() => {
-            setSelectedWorkflow({ documentId: doc.id, purpose: 'chunks' })
-            setChunkViewMode('readable')
           }}
           onViewOptions={() => {
             setOptionDraftOverride(null)
@@ -160,7 +150,7 @@ export function DocumentsPage() {
     <ControllerPage
       title='Documents'
       eyebrow='Inline workflow'
-      description='Upload, process, inspect chunks, open source context, replace, and delete documents without endpoint tabs.'
+      description='Upload, process, hand off chunk inspection, open source context, replace, and delete documents without endpoint tabs.'
       workspaceStrip={
         <WorkspaceStrip
           items={[
@@ -180,7 +170,7 @@ export function DocumentsPage() {
               { eyebrow: 'Workspace', title: selectedKnowledgeBaseId, body: 'Uploads and list queries use this knowledge-base scope.' },
               { eyebrow: 'Upload', title: uploadMutation.isPending ? 'Uploading' : 'Ready', body: 'Files are submitted as multipart requests.' },
               { eyebrow: 'Processing', title: hasBackendProcessingDocument ? 'Active' : 'Idle', body: 'Processing rows stay locked while backend work is active.' },
-              { eyebrow: 'Selection', title: selectedDocumentId ?? 'No document selected', body: 'Choose a row to inspect chunks or processing options.' },
+              { eyebrow: 'Selection', title: selectedDocumentId ?? 'No document selected', body: 'Choose a row for processing options or open Chunk Explorer.' },
             ]}
           />
           <RuntimeContextSummary
@@ -214,62 +204,38 @@ export function DocumentsPage() {
           <section className='stack'>
             <div>
               <span className='eyebrow'>Selected document workflow</span>
-              <h3>Chunks and processing options</h3>
+              <h3>Processing options and chunk handoff</h3>
             </div>
             {selectedWorkflow ? (
               <>
                 <p>Selected document: {selectedDocumentId}</p>
-                <div className='view-toggle' aria-label='Selected document workflow purpose'>
-                  <ChunkModeButton
-                    isActive={selectedWorkflow.purpose === 'chunks'}
-                    onClick={() => setSelectedWorkflow({ documentId: selectedWorkflow.documentId, purpose: 'chunks' })}
-                  >
-                    Chunks
-                  </ChunkModeButton>
-                  <ChunkModeButton
-                    isActive={selectedWorkflow.purpose === 'processing-options'}
-                    onClick={() => setSelectedWorkflow({ documentId: selectedWorkflow.documentId, purpose: 'processing-options' })}
-                  >
-                    Processing options
-                  </ChunkModeButton>
-                </div>
-                {selectedWorkflow.purpose === 'chunks' ? (
-                  chunksQuery.isLoading ? (
-                    <p>Loading chunks...</p>
-                  ) : chunksQuery.error ? (
-                    <Alert title='Load chunks failed' message={(chunksQuery.error as Error).message} />
-                  ) : (
-                    <DocumentChunksInspector chunks={chunksQuery.data ?? []} mode={chunkViewMode} onModeChange={setChunkViewMode} />
-                  )
-                ) : (
-                  <DocumentProcessingOptionsWorkflow
-                    data={processingOptionsQuery.data}
-                    draft={optionDraft}
-                    error={processingOptionsQuery.error}
-                    isLoading={processingOptionsQuery.isLoading}
-                    isSaving={saveProcessingDefaultsMutation.isPending}
-                    isClearing={clearProcessingDefaultsMutation.isPending}
-                    isProcessing={selectedDocumentId ? optionProcessingDocumentIds.has(selectedDocumentId) : false}
-                    saveError={saveProcessingDefaultsMutation.error}
-                    clearError={clearProcessingDefaultsMutation.error}
-                    processError={processWithOptionsMutation.error}
-                    onDraftChange={(key, value) => {
-                      setOptionDraftOverride((prev) => ({ ...(prev ?? loadedOptionDraft), [key]: value }))
-                    }}
-                    onSave={() => {
-                      void documentActions.handleSaveProcessingDefaults()
-                    }}
-                    onClear={() => {
-                      void documentActions.handleClearProcessingDefaults()
-                    }}
-                    onProcess={() => {
-                      void documentActions.handleProcessDocumentWithOptions()
-                    }}
-                  />
-                )}
+                <DocumentProcessingOptionsWorkflow
+                  data={processingOptionsQuery.data}
+                  draft={optionDraft}
+                  error={processingOptionsQuery.error}
+                  isLoading={processingOptionsQuery.isLoading}
+                  isSaving={saveProcessingDefaultsMutation.isPending}
+                  isClearing={clearProcessingDefaultsMutation.isPending}
+                  isProcessing={selectedDocumentId ? optionProcessingDocumentIds.has(selectedDocumentId) : false}
+                  saveError={saveProcessingDefaultsMutation.error}
+                  clearError={clearProcessingDefaultsMutation.error}
+                  processError={processWithOptionsMutation.error}
+                  onDraftChange={(key, value) => {
+                    setOptionDraftOverride((prev) => ({ ...(prev ?? loadedOptionDraft), [key]: value }))
+                  }}
+                  onSave={() => {
+                    void documentActions.handleSaveProcessingDefaults()
+                  }}
+                  onClear={() => {
+                    void documentActions.handleClearProcessingDefaults()
+                  }}
+                  onProcess={() => {
+                    void documentActions.handleProcessDocumentWithOptions()
+                  }}
+                />
               </>
             ) : (
-              <p>Choose a document in the table above and click View chunks or Options.</p>
+              <p>Choose a document in the table above for processing options, or use Inspect chunking to open the bounded explorer.</p>
             )}
           </section>
         </div>
@@ -280,26 +246,24 @@ export function DocumentsPage() {
 }
 
 function DocumentRowActions({
+  documentId,
   isProcessing,
-  isLoadingChunks,
   isLoadingOptions,
   isReplacing,
   isDeleting,
   onProcess,
   onReplace,
-  onViewChunks,
   onViewOptions,
   onDelete,
   replaceTestId,
 }: {
+  documentId: string
   isProcessing: boolean
-  isLoadingChunks: boolean
   isLoadingOptions: boolean
   isReplacing: boolean
   isDeleting: boolean
   onProcess: () => void
   onReplace: (file: File) => void
-  onViewChunks: () => void
   onViewOptions: () => void
   onDelete: () => void
   replaceTestId: string
@@ -323,15 +287,9 @@ function DocumentRowActions({
         disabled={isDeleting}
         onFileSelected={onReplace}
       />
-      <Button
-        type='button'
-        isPending={isLoadingChunks}
-        pendingText='Loading...'
-        onClick={onViewChunks}
-        variant='ghost'
-      >
-        View chunks
-      </Button>
+      <a className='button ghost' href={`/chunking?view=chunks&documentId=${encodeURIComponent(documentId)}`}>
+        Inspect chunking
+      </a>
       <Button
         type='button'
         isPending={isLoadingOptions}

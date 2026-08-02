@@ -94,7 +94,7 @@ test('surfaces no-selected-knowledge-base controller context', async ({ page }) 
   expect(api.unhandled).toEqual([])
 })
 
-test('uploads, processes, and inspects document chunks', async ({ page }) => {
+test('uploads, processes, and inspects document chunks in the bounded explorer', async ({ page }) => {
   const api = await mockGraphRagApi(page)
   await selectKnowledgeBase(page)
 
@@ -113,9 +113,12 @@ test('uploads, processes, and inspects document chunks', async ({ page }) => {
   await uploadedRow.getByRole('button', { name: 'Process' }).click()
   await expect(uploadedRow.getByRole('cell', { name: 'PROCESSED' })).toBeVisible()
 
-  await uploadedRow.getByRole('button', { name: 'View chunks' }).click()
-  await expect(page.getByText('Selected document: doc-uploaded')).toBeVisible()
-  await expect(page.getByTestId('document-chunks-readable-view')).toContainText('Alpha customer chunk text')
+  await uploadedRow.getByRole('link', { name: 'Inspect chunking' }).click()
+  await expect(page.getByTestId('chunk-explorer')).toBeVisible()
+  await expect(page.getByText('chunk-alpha-0')).toBeVisible()
+  await page.getByRole('button', { name: 'Select chunk chunk-alpha-0' }).click()
+  await expect(page.getByText('Alpha customer chunk text')).toBeVisible()
+  expect(api.requests).not.toContain('GET /documents/doc-uploaded/chunks')
   expect(api.unhandled).toEqual([])
 })
 

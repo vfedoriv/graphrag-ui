@@ -3,7 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
   documentsApi,
-  useDocumentChunksQuery,
   useDocumentProcessingOptionsQuery,
   useDocumentsQuery,
   useClearDocumentProcessingDefaultsMutation,
@@ -21,7 +20,7 @@ describe('documents api', () => {
     vi.unstubAllGlobals()
   })
 
-  it('calls list/upload/replace/delete/process/chunks endpoints', async () => {
+  it('calls list/upload/replace/delete/process and bounded chunk endpoints', async () => {
     const fetchMock = stubFetch((url) => {
       if (url.endsWith('/knowledge-bases/kb-a/documents')) {
         return jsonResponse(200, [{ id: 'doc-1', knowledgeBaseId: 'kb-a' }])
@@ -49,9 +48,9 @@ describe('documents api', () => {
       if (url.endsWith('/documents/doc-1/process')) {
         return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
       }
-      if (url.endsWith('/documents/doc-1/chunks')) {
-        return jsonResponse(200, [{ id: 'chunk-1' }])
-      }
+      if (url.endsWith('/documents/doc-1/chunks/hierarchy?page=1&size=10')) return jsonResponse(200, { page: 1, size: 10, totalElements: 0, content: [], flatChunkCount: 0 })
+      if (url.endsWith('/documents/doc-1/chunks/page?page=2&size=25&kind=CHILD&parentChunkId=parent-1&sectionIndex=3')) return jsonResponse(200, { page: 2, size: 25, totalElements: 0, content: [] })
+      if (url.endsWith('/documents/doc-1/chunks/chunk-1')) return jsonResponse(200, { id: 'chunk-1' })
       return jsonResponse(200, { id: 'doc-1', knowledgeBaseId: 'kb-a' })
     })
 
@@ -64,7 +63,9 @@ describe('documents api', () => {
     await documentsApi.saveProcessingDefaults('doc-1', { options: { preserveLineBreaks: true, maxPages: 12 } })
     await documentsApi.clearProcessingDefaults('doc-1')
     await documentsApi.processWithOptions('doc-1', { allowOverwrite: true, options: { preserveLineBreaks: false } })
-    await documentsApi.chunks('doc-1')
+    await documentsApi.chunkHierarchy('doc-1', 1, 10)
+    await documentsApi.chunkPage('doc-1', 2, 25, { kind: 'CHILD', parentChunkId: 'parent-1', sectionIndex: 3 })
+    await documentsApi.chunk('doc-1', 'chunk-1')
 
     const [uploadCall] = fetchMock.mock.calls.filter(
       (call) =>
@@ -186,16 +187,13 @@ describe('documents api', () => {
     )
 
     const { result: documentsResult } = renderHook(() => useDocumentsQuery(null), { wrapper })
-    const { result: chunksResult } = renderHook(() => useDocumentChunksQuery(null), { wrapper })
     const { result: optionsResult } = renderHook(() => useDocumentProcessingOptionsQuery(null), { wrapper })
 
     await waitFor(() => {
       expect(documentsResult.current.fetchStatus).toBe('idle')
-      expect(chunksResult.current.fetchStatus).toBe('idle')
       expect(optionsResult.current.fetchStatus).toBe('idle')
     })
     expect(documentsResult.current.data).toBeUndefined()
-    expect(chunksResult.current.data).toBeUndefined()
     expect(optionsResult.current.data).toBeUndefined()
     expect(fetchMock).not.toHaveBeenCalled()
   })
