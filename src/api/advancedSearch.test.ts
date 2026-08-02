@@ -72,4 +72,52 @@ describe('advanced search API contracts', () => {
     expect(canFetchAdvancedSearchResult('COMPLETED')).toBe(true)
     expect(canFetchAdvancedSearchResult('FAILED')).toBe(false)
   })
+
+  it('accepts nullable branch-level subquery IDs and preserves them in diagnostics', () => {
+    const branchAttempt = {
+      roundNumber: 1,
+      subqueryId: null,
+      retriever: 'TEXT',
+      status: 'FAILED',
+      candidateCount: 0,
+      latencyMs: 12,
+      failureCategory: 'TIMEOUT',
+    }
+    const backendResult = {
+      ...result,
+      result: { ...result.result, diagnostics: { ...result.result.diagnostics, attempts: [branchAttempt] } },
+    }
+
+    const parsed = parseAdvancedSearchResult(backendResult)
+
+    expect(parsed.kind).toBe('VALID')
+    expect(parsed.kind === 'VALID' ? parsed.result.diagnostics.attempts[0].subqueryId : undefined).toBeNull()
+  })
+
+  it('still rejects invalid required diagnostic attempt fields', () => {
+    const validAttempt = {
+      roundNumber: 1,
+      subqueryId: null,
+      retriever: 'TEXT',
+      status: 'FAILED',
+      candidateCount: 0,
+      latencyMs: 12,
+      failureCategory: 'TIMEOUT',
+    }
+    const invalidAttempts = [
+      { ...validAttempt, roundNumber: null },
+      { ...validAttempt, retriever: null },
+      { ...validAttempt, status: null },
+      { ...validAttempt, candidateCount: null },
+      { ...validAttempt, latencyMs: null },
+    ]
+
+    invalidAttempts.forEach((attempt) => {
+      const parsed = parseAdvancedSearchResult({
+        ...result,
+        result: { ...result.result, diagnostics: { ...result.result.diagnostics, attempts: [attempt] } },
+      })
+      expect(parsed.kind).toBe('MALFORMED')
+    })
+  })
 })

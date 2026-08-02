@@ -296,7 +296,10 @@ function collectDiagnosticWarnings(result: AdvancedSearchResultV1) {
   if (diagnostics.sufficiency?.fallbackUsed) warnings.push(`Sufficiency fallback used${diagnostics.sufficiency.fallbackCategory ? ` (${diagnostics.sufficiency.fallbackCategory})` : ''}.`)
   if (diagnostics.rerank?.fallbackUsed) warnings.push(`Reranking fallback used${diagnostics.rerank.fallbackCategory ? ` (${diagnostics.rerank.fallbackCategory})` : ''}.`)
   diagnostics.sourceMetadata?.warnings.forEach((warning) => warnings.push(`Source metadata warning: ${warning}`))
-  diagnostics.attempts.filter((attempt) => attempt.status.toUpperCase() !== 'SUCCEEDED' && attempt.status.toUpperCase() !== 'COMPLETED').forEach((attempt) => warnings.push(`Retriever attempt ${attempt.subqueryId} reported ${attempt.status}.`))
+  diagnostics.attempts.filter((attempt) => attempt.status.toUpperCase() !== 'SUCCEEDED' && attempt.status.toUpperCase() !== 'COMPLETED').forEach((attempt) => {
+    const attemptLabel = attempt.subqueryId ?? `${attempt.retriever} branch`
+    warnings.push(`Retriever attempt ${attemptLabel} reported ${attempt.status}.`)
+  })
   return warnings
 }
 

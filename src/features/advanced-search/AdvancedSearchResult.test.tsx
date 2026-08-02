@@ -105,6 +105,25 @@ describe('AdvancedSearchResultPanel', () => {
     expect(screen.getByText('Answer unavailable')).toBeInTheDocument()
   })
 
+  it('renders nullable branch attempts as cited results with retriever-labeled warnings', () => {
+    const branchResult = structuredClone(baseResult)
+    branchResult.diagnostics.attempts = [{
+      roundNumber: 1,
+      subqueryId: null,
+      retriever: 'TEXT',
+      status: 'FAILED',
+      candidateCount: 0,
+      latencyMs: 12,
+      failureCategory: 'TIMEOUT',
+    }]
+
+    renderResult(branchResult)
+
+    expect(screen.getByTestId('advanced-search-cited-result')).toBeInTheDocument()
+    expect(screen.queryByTestId('advanced-search-result-failure')).not.toBeInTheDocument()
+    expect(screen.getByText(/Retriever attempt TEXT branch reported FAILED\./)).toBeInTheDocument()
+  })
+
   it('uses snapshot label, cached filename, and document ID fallbacks without requiring document lookup', () => {
     const snapshot = { ...baseResult.evidence[0], sourceDisplayLabel: 'Snapshot label' }
     expect(resolveAdvancedSearchSourceLabel(snapshot, documents)).toBe('Snapshot label')
