@@ -43,14 +43,14 @@ describe('queries page', () => {
     expect((paramsInput as HTMLTextAreaElement).value).toBe('{\n  "x": 1\n}')
   })
 
-  it('shows the hybrid search tab alongside existing query tabs', () => {
+  it('shows exactly the four supported query workflows', () => {
     renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
     expect(screen.getByTestId('queries-endpoint-tabs-tab-ask-query')).toHaveTextContent('Ask query')
-    expect(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search')).toHaveTextContent('Hybrid search')
     expect(screen.getByTestId('queries-endpoint-tabs-tab-generate-cypher')).toHaveTextContent('Generate Cypher')
     expect(screen.getByTestId('queries-endpoint-tabs-tab-validate-cypher')).toHaveTextContent('Validate Cypher')
     expect(screen.getByTestId('queries-endpoint-tabs-tab-execute-cypher')).toHaveTextContent('Execute Cypher')
+    expect(screen.queryByTestId('queries-endpoint-tabs-tab-hybrid-search')).not.toBeInTheDocument()
   })
 
   it('shows pending indicator and prevents duplicate ask clicks while request is in flight', async () => {
@@ -125,54 +125,4 @@ describe('queries page', () => {
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/queries/execute'))).toBe(false)
   })
 
-  it('blocks hybrid search while local option bounds are invalid', async () => {
-    const user = userEvent.setup()
-    const fetchMock = stubFetch((url) => {
-      if (url.endsWith('/knowledge-bases') || url.endsWith('/ai-profiles') || url.endsWith('/runtime-settings')) {
-        return jsonResponse(200, [])
-      }
-      throw new Error(`Unexpected request: ${url}`)
-    })
-
-    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
-
-    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
-    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
-
-    fireEvent.change(within(hybridPanel).getByLabelText('Hit limit'), { target: { value: '0' } })
-    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
-    expect(within(hybridPanel).getByText('Hybrid search options invalid')).toBeInTheDocument()
-    expect(within(hybridPanel).getByText('Hit limit must be at least 1.')).toBeInTheDocument()
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/hybrid-search'))).toBe(false)
-
-    fireEvent.change(within(hybridPanel).getByLabelText('Hit limit'), { target: { value: '3' } })
-    fireEvent.change(within(hybridPanel).getByLabelText('Graph depth'), { target: { value: '-1' } })
-    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
-    expect(within(hybridPanel).getByText('Graph depth must be 0 or greater.')).toBeInTheDocument()
-    expect((within(hybridPanel).getByLabelText('Graph depth') as HTMLInputElement).value).toBe('-1')
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/hybrid-search'))).toBe(false)
-  })
-
-  it('shows hybrid search failure feedback without clearing inputs', async () => {
-    const user = userEvent.setup()
-    stubFetch((url) => {
-      if (url.endsWith('/queries/hybrid-search')) {
-        return jsonResponse(500, { detail: 'Hybrid backend unavailable' })
-      }
-      throw new Error(`Unexpected request: ${url}`)
-    })
-
-    renderWithProviders(<QueriesPage />, { selectedKnowledgeBaseId: 'kb-a' })
-
-    await user.click(screen.getByTestId('queries-endpoint-tabs-tab-hybrid-search'))
-    const hybridPanel = screen.getByTestId('queries-endpoint-tabs-panel-hybrid-search')
-    await user.type(within(hybridPanel).getByLabelText('Search query'), 'find graph evidence')
-    await user.click(within(hybridPanel).getByRole('button', { name: 'Search' }))
-
-    await waitFor(() => {
-      expect(within(hybridPanel).getByText('Hybrid search failed')).toBeInTheDocument()
-      expect(within(hybridPanel).getByText('Hybrid backend unavailable')).toBeInTheDocument()
-    })
-    expect((within(hybridPanel).getByLabelText('Search query') as HTMLTextAreaElement).value).toBe('find graph evidence')
-  })
 })

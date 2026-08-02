@@ -17,7 +17,7 @@ const runtimeSettings = [
     constraints: { min: 1, max: 20 },
     updateMode: 'LIVE',
     label: 'Query top K',
-    description: 'Hybrid search hit count.',
+    description: 'Advanced-search evidence limit.',
   },
   {
     key: 'index.batchSize',

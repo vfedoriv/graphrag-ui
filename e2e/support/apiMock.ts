@@ -34,6 +34,7 @@ type ApiMockState = {
 export type GraphRagApiMock = ApiMockState & {
   selectedKnowledgeBaseRequests: (knowledgeBaseId: string) => string[]
   failOnce: (request: string, detail: string) => void
+  completeAdvancedSearchRun: (runId: string) => void
 }
 
 export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
@@ -79,6 +80,15 @@ export async function mockGraphRagApi(page: Page): Promise<GraphRagApiMock> {
       state.requests.filter((request) => request.includes(`/knowledge-bases/${knowledgeBaseId}/`)),
     failOnce: (request: string, detail: string) => {
       state.failOnceByRequest[request] = detail
+    },
+    completeAdvancedSearchRun: (runId: string) => {
+      const run = state.advancedSearchRuns.find((item) => item.id === runId)
+      if (!run) return
+      run.status = 'COMPLETED'
+      run.stage = 'TERMINAL'
+      run.completedBranches = run.totalBranches
+      run.evidenceCount = 1
+      run.completedAt = '2026-05-06T14:00:03.000Z'
     },
   }
 }
@@ -364,6 +374,10 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
       await json(route, run)
       return
     }
+    if (advancedSearchRunMatch[3] === 'result' && method === 'GET') {
+      await json(route, advancedSearchResult(advancedSearchRunMatch[2]))
+      return
+    }
     if (!advancedSearchRunMatch[3] && method === 'GET') {
       await json(route, run)
       return
@@ -382,6 +396,43 @@ async function handleApiRoute(route: Route, state: ApiMockState) {
 
   state.unhandled.push(key)
   await problem(route, 500, 'Unhandled API mock', `No Playwright API mock handled ${key}`)
+}
+
+function advancedSearchResult(runId: string) {
+  return {
+    runId,
+    payloadVersion: 1,
+    createdAt: '2026-05-06T14:00:03.000Z',
+    result: {
+      payloadVersion: 1,
+      answer: {
+        version: 1,
+        status: 'ANSWERED',
+        text: 'The active customer is Ada.',
+        confidence: { level: 'HIGH', score: 0.94 },
+        limitations: [],
+        claims: [{ id: 'claim-1', kind: 'ANSWER', text: 'Ada is active.', citationIds: ['citation-1'], graphFactIds: [], graphEvidenceIds: [] }],
+      },
+      evidence: [{
+        citationId: 'citation-1', type: 'TEXT_CHILD', chunkId: 'chunk-1', documentId: 'doc-alpha',
+        range: { sourceStart: 10, sourceEnd: 32, pageStart: 1, pageEnd: 1 }, processingRunId: 'process-1',
+        effectiveChunkerRevision: 'chunker-v2', structuralPath: 'Customers > Active', text: 'Ada is an active customer.', rank: 1,
+        score: 0.91, sourceFilename: 'alpha-notes.txt', sourceContentType: 'text/plain', sourceDisplayLabel: 'Customer notes',
+      }],
+      contexts: [],
+      graphFacts: [],
+      answerDiagnostics: { repairAttempted: false, repairSucceeded: false, abstained: false, citationCount: 1, claimCount: 1, outcomeCategory: 'ANSWERED' },
+      diagnostics: {
+        plan: { version: 1, promptRevision: 'p1', subquestionCount: 1, exactTermCount: 0, graphRequestCount: 0, metadataConstrained: false, fallbackUsed: false, fallbackCategory: null },
+        sufficiency: { version: 1, promptRevision: 'p1', completeCoverageCount: 1, partialCoverageCount: 0, missingCoverageCount: 0, contradictionCount: 0, concreteGap: false, refinementCount: 0, fallbackUsed: false, fallbackCategory: null },
+        followUp: { executed: false, queryCount: 0, skippedCategory: 'NOT_NEEDED' }, attempts: [],
+        fusion: { acceptedByChannel: {}, truncatedByChannel: {}, executedSubqueries: {}, deduplicatedCandidateCount: 1, poolTruncatedCount: 0, graphDerivedCandidateCount: 0 },
+        graphExpansion: { seedCount: 0, sourceRowCount: 0, attachedFactCount: 0 }, parentContext: { evidenceConsidered: 1, contextCount: 0, tokenEstimate: 8, outcomes: {} },
+        rerank: { poolSize: 1, fallbackUsed: false, fallbackCategory: null }, selection: { requestedMaximum: 5, effectivePerDocumentCap: 5, comparisonPolicy: false, skippedForDiversity: 0, selectedByDocument: { 'doc-alpha': 1 } },
+        sourceMetadata: { warnings: [] },
+      },
+    },
+  }
 }
 
 async function json(route: Route, body: unknown, status = 200) {

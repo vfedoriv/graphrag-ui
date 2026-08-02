@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
+import { useDocumentsQuery } from '../../api/documents'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
 import { ControllerPage } from '../../shared/ui/ControllerPage'
@@ -11,6 +12,7 @@ import { OperationSpine, Notice, WorkspaceStrip } from '../../shared/ui/Prototyp
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { Table } from '../../shared/ui/Table'
 import { Textarea } from '../../shared/ui/Textarea'
+import { RuntimeContextSummary } from '../../shared/ui/RuntimeContextSummary'
 import {
   canFetchAdvancedSearchResult,
   useAdvancedSearchHistoryQuery,
@@ -20,10 +22,12 @@ import {
   useCancelAdvancedSearchMutation,
   useCreateAdvancedSearchMutation,
 } from '../../api/advancedSearch'
+import { AdvancedSearchResultPanel } from './AdvancedSearchResult'
+import { AdvancedSearchResultFetchError } from './AdvancedSearchResultFetchError'
 import { useKnowledgeBasesQuery } from '../../api/knowledgeBases'
 import { queryKeys } from '../../api/queryKeys'
 import { useRuntimeSettingsQuery } from '../../api/runtimeSettings'
-import { ApiError, type AdvancedSearchReadinessIssue, type AdvancedSearchRunDetail, type AdvancedSearchRunStatus, type AdvancedSearchRunSummary, type RuntimeSetting } from '../../api/types'
+import { ApiError, type AdvancedSearchReadinessIssue, type AdvancedSearchResultParseResult, type AdvancedSearchRunDetail, type AdvancedSearchRunStatus, type AdvancedSearchRunSummary, type DocumentUpload, type RuntimeSetting } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 
 const HISTORY_PAGE_SIZE = 10
@@ -67,11 +71,13 @@ export function AdvancedSearchPage() {
   const runQuery = useAdvancedSearchRunQuery(selectedKnowledgeBaseId, runId)
   const focusedStatus = runQuery.data?.status ?? null
   const resultQuery = useAdvancedSearchResultQuery(selectedKnowledgeBaseId, runId, focusedStatus)
+  const documentsQuery = useDocumentsQuery(selectedKnowledgeBaseId)
   const runtimeSettingsQuery = useRuntimeSettingsQuery()
   const createMutation = useCreateAdvancedSearchMutation()
   const cancelMutation = useCancelAdvancedSearchMutation()
 
   const evidenceHints = useMemo(() => getEvidenceHints(runtimeSettingsQuery.data ?? []), [runtimeSettingsQuery.data])
+  const cachedDocuments = Array.isArray(documentsQuery.data) ? documentsQuery.data : []
   const readiness = readinessQuery.data
   const blockers = readiness?.blockers ?? []
   const informational = readiness?.informational ?? []
@@ -264,6 +270,11 @@ export function AdvancedSearchPage() {
             schemaUnavailable={schemaUnavailable}
             emptyCorpus={emptyCorpus}
           />
+          <RuntimeContextSummary
+            knowledgeBaseId={selectedKnowledgeBaseId}
+            settingHints={['advanced', 'search', 'evidence']}
+            title='Advanced Search runtime context'
+          />
 
           <form className='stack' onSubmit={submit}>
             <FieldLabel htmlFor='advanced-search-question'>Question</FieldLabel>
@@ -336,7 +347,9 @@ export function AdvancedSearchPage() {
             error={runQuery.error as Error | null}
             result={resultQuery.data}
             resultLoading={resultQuery.isLoading}
+            resultFetching={resultQuery.isFetching}
             resultError={resultQuery.error as Error | null}
+            documents={cachedDocuments}
             isCancelling={cancelMutation.isPending}
             onCancel={cancel}
           />
@@ -433,7 +446,9 @@ function FocusedRunPanel({
   error,
   result,
   resultLoading,
+  resultFetching,
   resultError,
+  documents,
   isCancelling,
   onCancel,
 }: {
@@ -442,9 +457,11 @@ function FocusedRunPanel({
   isLoading: boolean
   isFetching: boolean
   error: Error | null
-  result?: { kind: string; raw: unknown; reason?: string }
+  result?: AdvancedSearchResultParseResult
   resultLoading: boolean
+  resultFetching: boolean
   resultError: Error | null
+  documents: DocumentUpload[]
   isCancelling: boolean
   onCancel: () => void
 }) {
@@ -493,10 +510,10 @@ function FocusedRunPanel({
       {resultEligible ? (
         <div className='flow-card'>
           <h3>Result handoff eligible</h3>
-          {resultLoading ? <p>Loading the retained result resource...</p> : null}
-          {resultError ? <Alert title='Result not available yet' message={resultError.message} tone={isConflictError(resultError) ? 'info' : 'error'} /> : null}
-          {result?.kind === 'VALID' ? <OutputPreview label='Result resource JSON' format='json'>{JSON.stringify(result.raw, null, 2)}</OutputPreview> : null}
-          {result && result.kind !== 'VALID' ? <Alert title='Result requires cited-result handling' message={result.reason ?? 'The retained result is not in a supported presentation format.'} tone='info' /> : null}
+          {resultLoading && !result ? <p>Loading the retained result resource...</p> : null}
+          {resultFetching && !resultLoading ? <p className='muted'>Refreshing retained result...</p> : null}
+          {resultError ? <AdvancedSearchResultFetchError error={resultError} /> : null}
+          {result ? <AdvancedSearchResultPanel parsed={result} runStatus={run.status} runFailureCategory={run.failureCategory} documents={documents} /> : null}
         </div>
       ) : null}
     </section>
@@ -621,10 +638,6 @@ function asApiError(error: unknown) {
 
 function isNotFoundError(error: unknown) {
   return error instanceof ApiError && error.status === 404
-}
-
-function isConflictError(error: unknown) {
-  return error instanceof ApiError && error.status === 409
 }
 
 function isTerminalStatus(status: AdvancedSearchRunStatus) {

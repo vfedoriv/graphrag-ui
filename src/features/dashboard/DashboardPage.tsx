@@ -124,7 +124,7 @@ export function DashboardPage() {
             items={[
               { to: '/schemas', title: 'Schema workbench', description: 'Generate, validate, create, activate' },
               { to: '/documents', title: 'Document intake', description: 'Upload, process, inspect chunks' },
-              { to: '/queries', title: 'Query console', description: 'Ask, generate Cypher, hybrid search' },
+              { to: '/queries', title: 'Query console', description: 'Ask, generate, validate, and execute Cypher' },
             ]}
           />
         </article>

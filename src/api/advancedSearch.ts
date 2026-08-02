@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { z } from 'zod'
 import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
+import { ApiError } from './types'
 import type {
   AdvancedSearchCreateRequest,
   AdvancedSearchReadiness,
@@ -104,7 +105,18 @@ export const advancedSearchApi = {
     return apiFetch<AdvancedSearchRunPage>(`${runBase(knowledgeBaseId)}?${params.toString()}`)
   },
   detail: (knowledgeBaseId: string, runId: string) => apiFetch<AdvancedSearchRunDetail>(`${runBase(knowledgeBaseId)}/${runId}`),
-  result: async (knowledgeBaseId: string, runId: string) => parseAdvancedSearchResult(await apiFetch<unknown>(`${runBase(knowledgeBaseId)}/${runId}/result`)),
+  result: async (knowledgeBaseId: string, runId: string) => {
+    const parsed = parseAdvancedSearchResult(await apiFetch<unknown>(`${runBase(knowledgeBaseId)}/${runId}/result`))
+    if (parsed.kind === 'VALID' && parsed.envelope.runId !== runId) {
+      return {
+        kind: 'MALFORMED' as const,
+        reason: 'Advanced-search result envelope does not belong to the focused run',
+        raw: parsed.raw,
+        issues: [`runId: expected ${runId}, received ${parsed.envelope.runId}`],
+      }
+    }
+    return parsed
+  },
   cancel: (knowledgeBaseId: string, runId: string) => apiFetch<AdvancedSearchRunSummary>(`${runBase(knowledgeBaseId)}/${runId}/cancel`, { method: 'POST' }),
 }
 
@@ -133,7 +145,7 @@ export function useAdvancedSearchResultQuery(knowledgeBaseId: string | null, run
   return useQuery({ queryKey: queryKeys.advancedSearchResultMaybe(knowledgeBaseId, runId), queryFn: () => {
     if (!knowledgeBaseId || !runId) throw new Error('Cannot load an advanced-search result without identifiers')
     return advancedSearchApi.result(knowledgeBaseId, runId)
-  }, enabled: Boolean(knowledgeBaseId && runId && canFetchAdvancedSearchResult(status)) })
+  }, enabled: Boolean(knowledgeBaseId && runId && canFetchAdvancedSearchResult(status)), retry: false, refetchInterval: (query) => query.state.error instanceof ApiError && query.state.error.status === 409 ? 1500 : false })
 }
 
 export function useCreateAdvancedSearchMutation() {

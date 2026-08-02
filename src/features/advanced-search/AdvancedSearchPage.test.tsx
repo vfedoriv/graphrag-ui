@@ -1,8 +1,10 @@
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AdvancedSearchPage } from './AdvancedSearchPage'
+import { AdvancedSearchResultFetchError } from './AdvancedSearchResultFetchError'
+import { ApiError } from '../../api/types'
 import { renderWithProviders, jsonResponse, stubFetch } from '../../test/helpers'
 
 const knowledgeBases = [{ id: 'kb-1', name: 'Research', activeSchemaId: 'schema-1', createdAt: '2026-08-01T00:00:00Z' }]
@@ -175,5 +177,15 @@ describe('AdvancedSearchPage', () => {
     const createRequest = requests.find(({ url, init }) => url.endsWith('/advanced-search-runs') && init?.method === 'POST')
     expect(JSON.parse(String(createRequest?.init?.body))).toMatchObject({ maximumEvidence: 12, includeEvidenceText: true })
     expect(screen.queryByText('Result handoff eligible')).not.toBeInTheDocument()
+  })
+
+  it('preserves focused context for pre-result, expired, and transport failures', () => {
+    const { rerender } = render(<AdvancedSearchResultFetchError error={new ApiError({ status: 409, message: 'Not ready' })} />)
+    expect(screen.getByText('Result is not ready yet')).toBeInTheDocument()
+    rerender(<AdvancedSearchResultFetchError error={new ApiError({ status: 404, message: 'Expired' })} />)
+    expect(screen.getByText('Result expired or unavailable')).toBeInTheDocument()
+    rerender(<AdvancedSearchResultFetchError error={new ApiError({ status: 0, message: 'Network request failed' })} />)
+    expect(screen.getByText('Result request failed')).toBeInTheDocument()
+    expect(screen.getByText(/Network request failed/)).toBeInTheDocument()
   })
 })

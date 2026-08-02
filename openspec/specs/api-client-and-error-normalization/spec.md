@@ -65,29 +65,6 @@ The system SHALL expose typed TanStack Query hooks from API modules for backend 
 - **WHEN** a test or non-React helper needs the raw API function
 - **THEN** the API module MAY keep the raw function exported while production feature components use the hook wrapper
 
-### Requirement: API modules expose hybrid search endpoint hook
-The system SHALL expose typed API support for the hybrid search endpoint through the query API module and a TanStack Query mutation hook, using DTO types that match the current backend response contract.
-
-#### Scenario: Feature component submits hybrid search
-- **WHEN** a feature component triggers hybrid search for a selected knowledge base
-- **THEN** the component SHALL consume a typed API-module mutation hook for `POST /knowledge-bases/{knowledgeBaseId}/queries/hybrid-search`
-
-#### Scenario: Hybrid search request is serialized
-- **WHEN** hybrid search is requested
-- **THEN** the API module SHALL send a JSON body containing `query`, `topK`, `graphDepth`, and `includeChunkText` using the shared API client helpers
-
-#### Scenario: Hybrid search response is parsed
-- **WHEN** the backend returns a successful hybrid search response
-- **THEN** the API module SHALL parse it into typed response fields for query metadata, hit metadata, source metadata, optional chunk text, graph entities under `graph.entities`, and graph relationships under `graph.relationships`
-
-#### Scenario: Hybrid search relationship endpoints are typed
-- **WHEN** the backend returns hybrid search graph relationships
-- **THEN** the API module SHALL expose relationship endpoint fields as `startNodeElementId` and `endNodeElementId`
-
-#### Scenario: Hybrid search request fails
-- **WHEN** the backend returns a validation or service error for hybrid search
-- **THEN** the shared API client error normalization SHALL provide the Hybrid search workflow with the same `ApiError` contract used by other query endpoints
-
 ### Requirement: API client preserves machine-readable admission conflicts
 The system SHALL preserve machine-readable readiness blockers and other safe structured fields from backend ProblemDetail responses so advanced operational workflows can present actionable `409` admission failures without reparsing error message text.
 
@@ -109,3 +86,22 @@ The system SHALL expose typed query and mutation hooks plus reusable raw functio
 #### Scenario: Test invokes raw operation
 - **WHEN** an API contract test needs to assert an exact route or payload
 - **THEN** it SHALL be able to call the exported raw API operation without rendering React
+
+### Requirement: No frontend request targets the deleted hybrid-search endpoint
+The system SHALL remove Hybrid Search request/response DTOs, raw API functions, mutation hooks, and tests and SHALL ensure no production or test request targets `/queries/hybrid-search`.
+
+#### Scenario: Search functionality is invoked
+- **WHEN** a user submits search from the supported frontend
+- **THEN** the request SHALL target the advanced-search run route family
+- **AND** SHALL NOT target the deleted Hybrid Search endpoint
+
+### Requirement: Unsupported advanced-search results use normalized explicit state
+The system SHALL expose unsupported and malformed successful result payloads to the Advanced Search UI as explicit diagnosable states rather than raw runtime exceptions or coerced version-one data.
+
+#### Scenario: Successful HTTP result has unsupported payload
+- **WHEN** the API returns HTTP success with an unsupported or inconsistent payload version
+- **THEN** the client SHALL retain raw JSON and provide a stable unsupported-result state
+
+#### Scenario: Successful version-one payload is malformed
+- **WHEN** the API returns HTTP success with version 1 but invalid required structure
+- **THEN** the client SHALL retain raw JSON and provide a stable malformed-result state

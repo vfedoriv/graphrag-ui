@@ -100,13 +100,22 @@ The system SHALL treat sensitive runtime settings as read-only masked/configured
 - **AND** the system SHALL NOT provide a value editor for that runtime setting
 
 ### Requirement: Relevant runtime properties are surfaced in workflow context
-The system SHALL show read-only summaries of runtime settings that affect schema generation, document processing, query safety, and hybrid search on the corresponding workflow pages.
+The system SHALL show read-only summaries of runtime settings that affect schema generation, document processing, query safety, chunking, and advanced search on the corresponding workflow pages, while all advanced-search runtime tuning remains editable only through generic Settings.
 
 #### Scenario: User opens an affected workflow page
-- **WHEN** a user opens Schemas, Documents, or Queries
-- **THEN** the system SHALL display available active runtime setting context relevant to that page
-- **AND** the system SHALL provide a clear path to AI Providers for provider-related edits
-- **AND** the system SHALL provide a clear path to Settings/Properties for other runtime property edits
+- **WHEN** a user opens Schemas, Documents, Queries, Chunking, or Advanced Search
+- **THEN** the system SHALL display available active runtime-setting context relevant to that page
+- **AND** SHALL provide a clear path to AI Providers for provider-related edits
+- **AND** SHALL provide a clear path to Settings/Properties for other runtime-property edits
+
+#### Scenario: User opens Advanced Search
+- **WHEN** runtime settings provide advanced-search default or bound hints
+- **THEN** the workspace SHALL expose those values read-only for per-run evidence guidance
+- **AND** SHALL not expose global tuning mutations outside Settings
+
+#### Scenario: Hybrid Search tuning hints exist in old frontend copy
+- **WHEN** the deleted Hybrid Search workflow is removed
+- **THEN** its workflow-specific runtime-setting hints and copy SHALL also be removed
 
 ### Requirement: Chunking workspace combines mutation definitions with authoritative aggregate state
 The system SHALL keep generic runtime Settings capable of editing chunking keys while the Chunking Strategy view uses runtime-setting definitions for mutation semantics and `GET /api/v1/chunking-state` for effective combined values and revisions.

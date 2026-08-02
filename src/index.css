@@ -751,6 +751,14 @@ textarea:focus-visible,
   margin-top: 14px;
 }
 
+.advanced-search-raw-output {
+  max-height: 360px;
+}
+
+.advanced-search-diagnostic-output {
+  max-height: 240px;
+}
+
 .inline-state {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

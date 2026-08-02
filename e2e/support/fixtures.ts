@@ -137,7 +137,7 @@ export const runtimeSettingsFixture: RuntimeSetting[] = [
     sensitive: false,
     updateMode: 'LIVE',
     label: 'Query top K',
-    description: 'Default hybrid search hit limit.',
+    description: 'Default advanced-search evidence limit.',
   },
 ]
 
