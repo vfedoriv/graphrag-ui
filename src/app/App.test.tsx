@@ -99,6 +99,44 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Schema Builder' })).toBeInTheDocument()
   })
 
+  it('navigates to Chunking after Documents and normalizes the default strategy view', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' })
+    const labels = Array.from(nav.querySelectorAll('a')).map((link) => link.textContent?.trim())
+    expect(labels).toEqual([
+      'Dashboard',
+      'Knowledge Bases',
+      'Schemas',
+      'Schema Builder',
+      'Schema Drafts',
+      'Documents',
+      'Chunking',
+      'Queries',
+      'AI Providers',
+      'Settings',
+    ])
+
+    await user.click(screen.getByRole('link', { name: 'Chunking' }))
+
+    expect(await screen.findByRole('heading', { name: 'Chunking' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Chunking' })).toHaveClass('active')
+    expect(screen.getByRole('tab', { name: 'Strategy' })).toHaveAttribute('aria-selected', 'true')
+    expect(window.location.pathname).toBe('/chunking')
+    expect(window.location.search).toBe('?view=strategy')
+    expect(screen.getByText('Scope: Global')).toBeInTheDocument()
+  })
+
+  it('normalizes unsupported Chunking views while keeping Strategy available without a knowledge base', async () => {
+    window.history.pushState({}, '', '/chunking?view=unknown')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Strategy' })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.search).toBe('?view=strategy'))
+    expect(screen.getByText('Selected workspace: None selected')).toBeInTheDocument()
+  })
+
   it('does not call dedicated health endpoint', async () => {
     render(<App />)
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())

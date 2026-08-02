@@ -1908,6 +1908,115 @@ textarea {
   gap: 18px;
 }
 
+.chunking-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.chunking-control-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.chunking-control-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 14px;
+}
+
+.chunking-control-card label {
+  font-size: 14px;
+}
+
+.chunking-control-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.chunking-control-values > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chunking-control-values strong,
+.chunking-control-values code {
+  overflow-wrap: anywhere;
+}
+
+.chunking-control-values small {
+  color: var(--muted);
+}
+
+.chunking-validation-error {
+  color: var(--danger) !important;
+}
+
+.chunking-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.chunking-metadata-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.chunking-metadata-grid dt {
+  color: var(--muted);
+  font: 700 11px/1.2 var(--font-mono);
+  text-transform: uppercase;
+}
+
+.chunking-metadata-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.chunking-aliases {
+  gap: 12px;
+}
+
+.chunking-aliases summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.chunking-aliases table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.chunking-aliases th,
+.chunking-aliases td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.chunking-aliases th {
+  color: var(--muted);
+  font: 700 11px/1 var(--font-mono);
+  text-transform: uppercase;
+}
+
 .split-stack {
   display: flex;
   flex-wrap: wrap;
@@ -1968,6 +2077,11 @@ textarea {
   .profile-form,
   .ops-spine,
   .schema-builder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chunking-control-values,
+  .chunking-metadata-grid {
     grid-template-columns: 1fr;
   }
 

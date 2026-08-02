@@ -52,6 +52,7 @@ export function useBulkUpdateRuntimeSettingsMutation() {
         ]
       })
       queryClient.invalidateQueries({ queryKey: queryKeys.runtimeSettings() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.chunkingState() })
     },
   })
 }

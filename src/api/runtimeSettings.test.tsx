@@ -57,6 +57,7 @@ describe('runtime settings api', () => {
 
     expect(queryClient.getQueryData(['runtime-settings'])).toEqual([{ key: 'query.topK', currentValue: 10 }])
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['runtime-settings'] })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['chunking-state'] })
   })
 
   it('normalizes backend errors', async () => {

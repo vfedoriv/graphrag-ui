@@ -3,19 +3,24 @@
 This specification defines the required behavior for admin app shell and navigation in the GraphRAG admin UI.
 ## Requirements
 ### Requirement: Admin shell provides stable navigation and context
-The system SHALL expose primary navigation entries by controller pages and schema-building workspace (Dashboard, Knowledge Bases, Schemas, Schema Builder, Documents, Queries, Settings), route each entry to its configured workspace, render the prototype-aligned brand/sidebar treatment, and provide shell-level action buttons with the shared interactive visual feedback states.
+The system SHALL expose primary navigation entries by controller pages and dedicated workspaces (Dashboard, Knowledge Bases, Schemas, Schema Builder, Schema Drafts, Documents, Chunking, Queries, AI Providers, Settings), route each entry to its configured workspace, render the prototype-aligned brand/sidebar treatment, and provide shell-level action buttons with the shared interactive visual feedback states.
 
 #### Scenario: Navigate by controller
-- **WHEN** a user selects a controller from primary navigation
-- **THEN** the system SHALL route to that controller's unified page with top context and the route's configured workflow structure
+- **WHEN** a user selects a controller or workspace from primary navigation
+- **THEN** the system SHALL route to its unified page with top context and configured workflow structure
 
 #### Scenario: Navigate to Schema Builder
 - **WHEN** a user selects Schema Builder from primary navigation
 - **THEN** the system SHALL route to the dedicated Schema Builder workspace
-- **AND** the system SHALL preserve the current global knowledge-base selection
+- **AND** SHALL preserve the current global knowledge-base selection
+
+#### Scenario: Navigate to Chunking
+- **WHEN** a user selects Chunking from primary navigation
+- **THEN** the system SHALL lazy-load `/chunking`
+- **AND** SHALL place Chunking immediately after Documents and before Queries
 
 #### Scenario: Identify current route
-- **WHEN** a user views a controller route or the Schema Builder route
+- **WHEN** a user views a controller or dedicated workspace route
 - **THEN** the primary navigation SHALL visibly mark the active route using the prototype active navigation styling
 
 ### Requirement: Admin shell uses left-anchored responsive workspace layout
