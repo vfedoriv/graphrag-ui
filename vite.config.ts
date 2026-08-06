@@ -7,10 +7,23 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 const localOpenPath = '/__graphrag-ui/open-local-file'
 
+// These directories contain generated codebase-memory and browser-automation
+// artifacts. Keep this list narrow so application source and configuration
+// files remain eligible for Vite HMR and full reloads.
+export const toolingWatcherIgnorePatterns = [
+  '**/.codebase-memory/**',
+  '**/.playwright-cli/**',
+  '**/.playwright-mcp/**',
+  '**/output/playwright/**',
+] as const
+
 export default defineConfig({
   plugins: [localFileOpenPlugin(), react(), tailwindcss()],
   server: {
     port: 8333,
+    watch: {
+      ignored: [...toolingWatcherIgnorePatterns],
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
