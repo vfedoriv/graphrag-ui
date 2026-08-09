@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, toJsonBody } from './client'
 import { queryKeys } from './queryKeys'
 import type {
+  ChunkPageFilters,
   DocumentChunk,
   DocumentChunkHierarchy,
   DocumentChunkPage,
@@ -55,7 +56,7 @@ export const documentsApi = {
     documentId: string,
     page = 0,
     size = 20,
-    filters: { kind?: string | null; parentChunkId?: string | null; sectionIndex?: number | null } = {},
+    filters: ChunkPageFilters = {},
   ) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
     if (filters.kind) params.set('kind', filters.kind)
@@ -96,7 +97,7 @@ export function useDocumentChunkPageQuery(
   documentId: string | null,
   page = 0,
   size = 20,
-  filters: { kind?: string | null; parentChunkId?: string | null; sectionIndex?: number | null } = {},
+  filters: ChunkPageFilters = {},
   options: { enabled?: boolean } = {},
 ) {
   return useQuery({

@@ -1,8 +1,4 @@
-## Purpose
-
-This specification defines the typed API contracts and endpoint behavior for advanced chunking, migration, reprocessing, and search operations in the GraphRAG admin UI.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Frontend models authoritative chunking contracts
 The system SHALL define typed frontend contracts for aggregate chunking state, complete document chunk provenance, metadata-only chunk summaries, bounded chunk pages and hierarchies, migration previews, and generalized reprocessing plans using the backend wire names and legacy nullability through backend commit `2c4527b`. For bounded chunk-page requests, the frontend contract SHALL expose a request-only kind selector of `PARENT`, `CHILD`, or virtual `FLAT`; response chunk kinds SHALL remain nullable/string-compatible persisted values.
@@ -90,34 +86,3 @@ The system SHALL provide stable query-key factories whose identities include eve
 #### Scenario: Required identifier is missing
 - **WHEN** a query lacks a required knowledge-base, document, run, plan, or chunk ID
 - **THEN** its hook SHALL use a stable disabled key and SHALL NOT invoke the endpoint
-
-### Requirement: Polling and result admission are deterministic
-The system SHALL provide shared status helpers so focused non-terminal advanced-search runs poll every 1.5 seconds, focused active reprocessing plans poll while non-terminal, and advanced-search result requests enable only for `COMPLETED` or `PARTIAL`.
-
-#### Scenario: Focused advanced-search run is active
-- **WHEN** the focused run status is non-terminal
-- **THEN** its detail hook SHALL refetch at a 1.5-second interval
-
-#### Scenario: Advanced-search run becomes terminal
-- **WHEN** the focused run enters any terminal status
-- **THEN** detail polling SHALL stop
-- **AND** result fetching SHALL become enabled only for `COMPLETED` or `PARTIAL`
-
-#### Scenario: Reprocessing plan becomes terminal
-- **WHEN** the focused reprocessing plan enters a terminal status
-- **THEN** plan-detail polling SHALL stop while its paged items remain inspectable
-
-### Requirement: Versioned result failures remain diagnosable
-The system SHALL check both advanced-search result envelope and nested payload versions and SHALL distinguish supported version-one results, unsupported versions, and malformed supported-version payloads while retaining raw response JSON for diagnosis.
-
-#### Scenario: Supported versions match
-- **WHEN** both payload-version fields equal 1 and the required version-one structure is valid
-- **THEN** the API boundary SHALL return the typed `AdvancedSearchResultV1`
-
-#### Scenario: Envelope and result versions differ
-- **WHEN** envelope and nested payload versions do not match
-- **THEN** the API boundary SHALL return an explicit unsupported/malformed result state and raw diagnostic JSON instead of coercing either version
-
-#### Scenario: Version-one structure is malformed
-- **WHEN** both versions equal 1 but required answer or reference structures are malformed
-- **THEN** the API boundary SHALL return a malformed-result state with raw diagnostic JSON

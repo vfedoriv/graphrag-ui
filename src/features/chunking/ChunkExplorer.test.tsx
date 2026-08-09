@@ -76,7 +76,7 @@ function renderExplorer(initialEntry = '/chunking?view=chunks') {
   )
 }
 
-function baseFetch(extra: (url: string) => ReturnType<typeof jsonResponse> | undefined) {
+function baseFetch(extra: (url: string) => ReturnType<typeof jsonResponse> | Promise<ReturnType<typeof jsonResponse>> | undefined) {
   return stubFetch((url) => {
     if (url.endsWith('/knowledge-bases/kb-a/documents')) return jsonResponse(200, [documentFixture])
     return extra(url) ?? jsonResponse(404, { detail: `Unexpected request: ${url}` })
@@ -161,8 +161,8 @@ describe('ChunkExplorer', () => {
   })
 
   it('pages flat fallback chunks and exposes mixed parent and flat populations', async () => {
-    const flatChunk = { ...childFixture, id: 'flat-1', kind: 'FLAT', parentChunkId: null, text: 'flat text', childIndex: null }
-    baseFetch((url) => {
+    const flatChunk = { ...childFixture, id: 'flat-1', kind: 'CHILD', parentChunkId: null, text: 'flat text', childIndex: null }
+    const fetchMock = baseFetch((url) => {
       if (url.endsWith('/documents/doc-1/chunks/hierarchy?page=0&size=20')) {
         return jsonResponse(200, { page: 0, size: 20, totalElements: 1, content: [parentFixture], flatChunkCount: 1 })
       }
@@ -178,8 +178,63 @@ describe('ChunkExplorer', () => {
     expect(await screen.findByText('parent-1')).toBeInTheDocument()
     expect(await screen.findByText('flat-1')).toBeInTheDocument()
     expect(screen.getByText('Flat population')).toBeInTheDocument()
+    expect(screen.getByText('CHILD · 1')).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Select chunk flat-1' }))
     expect(await screen.findByText('flat text')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => /\/documents\/doc-1\/chunks$/.test(String(url)))).toBe(false)
+  })
+
+  it('keeps the flat population independent when its page fails and retries', async () => {
+    const flatChunk = { ...childFixture, id: 'flat-1', kind: 'CHILD', parentChunkId: null, text: 'flat text', childIndex: null }
+    let flatPageCalls = 0
+    const fetchMock = baseFetch((url) => {
+      if (url.endsWith('/documents/doc-1/chunks/hierarchy?page=0&size=20')) {
+        return jsonResponse(200, { page: 0, size: 20, totalElements: 1, content: [parentFixture], flatChunkCount: 1 })
+      }
+      if (url.endsWith('/documents/doc-1/chunks/page?page=0&size=20&kind=FLAT')) {
+        flatPageCalls += 1
+        return flatPageCalls === 1
+          ? jsonResponse(503, { detail: 'Flat population unavailable' })
+          : jsonResponse(200, { page: 0, size: 20, totalElements: 1, content: [flatChunk] })
+      }
+      return undefined
+    })
+
+    renderExplorer('/chunking?view=chunks&documentId=doc-1')
+
+    expect(await screen.findByText('parent-1')).toBeInTheDocument()
+    expect(await screen.findByText('Flat population unavailable')).toBeInTheDocument()
+    expect(screen.getByText('parent-1')).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Retry flat page' }))
+    expect(await screen.findByText('flat-1')).toBeInTheDocument()
+    expect(flatPageCalls).toBe(2)
+    expect(fetchMock.mock.calls.some(([url]) => /\/documents\/doc-1\/chunks$/.test(String(url)))).toBe(false)
+  })
+
+  it('selects an unparented child directly while its bounded flat page loads', async () => {
+    const flatChunk = { ...childFixture, id: 'flat-1', kind: 'CHILD', parentChunkId: null, text: 'flat text', childIndex: null }
+    let resolveFlatPage: ((response: ReturnType<typeof jsonResponse>) => void) | undefined
+    const flatPage = new Promise<ReturnType<typeof jsonResponse>>((resolve) => {
+      resolveFlatPage = resolve
+    })
+    const fetchMock = baseFetch((url) => {
+      if (url.endsWith('/documents/doc-1/chunks/hierarchy?page=0&size=20')) {
+        return jsonResponse(200, { page: 0, size: 20, totalElements: 0, content: [], flatChunkCount: 1 })
+      }
+      if (url.endsWith('/documents/doc-1/chunks/page?page=0&size=20&kind=FLAT')) return flatPage
+      if (url.endsWith('/documents/doc-1/chunks/flat-1')) return jsonResponse(200, flatChunk)
+      return undefined
+    })
+
+    renderExplorer('/chunking?view=chunks&documentId=doc-1&chunkId=flat-1')
+
+    expect(await screen.findByText('flat text')).toBeInTheDocument()
+    expect(screen.getByText('Loading flat chunk page...')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/chunks/flat-1'))).toBe(true)
+
+    resolveFlatPage?.(jsonResponse(200, { page: 0, size: 20, totalElements: 1, content: [flatChunk] }))
+    expect(await screen.findByRole('button', { name: 'Select chunk flat-1' })).toBeInTheDocument()
+    expect(screen.getByText('Kind')).toBeInTheDocument()
   })
 
   it('resolves a deep-linked child directly, reveals its parent, and loads one bounded child page', async () => {

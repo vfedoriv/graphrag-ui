@@ -31,7 +31,13 @@ describe('advanced operation routes and keys', () => {
   })
 
   it('isolates filters and required identifiers in stable query keys', () => {
-    expect(queryKeys.chunkPage('doc-1', 0, 20, 'PARENT', null, null)).not.toEqual(queryKeys.chunkPage('doc-1', 0, 20, 'CHILD', null, null))
+    const flatPage = queryKeys.chunkPage('doc-1', 0, 20, 'FLAT', null, null)
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-1', 0, 20, 'CHILD', null, null))
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-2', 0, 20, 'FLAT', null, null))
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-1', 1, 20, 'FLAT', null, null))
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-1', 0, 10, 'FLAT', null, null))
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-1', 0, 20, 'FLAT', 'parent-1', null))
+    expect(flatPage).not.toEqual(queryKeys.chunkPage('doc-1', 0, 20, 'FLAT', null, 3))
     expect(queryKeys.reprocessingPlanHistoryFiltered('kb-1', { reason: 'SCHEMA_ACTIVATION', status: 'RUNNING' }, 0, 20)).not.toEqual(queryKeys.reprocessingPlanHistoryFiltered('kb-1', { reason: 'CHUNK_STRATEGY_MIGRATION', status: 'RUNNING' }, 0, 20))
     expect(queryKeys.advancedSearchHistory('kb-1', 'RUNNING', 0, 20)).not.toEqual(queryKeys.advancedSearchHistory('kb-2', 'RUNNING', 0, 20))
     expect(queryKeys.chunkDirectMaybe(null, 'chunk-1')).toEqual(['documents', 'chunks', 'none', 'direct', 'none'])

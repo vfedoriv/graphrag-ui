@@ -257,6 +257,14 @@ export type DocumentChunk = {
   metadata: string | null
 }
 
+export type ChunkPageKind = 'PARENT' | 'CHILD' | 'FLAT'
+
+export type ChunkPageFilters = {
+  kind?: ChunkPageKind | null
+  parentChunkId?: string | null
+  sectionIndex?: number | null
+}
+
 export type PageResponse<T> = {
   page: number
   size: number

@@ -117,6 +117,32 @@ describe('documents api', () => {
     )
   })
 
+  it('serializes virtual flat pages and preserves persisted response kinds', async () => {
+    const flatChunk = {
+      id: 'flat-1',
+      documentId: 'doc-1',
+      chunkIndex: 1,
+      text: 'flat text',
+      tokenEstimate: 12,
+      kind: 'CHILD',
+      parentChunkId: null,
+      metadata: null,
+    }
+    const fetchMock = stubFetch((url) => {
+      if (url.endsWith('/documents/doc-1/chunks/page?page=0&size=20&kind=FLAT')) {
+        return jsonResponse(200, { page: 0, size: 20, totalElements: 1, content: [flatChunk] })
+      }
+      return jsonResponse(404, { detail: `Unexpected request: ${url}` })
+    })
+
+    const result = await documentsApi.chunkPage('doc-1', 0, 20, { kind: 'FLAT' })
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      '/api/v1/documents/doc-1/chunks/page?page=0&size=20&kind=FLAT',
+    ])
+    expect(result.content[0]).toMatchObject({ kind: 'CHILD', parentChunkId: null })
+  })
+
   it('invalidates document queries after upload/process/replace/delete', async () => {
     stubFetch((url) => {
       if (url.endsWith('/knowledge-bases/kb-a/documents/doc-delete')) {

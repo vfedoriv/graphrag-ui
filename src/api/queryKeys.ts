@@ -1,3 +1,5 @@
+import type { ChunkPageKind } from './types'
+
 export const queryKeys = {
   knowledgeBases: () => ['knowledge-bases'] as const,
   knowledgeBase: (id: string) => ['knowledge-bases', id] as const,
@@ -22,9 +24,9 @@ export const queryKeys = {
     ['documents', 'chunks', documentId, 'hierarchy', page, size] as const,
   chunkHierarchyMaybe: (documentId: string | null, page: number, size: number) =>
     documentId ? queryKeys.chunkHierarchy(documentId, page, size) : (['documents', 'chunks', 'none', 'hierarchy', page, size] as const),
-  chunkPage: (documentId: string, page: number, size: number, kind?: string | null, parentChunkId?: string | null, sectionIndex?: number | null) =>
+  chunkPage: (documentId: string, page: number, size: number, kind?: ChunkPageKind | null, parentChunkId?: string | null, sectionIndex?: number | null) =>
     ['documents', 'chunks', documentId, 'page', page, size, kind ?? 'none', parentChunkId ?? 'none', sectionIndex ?? 'none'] as const,
-  chunkPageMaybe: (documentId: string | null, page: number, size: number, kind?: string | null, parentChunkId?: string | null, sectionIndex?: number | null) =>
+  chunkPageMaybe: (documentId: string | null, page: number, size: number, kind?: ChunkPageKind | null, parentChunkId?: string | null, sectionIndex?: number | null) =>
     documentId ? queryKeys.chunkPage(documentId, page, size, kind, parentChunkId, sectionIndex) : ['documents', 'chunks', 'none', 'page', page, size, kind ?? 'none', parentChunkId ?? 'none', sectionIndex ?? 'none'] as const,
   chunkDirect: (documentId: string, chunkId: string) => ['documents', 'chunks', documentId, 'direct', chunkId] as const,
   chunkDirectMaybe: (documentId: string | null, chunkId: string | null) =>
