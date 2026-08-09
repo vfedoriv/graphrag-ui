@@ -8,7 +8,7 @@ import {
   useDocumentsQuery,
 } from '../../api/documents'
 import { queryKeys } from '../../api/queryKeys'
-import { ApiError, type DocumentChunk, type DocumentChunkSummary } from '../../api/types'
+import { ApiError, type DocumentChunk, type DocumentChunkHierarchy, type DocumentChunkSummary } from '../../api/types'
 import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { Alert } from '../../shared/ui/Alert'
 import { Button } from '../../shared/ui/Button'
@@ -18,6 +18,10 @@ import { OperationSpine, WorkspaceStrip } from '../../shared/ui/PrototypePrimiti
 import { StatusBadge } from '../../shared/ui/StatusBadge'
 import { isCompletedOrSuccessfullyProcessed } from '../documents/documentStatus'
 import { CHUNK_EXPLORER_PAGE_SIZE, readChunkExplorerSelection } from './chunkExplorerState'
+
+type ChunkExplorerMode = 'EMPTY' | 'FLAT' | 'HIERARCHICAL'
+
+const DOCUMENT_TOPOLOGY_CONFLICT_DETAIL = 'Document chunk topology is invalid'
 
 export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: string | null }) {
   const location = useLocation()
@@ -81,15 +85,21 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
     ? Math.floor(directChunk.chunkIndex / CHUNK_EXPLORER_PAGE_SIZE)
     : flatPage
   const hierarchyQuery = useDocumentChunkHierarchyQuery(processedDocumentId, hierarchyPage, CHUNK_EXPLORER_PAGE_SIZE)
-  const flatChunkCount = hierarchyQuery.data?.flatChunkCount ?? 0
+  const topologyConflict = isDocumentTopologyConflict(hierarchyQuery.error)
+  const hierarchyData = hierarchyQuery.isFetching ? undefined : hierarchyQuery.data
+  const chunkExplorerMode = topologyConflict ? null : deriveChunkExplorerMode(hierarchyData)
+  const flatChunkCount = hierarchyData?.flatChunkCount ?? 0
   const flatQuery = useDocumentChunkPageQuery(
     processedDocumentId,
     effectiveFlatPage,
     CHUNK_EXPLORER_PAGE_SIZE,
     { kind: 'FLAT' },
-    { enabled: flatChunkCount > 0 },
+    { enabled: chunkExplorerMode === 'FLAT' },
   )
   const parentDirectQuery = useDocumentChunkQuery(processedDocumentId, directChunk?.parentChunkId ?? null)
+  const flatPageData = flatQuery.isFetching ? undefined : flatQuery.data
+  const hierarchyLoading = hierarchyQuery.isPending || hierarchyQuery.isFetching
+  const flatLoading = flatQuery.isPending || flatQuery.isFetching
 
   useEffect(() => {
     if (!(directQuery.error instanceof ApiError) || directQuery.error.status !== 404 || !chunkId || !documentId) return
@@ -97,14 +107,17 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
     updateSelection(documentId, null, 'The selected chunk was not found in this document. The stale chunk selection was cleared without changing the knowledge base.')
   }, [chunkId, directQuery.error, documentId, updateSelection])
 
-  const hierarchyParents = useMemo(() => hierarchyQuery.data?.content ?? [], [hierarchyQuery.data])
+  const hierarchyParents = useMemo(
+    () => chunkExplorerMode === 'HIERARCHICAL' ? hierarchyData?.content ?? [] : [],
+    [chunkExplorerMode, hierarchyData],
+  )
   const effectiveExpandedParents = useMemo(() => {
     if (!directChunk?.parentChunkId) return expandedParents
     const next = new Set(expandedParents)
     next.add(directChunk.parentChunkId)
     return next
   }, [directChunk, expandedParents])
-  const syntheticParent = parentDirectQuery.data && directChunk?.parentChunkId && !hierarchyParents.some((parent) => parent.id === directChunk.parentChunkId)
+  const syntheticParent = chunkExplorerMode === 'HIERARCHICAL' && parentDirectQuery.data && directChunk?.parentChunkId && !hierarchyParents.some((parent) => parent.id === directChunk.parentChunkId)
     ? parentDirectQuery.data
     : null
   const visibleParents = useMemo(
@@ -190,8 +203,7 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
             ariaLabel='Chunk Explorer status'
             items={[
               { eyebrow: 'Document', title: selectedDocument.originalFilename, body: selectedDocument.id },
-              { eyebrow: 'Hierarchy', title: hierarchyQuery.isLoading ? 'Loading' : `${hierarchyQuery.data?.totalElements ?? 0} parents`, body: 'Metadata-only bounded pages' },
-              { eyebrow: 'Flat chunks', title: String(flatChunkCount), body: 'Separate bounded fallback population' },
+              { eyebrow: 'Topology', title: topologyConflict ? 'Integrity conflict' : hierarchyLoading ? 'Loading' : formatModeLabel(chunkExplorerMode), body: 'One bounded document outline' },
               { eyebrow: 'Selection', title: directChunk ? directChunk.id : chunkId ?? 'None', body: 'Direct authoritative lookup' },
             ]}
           />
@@ -200,24 +212,32 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
               <div className='panel-head compact'>
                 <div>
                   <p className='eyebrow'>Bounded outline</p>
-                  <h3>Hierarchy and flat chunks</h3>
+                  <h3>{topologyConflict ? 'Document integrity' : formatModeHeading(chunkExplorerMode)}</h3>
                 </div>
-                <StatusBadge label={`${hierarchyQuery.data?.totalElements ?? 0} parent summaries`} tone='neutral' />
+                <StatusBadge label={formatModeStatus(chunkExplorerMode, hierarchyData?.totalElements ?? 0, flatChunkCount, hierarchyLoading, topologyConflict)} tone={topologyConflict ? 'warning' : 'neutral'} />
               </div>
-              {hierarchyQuery.isLoading ? <p>Loading chunk hierarchy...</p> : null}
-              {hierarchyQuery.error ? (
+              {hierarchyLoading ? <p>Loading document topology...</p> : null}
+              {topologyConflict ? (
+                <div className='stack'>
+                  <Alert
+                    title='Document integrity error'
+                    message={`${DOCUMENT_TOPOLOGY_CONFLICT_DETAIL}. Collection navigation is disabled until the document is repaired.`}
+                  />
+                  <Button type='button' variant='ghost' onClick={() => void hierarchyQuery.refetch()}>Retry hierarchy check</Button>
+                </div>
+              ) : hierarchyQuery.error ? (
                 <div className='stack'>
                   <Alert title='Hierarchy page failed' message={(hierarchyQuery.error as Error).message} />
                   <Button type='button' variant='ghost' onClick={() => void hierarchyQuery.refetch()}>Retry hierarchy page</Button>
                 </div>
               ) : null}
-              {!hierarchyQuery.isLoading && !hierarchyQuery.error && hierarchyParents.length === 0 && flatChunkCount === 0 ? (
-                <EmptyState title='No chunks available' body='This processed document has no hierarchy or flat chunk output.' />
+              {!hierarchyLoading && !hierarchyQuery.error && chunkExplorerMode === 'EMPTY' ? (
+                <EmptyState title='No chunks available' body='This processed document has no chunk output.' />
               ) : null}
-              {!hierarchyQuery.isLoading && !hierarchyQuery.error && hierarchyParents.length === 0 && (hierarchyQuery.data?.totalElements ?? 0) > 0 ? (
+              {!hierarchyLoading && !hierarchyQuery.error && chunkExplorerMode === 'HIERARCHICAL' && hierarchyParents.length === 0 && (hierarchyData?.totalElements ?? 0) > 0 ? (
                 <EmptyState title='No parent summaries on this page' body='Use the bounded hierarchy controls to reveal another page.' />
               ) : null}
-              {visibleParents.length > 0 ? (
+              {chunkExplorerMode === 'HIERARCHICAL' && visibleParents.length > 0 ? (
                 <div className='stack' data-testid='chunk-parent-outline'>
                   {visibleParents.map((parent) => (
                     <ChunkParentBranch
@@ -235,41 +255,41 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
                   ))}
                 </div>
               ) : null}
-              {hierarchyQuery.data && hierarchyQuery.data.totalElements > 0 ? (
+              {chunkExplorerMode === 'HIERARCHICAL' && hierarchyData && hierarchyData.totalElements > 0 ? (
                 <PageControls
                   page={hierarchyPage}
                   size={CHUNK_EXPLORER_PAGE_SIZE}
-                  total={hierarchyQuery.data.totalElements}
+                  total={hierarchyData.totalElements}
                   onPageChange={setHierarchyPage}
                   label='Hierarchy pages'
                 />
               ) : null}
-              {flatChunkCount > 0 ? (
+              {chunkExplorerMode === 'FLAT' && flatChunkCount > 0 ? (
                 <section className='stack' aria-label='Flat chunk outline'>
                   <div className='panel-head compact'>
                     <div>
-                      <p className='eyebrow'>Flat population</p>
-                      <h4>Non-parent chunks</h4>
+                      <p className='eyebrow'>Flat document</p>
+                      <h4>Flat chunks</h4>
                     </div>
                     <StatusBadge label={`${flatChunkCount} total`} tone='neutral' />
                   </div>
-                  {flatQuery.isLoading ? <p>Loading flat chunk page...</p> : null}
+                  {flatLoading ? <p>Loading flat chunk page...</p> : null}
                   {flatQuery.error ? (
                     <div className='stack'>
                       <Alert title='Flat chunk page failed' message={(flatQuery.error as Error).message} />
                       <Button type='button' variant='ghost' onClick={() => void flatQuery.refetch()}>Retry flat page</Button>
                     </div>
                   ) : null}
-                  {!flatQuery.isLoading && !flatQuery.error && (flatQuery.data?.content.length ?? 0) === 0 ? (
+                  {!flatLoading && !flatQuery.error && (flatPageData?.content.length ?? 0) === 0 ? (
                     <EmptyState title='No flat chunks on this page' body='Try another bounded flat page.' />
                   ) : null}
-                  {flatQuery.data?.content.map((chunk) => (
+                  {flatPageData?.content.map((chunk) => (
                     <ChunkOutlineRow key={chunk.id} chunk={chunk} isSelected={directChunk?.id === chunk.id} onSelect={() => selectChunk(chunk.id)} />
                   ))}
                   <PageControls
                   page={effectiveFlatPage}
                   size={CHUNK_EXPLORER_PAGE_SIZE}
-                  total={flatQuery.data?.totalElements ?? flatChunkCount}
+                  total={flatPageData?.totalElements ?? flatChunkCount}
                     onPageChange={(nextPage) => {
                       setFlatPageWasManuallyChanged(true)
                       setFlatPage(nextPage)
@@ -293,7 +313,7 @@ export function ChunkExplorer({ tabs, activeKb }: { tabs: ReactNode; activeKb: s
           {directChunk?.parentChunkId && syntheticParent ? (
             <Alert title='Selected parent is off the current page' message='The child detail remains selected. Its parent was revealed with one bounded direct lookup; hierarchy navigation was not scanned.' tone='info' />
           ) : null}
-          {directChunk && !directChunk.parentChunkId && !isParentChunk(directChunk) ? (
+          {chunkExplorerMode === 'FLAT' && directChunk && !directChunk.parentChunkId && !isParentChunk(directChunk) ? (
             <Alert title='Flat chunk reveal' message={`The selected flat chunk is on bounded flat page ${Math.floor(directChunk.chunkIndex / CHUNK_EXPLORER_PAGE_SIZE) + 1} when its position is available.`} tone='info' />
           ) : null}
         </>
@@ -348,6 +368,8 @@ function ChunkParentBranch({
     { kind: 'CHILD', parentChunkId: parent.id },
     { enabled: isExpanded },
   )
+  const childPageData = childQuery.isFetching ? undefined : childQuery.data
+  const childLoading = childQuery.isPending || childQuery.isFetching
 
   return (
     <article className='stack' data-testid={`chunk-parent-${parent.id}`}>
@@ -360,23 +382,23 @@ function ChunkParentBranch({
         </div>
         {isExpanded ? (
           <div className='stack pl-6' data-testid={`chunk-children-${parent.id}`}>
-            {childQuery.isLoading ? <p>Loading children...</p> : null}
+            {childLoading ? <p>Loading children...</p> : null}
             {childQuery.error ? (
               <div className='stack'>
                 <Alert title='Child page failed' message={(childQuery.error as Error).message} />
                 <Button type='button' variant='ghost' onClick={() => void childQuery.refetch()}>Retry children</Button>
               </div>
             ) : null}
-            {!childQuery.isLoading && !childQuery.error && (childQuery.data?.content.length ?? 0) === 0 ? (
+            {!childLoading && !childQuery.error && (childPageData?.content.length ?? 0) === 0 ? (
               <EmptyState title='No children on this page' body='This parent remains visible. Try another child page or retry the branch.' />
             ) : null}
-            {childQuery.data?.content.map((child) => (
+            {childPageData?.content.map((child) => (
               <ChunkOutlineRow key={child.id} chunk={child} isSelected={selectedChunkId === child.id} onSelect={() => onSelectChild(child.id)} />
             ))}
             <PageControls
               page={page}
               size={CHUNK_EXPLORER_PAGE_SIZE}
-              total={childQuery.data?.totalElements ?? 0}
+              total={childPageData?.totalElements ?? 0}
               onPageChange={setPage}
               label={`Children of ${parent.id}`}
             />
@@ -507,6 +529,49 @@ function PageControls({ page, size, total, onPageChange, label }: { page: number
 
 function isParentChunk(chunk: DocumentChunk) {
   return chunk.kind?.toUpperCase() === 'PARENT'
+}
+
+function deriveChunkExplorerMode(hierarchy: DocumentChunkHierarchy | undefined): ChunkExplorerMode | null {
+  if (!hierarchy) return null
+  if (hierarchy.totalElements === 0 && hierarchy.flatChunkCount === 0) return 'EMPTY'
+  if (hierarchy.totalElements === 0 && hierarchy.flatChunkCount > 0) return 'FLAT'
+  if (hierarchy.totalElements > 0 && hierarchy.flatChunkCount === 0) return 'HIERARCHICAL'
+  return null
+}
+
+function isDocumentTopologyConflict(error: unknown) {
+  return error instanceof ApiError && error.status === 409 && (
+    error.problemDetail?.detail === DOCUMENT_TOPOLOGY_CONFLICT_DETAIL || error.message === DOCUMENT_TOPOLOGY_CONFLICT_DETAIL
+  )
+}
+
+function formatModeLabel(mode: ChunkExplorerMode | null) {
+  if (mode === 'EMPTY') return 'Empty'
+  if (mode === 'FLAT') return 'Flat'
+  if (mode === 'HIERARCHICAL') return 'Hierarchical'
+  return 'Unavailable'
+}
+
+function formatModeHeading(mode: ChunkExplorerMode | null) {
+  if (mode === 'EMPTY') return 'No chunk output'
+  if (mode === 'FLAT') return 'Flat chunks'
+  if (mode === 'HIERARCHICAL') return 'Hierarchy'
+  return 'Document topology'
+}
+
+function formatModeStatus(
+  mode: ChunkExplorerMode | null,
+  parentTotal: number,
+  flatChunkCount: number,
+  isLoading: boolean,
+  topologyConflict: boolean,
+) {
+  if (topologyConflict) return 'Integrity conflict'
+  if (isLoading) return 'Loading topology'
+  if (mode === 'EMPTY') return 'Empty document'
+  if (mode === 'FLAT') return `${flatChunkCount} flat chunks`
+  if (mode === 'HIERARCHICAL') return `${parentTotal} parent summaries`
+  return 'Topology unavailable'
 }
 
 function formatRange(start: number | null | undefined, end: number | null | undefined) {
