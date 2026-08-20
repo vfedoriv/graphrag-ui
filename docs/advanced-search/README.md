@@ -1,6 +1,8 @@
 # Advanced Search Strategy and Flow
 
-This document explains the implemented GraphRAG advanced-search system end to end: readiness and admission, bounded AI planning, parallel text and optional graph retrieval, fusion and reranking, evidence sufficiency, one optional follow-up round, cited answer synthesis, durable lifecycle management, and the frontend operator workflow. It was verified against both repositories and the running applications on 2026-08-07.
+This document explains the implemented GraphRAG advanced-search system end to end: readiness and admission, bounded AI planning, parallel text and optional graph retrieval, fusion and reranking, evidence sufficiency, one optional follow-up round, cited answer synthesis, durable lifecycle management, and the frontend operator workflow. The live examples were captured on 2026-08-07; source paths, controls, caveats, and screenshots were rechecked against both repositories on 2026-08-20.
+
+> **Documentation ownership:** The backend [documentation portal](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md) and [canonical Advanced Search workflow](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/workflows/advanced-search.md) own system behavior and API contracts. This frontend-owned companion retains UI controls, screenshots, observed caveats, and implementation maps.
 
 For exact API shapes, settings, state semantics, result fields, diagnostics, observed examples, and implementation locations, see [Advanced Search Reference](reference.md).
 
@@ -352,9 +354,7 @@ These points are important when interpreting the current UI and API:
 
 ## Source map
 
-Backend repository: `/home/vitaliy/workspace/graphrag`
-
-Frontend repository: `/home/vitaliy/workspace/graphrag-ui`
+Backend paths below are relative to the [GraphRAG backend repository](https://github.com/vfedoriv/graphrag). Frontend paths are relative to this repository.
 
 | Concern | Primary implementation |
 | --- | --- |

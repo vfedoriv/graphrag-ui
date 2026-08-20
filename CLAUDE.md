@@ -40,13 +40,23 @@ src/
 1. **`src/api/client.ts`** — `apiFetch<T>` is the single fetch wrapper. It sets headers, handles 204/empty bodies, and normalizes all errors to `ApiError` via `ProblemDetail` parsing.
 2. **`src/api/types.ts`** — all DTO types live here (or in feature-local files for one-off shapes).
 3. **`src/api/queryKeys.ts`** — all TanStack Query cache keys. Invalidate via these keys after mutations.
-4. **`src/api/{knowledgeBases,schemas,documents,queries}.ts`** — domain API modules exporting `useQuery`/`useMutation` hooks built on `apiFetch`.
+4. **`src/api/*.ts` domain modules** — hooks and serializers for knowledge bases, schemas and drafts, documents, chunking/reprocessing, Advanced Search, queries, AI profiles, and runtime settings, all built on `apiFetch`.
 5. **`src/shared/state/selectedKnowledgeBase.tsx`** — active KB selection, persisted to `localStorage` under `graphrag.selectedKnowledgeBase`, provided via `SelectedKnowledgeBaseProvider`.
 6. **`src/app/providers.tsx`** — wraps `QueryClientProvider` + `SelectedKnowledgeBaseProvider`; applied at the root in `main.tsx`.
 
 ### UI patterns
 
 Feature pages use `ControllerPage` (title + top-section panel + optional `EndpointTabs`). Each tab maps to one API endpoint. Always use primitives from `src/shared/ui` before adding new components.
+
+### Routed workflows
+
+The router exposes the dashboard, knowledge bases, schemas, schema builder, schema drafts, documents, chunking, Advanced Search, queries, AI providers, and settings. Keep README and contributor workflow inventories aligned with `src/app/router.tsx` when routes change.
+
+### Documentation ownership
+
+The backend [documentation portal](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md) is canonical for system behavior and API contracts. This repository owns the complete frontend companions at `docs/advanced-search/README.md`, `docs/advanced-search/reference.md`, `docs/chunking/README.md`, and `docs/chunking/reference.md`.
+
+When UI behavior or a backend relationship changes, update the affected guide, README documentation index, and overlapping guidance in `AGENTS.md` and this file together. Keep frontend document/image links relative and backend targets on stable `main` GitHub URLs. Coordinate canonical behavior edits in the backend repository instead of redefining them here.
 
 ### Testing patterns
 
@@ -58,7 +68,8 @@ TypeScript everywhere — no `any`. Two-space indentation, single quotes, no sem
 
 ## Environment
 
-- Backend API reference: `/home/vitaliy/workspace/graphrag`
+- Backend repository: `https://github.com/vfedoriv/graphrag`
+- Canonical backend portal: `https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md`
 - Dev proxy default: `http://localhost:8080`
 - Docker runtime env var: `GRAPHRAG_API_URL`
 - Auth/authorization: out of scope

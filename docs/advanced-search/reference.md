@@ -2,6 +2,8 @@
 
 This reference supplements [Advanced Search Strategy and Flow](README.md) with exact routes, request/response contracts, lifecycle rules, runtime settings, ranking constants, diagnostics, examples, and implementation locations.
 
+> **Documentation ownership:** The backend [documentation portal](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md) and [canonical Advanced Search workflow](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/workflows/advanced-search.md) own system behavior and API contracts. This frontend-owned reference preserves exact UI behavior, screenshots, observed caveats, and cross-stack source locations. Source and screenshot references were rechecked on 2026-08-20; live observations remain dated 2026-08-07.
+
 ## API base
 
 All routes are scoped to one knowledge base:
@@ -511,7 +513,7 @@ Attempts and evidence count are committed at terminal completion. During retriev
 
 ## Implementation map
 
-Backend repository: `/home/vitaliy/workspace/graphrag`
+Backend paths below are relative to `src/main/java/io/github/vfedoriv/graphrag/` in the [GraphRAG backend repository](https://github.com/vfedoriv/graphrag).
 
 | Concern | File |
 | --- | --- |
@@ -536,7 +538,7 @@ Backend repository: `/home/vitaliy/workspace/graphrag`
 | Result codec and DTOs | `service/AdvancedSearchResultCodec.java`, `dto/AdvancedSearchResultDtos.java` |
 | Runtime settings | `service/RuntimeSettingsService.java`, `src/main/resources/application.properties` |
 
-Frontend repository: `/home/vitaliy/workspace/graphrag-ui`
+Frontend paths below are relative to this repository.
 
 | Concern | File |
 | --- | --- |

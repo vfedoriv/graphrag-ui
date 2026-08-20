@@ -1,6 +1,8 @@
 # Chunking Strategy and Lifecycle
 
-This document explains how GraphRAG turns a parsed document into retrievable child chunks, optional parent chunks, contextualized embedding text, and graph-extraction input. It covers the backend implementation, frontend workflows, runtime configuration, revision tracking, and explicit reprocessing lifecycle as verified against the running applications on 2026-08-07.
+This document explains how GraphRAG turns a parsed document into retrievable child chunks, optional parent chunks, contextualized embedding text, and graph-extraction input. It covers the backend implementation, frontend workflows, runtime configuration, revision tracking, and explicit reprocessing lifecycle. The live examples were captured on 2026-08-07; source paths, controls, compatibility behavior, and screenshots were rechecked against both repositories on 2026-08-20.
+
+> **Documentation ownership:** The backend [documentation portal](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md) and [canonical Chunking and Reprocessing workflow](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/workflows/chunking-reprocessing.md) own system behavior and API contracts. This frontend-owned companion retains UI controls, screenshots, observed caveats, and implementation maps.
 
 For endpoint payloads, state machines, parser options, and a source-code map, see [Chunking Reference](reference.md).
 
@@ -299,11 +301,9 @@ Each plan stores an immutable snapshot of strategy, settings, tokenizer, schema,
 - Inspect source offsets and `sourceHash` when diagnosing citation or boundary issues. Inspect contextualization metadata when diagnosing embedding input.
 - Expect storage and embedding volume to rise as child targets shrink or overlap rises. Recursive parents add records but not embedding calls.
 
-## Known implementation gap
+## Flat inspection compatibility
 
-Verified on 2026-08-07: the frontend Chunk Explorer requests `kind=FLAT` when `flatChunkCount` is non-zero, while the backend bounded chunk endpoint accepts only `PARENT` or `CHILD`. Current live recursive documents have no flat population, so the normal view works, but a fixed-character or other flat population would receive HTTP 400 when the Explorer tries to load it.
-
-The contract should be aligned before relying on Explorer inspection of fixed-character output. The least disruptive options are to have the frontend request unparented `CHILD` records using the supported filters, or to add an explicitly documented `FLAT` backend filter. This document does not change application behavior.
+The earlier frontend/backend mismatch for flat inspection has been resolved. The frontend requests virtual `kind=FLAT`, and the backend now accepts that filter as unparented persisted `CHILD` chunks. Responses still report the persisted kind as `CHILD`; `FLAT` is a read filter, not a third stored kind. Combining `kind=FLAT` with `parentChunkId` remains invalid and returns HTTP 400.
 
 ## Related documentation
 

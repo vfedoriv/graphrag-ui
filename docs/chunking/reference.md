@@ -2,6 +2,8 @@
 
 This reference supplements [Chunking Strategy and Lifecycle](README.md) with exact constraints, API routes, provenance fields, migration semantics, examples, and implementation locations.
 
+> **Documentation ownership:** The backend [documentation portal](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/index.md) and [canonical Chunking and Reprocessing workflow](https://github.com/vfedoriv/graphrag/blob/main/src/site/markdown/workflows/chunking-reprocessing.md) own system behavior and API contracts. This frontend-owned reference preserves exact UI behavior, screenshots, compatibility notes, and cross-stack source locations.
+
 ## Effective settings and validation
 
 | Key | Type and constraints | Consumed by |
@@ -180,7 +182,7 @@ This is a global policy view. It is not scoped to the active knowledge base.
 | `GET /api/v1/documents/{documentId}/processing-options/defaults` | Read saved document defaults |
 | `PUT /api/v1/documents/{documentId}/processing-options/defaults` | Replace saved document defaults |
 | `DELETE /api/v1/documents/{documentId}/processing-options/defaults` | Clear saved defaults |
-| `GET /api/v1/documents/{documentId}/chunks/page` | Read a bounded page filtered by `PARENT` or `CHILD`, parent, or section |
+| `GET /api/v1/documents/{documentId}/chunks/page` | Read a bounded page filtered by persisted `PARENT`/`CHILD`, virtual `FLAT`, parent, or section |
 | `GET /api/v1/documents/{documentId}/chunks/hierarchy` | Read bounded parent summaries and `flatChunkCount` |
 | `GET /api/v1/documents/{documentId}/chunks/{chunkId}` | Read direct chunk detail |
 | `GET /api/v1/documents/{documentId}/chunks` | Legacy complete list; avoid in new clients |
@@ -301,19 +303,19 @@ Creation is allowed only for a matching, ready preview with selected work. The s
 
 Strategy settings are global. Explorer and Reprocessing are scoped to the selected knowledge base.
 
-## Known contract issue
+## Flat filter contract
 
-The hierarchy DTO reports `flatChunkCount`, where flat records are unparented `CHILD` chunks. The frontend currently translates that population into `kind=FLAT`, but the backend page filter validates only `PARENT` and `CHILD`. A request such as this returns HTTP 400:
+The hierarchy DTO reports `flatChunkCount`, where flat records are unparented persisted `CHILD` chunks. The frontend translates that population into the backend's virtual `kind=FLAT` page filter:
 
 ```text
 GET /api/v1/documents/{id}/chunks/page?page=0&size=20&kind=FLAT
 ```
 
-This is latent for the verified recursive documents because their `flatChunkCount` is zero. It affects inspection of fixed-character output and any recursive population that remains unparented.
+The request returns unparented records whose response `kind` remains `CHILD`; `FLAT` is not a third persisted kind. A simultaneous `parentChunkId` is invalid and returns HTTP 400. This contract supports fixed-character output and any recursive child population that remains unparented.
 
 ## Implementation source map
 
-Backend repository: `/home/vitaliy/workspace/graphrag`
+Backend paths below are relative to the [GraphRAG backend repository](https://github.com/vfedoriv/graphrag).
 
 | Concern | Primary implementation |
 | --- | --- |
@@ -332,7 +334,7 @@ Backend repository: `/home/vitaliy/workspace/graphrag`
 | HTTP endpoints | `src/main/java/io/github/vfedoriv/graphrag/controller/DocumentController.java`, `ChunkingStateController.java`, `ChunkMigrationController.java` |
 | Deployment defaults | `src/main/resources/application.properties` |
 
-Frontend repository: `/home/vitaliy/workspace/graphrag-ui`
+Frontend paths below are relative to this repository.
 
 | Concern | Primary implementation |
 | --- | --- |
@@ -347,7 +349,7 @@ Frontend repository: `/home/vitaliy/workspace/graphrag-ui`
 
 ## Verification snapshot
 
-The documentation was checked against the running UI and API on 2026-08-07:
+The live observations below were checked against the running UI and API on 2026-08-07. Source paths, controls, compatibility behavior, and screenshots were rechecked against both repositories on 2026-08-20:
 
 - Global strategy: `recursive` with the defaults listed above.
 - Token counting: exact CL100K.
