@@ -1,6 +1,6 @@
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AdvancedSearchPage } from './AdvancedSearchPage'
 import { AdvancedSearchResultFetchError } from './AdvancedSearchResultFetchError'
@@ -43,6 +43,7 @@ function mockAdvancedSearchApi(options: {
   createStatus?: 201 | 429 | 409
   onCreate?: (payload: Record<string, unknown>) => unknown
   initialRuns?: ReturnType<typeof runDetail>[]
+  onDetail?: (runId: string) => ReturnType<typeof jsonResponse> | undefined
 } = {}) {
   const runs = options.initialRuns ?? [runDetail('run-old', 'Earlier question', 'COMPLETED')]
   const requests: Array<{ url: string; init?: RequestInit }> = []
@@ -87,6 +88,8 @@ function mockAdvancedSearchApi(options: {
     }
     const detailMatch = path.match(/advanced-search-runs\/(run-[^/]+)$/)
     if (detailMatch) {
+      const response = options.onDetail?.(detailMatch[1])
+      if (response) return response
       const run = runs.find((item) => item.id === detailMatch[1] && item.knowledgeBaseId === knowledgeBaseId)
       return run ? jsonResponse(200, run) : jsonResponse(404, { title: 'Not found' })
     }
@@ -195,6 +198,80 @@ describe('AdvancedSearchPage', () => {
       expect(screen.queryByText('Ready for advanced search')).not.toBeInTheDocument()
     }
   })
+
+  it.each(['mismatched', 'missing', 'expired'] as const)(
+    'clears a %s focused run while preserving the draft, options, and browsed history',
+    async (scenario) => {
+      const runs = Array.from({ length: 12 }, (_, index) => runDetail(`run-history-${index}`, `Retained question ${index}`, 'RUNNING'))
+      const staleRun = runs[10]
+      let expired = false
+      const { requests } = mockAdvancedSearchApi({
+        initialRuns: runs,
+        onDetail: (id) => {
+          if (id !== staleRun.id) return
+          if (scenario === 'mismatched') return jsonResponse(200, { ...staleRun, knowledgeBaseId: 'kb-2' })
+          if (scenario === 'missing' || expired) return jsonResponse(404, { title: 'Not found', detail: 'Run is no longer retained' })
+        },
+      })
+      const user = userEvent.setup()
+      const { queryClient } = renderWithProviders(
+        <MemoryRouter initialEntries={['/advanced-search?view=history']}>
+          <WorkspaceControls />
+          <AdvancedSearchPage />
+        </MemoryRouter>,
+        { selectedKnowledgeBaseId: 'kb-1' },
+      )
+
+      await user.type(await screen.findByLabelText('Question'), 'Keep my next question')
+      await user.click(screen.getByRole('button', { name: 'Advanced options' }))
+      await user.type(screen.getByLabelText('Maximum evidence'), '17')
+      await user.click(screen.getByLabelText('Include evidence text'))
+      await user.selectOptions(screen.getByLabelText('Status'), 'RUNNING')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      await user.click(await screen.findByRole('button', { name: staleRun.query }))
+
+      if (scenario === 'expired') {
+        expect(await screen.findByRole('heading', { name: staleRun.id })).toBeInTheDocument()
+        expect(screen.getByLabelText('Current URL')).toHaveTextContent(`runId=${staleRun.id}`)
+        // A previously loaded run disappears from retention on the next detail refresh.
+        expired = true
+        await act(async () => {
+          await queryClient.refetchQueries({ queryKey: queryKeys.advancedSearchRun('kb-1', staleRun.id), exact: true })
+        })
+      }
+
+      const notice = scenario === 'mismatched' ? 'Run selection cleared' : 'Run is no longer available'
+      expect(await screen.findByText(notice)).toBeInTheDocument()
+      expect(screen.getByText(scenario === 'mismatched'
+        ? 'This run belongs to a different knowledge base, so it was not selected automatically.'
+        : 'This run may have expired or may not belong to the selected knowledge base. Your question, options, and history were preserved.',
+      )).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByLabelText('Current URL')).toHaveTextContent(/^\/advanced-search\?view=history$/))
+      expect(screen.getByRole('heading', { name: 'No focused run' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: staleRun.id })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.getByText('Select a retained history row or submit a new search to monitor its lifecycle here.')).toBeInTheDocument()
+      expect(screen.getByText('Workspace: Research')).toBeInTheDocument()
+      expect(screen.getByLabelText('Question')).toHaveValue('Keep my next question')
+      expect(screen.getByRole('button', { name: 'Hide advanced options' })).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByLabelText('Maximum evidence')).toHaveValue(17)
+      expect(screen.getByLabelText('Include evidence text')).not.toBeChecked()
+      expect(screen.getByRole('button', { name: 'Submit search' })).toBeEnabled()
+      expect(screen.getByLabelText('Status')).toHaveValue('RUNNING')
+      expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: staleRun.query })).toBeInTheDocument()
+      expect(requests.filter(({ url }) => url.endsWith(`/advanced-search-runs/${staleRun.id}`))).toHaveLength(scenario === 'expired' ? 2 : 1)
+
+      // Follow the recovery guidance by selecting another retained run on the same page.
+      await user.click(screen.getByRole('button', { name: runs[11].query }))
+      expect(await screen.findByRole('heading', { name: runs[11].id })).toBeInTheDocument()
+      expect(screen.getByLabelText('Current URL')).toHaveTextContent(`runId=${runs[11].id}`)
+      expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+      expect(screen.getByLabelText('Question')).toHaveValue('Keep my next question')
+    },
+  )
 
   it('shows readiness blockers and informational degraded capabilities separately', async () => {
     mockAdvancedSearchApi({
