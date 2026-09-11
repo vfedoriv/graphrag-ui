@@ -1,10 +1,12 @@
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AdvancedSearchPage } from './AdvancedSearchPage'
 import { AdvancedSearchResultFetchError } from './AdvancedSearchResultFetchError'
 import { ApiError } from '../../api/types'
+import { queryKeys } from '../../api/queryKeys'
+import { useSelectedKnowledgeBase } from '../../shared/state/useSelectedKnowledgeBase'
 import { renderWithProviders, jsonResponse, stubFetch } from '../../test/helpers'
 
 const knowledgeBases = [{ id: 'kb-1', name: 'Research', activeSchemaId: 'schema-1', createdAt: '2026-08-01T00:00:00Z' }]
@@ -40,20 +42,22 @@ function mockAdvancedSearchApi(options: {
   readiness?: Record<string, unknown>
   createStatus?: 201 | 429 | 409
   onCreate?: (payload: Record<string, unknown>) => unknown
+  initialRuns?: ReturnType<typeof runDetail>[]
 } = {}) {
-  const runs = [runDetail('run-old', 'Earlier question', 'COMPLETED')]
+  const runs = options.initialRuns ?? [runDetail('run-old', 'Earlier question', 'COMPLETED')]
   const requests: Array<{ url: string; init?: RequestInit }> = []
   let createCount = 0
   const fetchMock = stubFetch((url, init) => {
     requests.push({ url, init })
     const parsed = new URL(url, 'http://test')
     const path = parsed.pathname.replace('/api/v1', '')
+    const knowledgeBaseId = path.match(/^\/knowledge-bases\/([^/]+)/)?.[1]
 
     if (path === '/knowledge-bases') return jsonResponse(200, knowledgeBases)
     if (path === '/runtime-settings') return jsonResponse(200, [])
     if (path.endsWith('/readiness')) {
       return jsonResponse(200, options.readiness ?? {
-        knowledgeBaseId: 'kb-1', ready: true, profileId: 'profile-1', profileRevision: 2,
+        knowledgeBaseId, ready: true, profileId: 'profile-1', profileRevision: 2,
         graphBranchAvailable: true, embeddedCorpusPresent: true, blockers: [], informational: [],
       })
     }
@@ -69,17 +73,38 @@ function mockAdvancedSearchApi(options: {
     }
     if (path.endsWith('/advanced-search-runs') && init?.method !== 'POST') {
       const status = parsed.searchParams.get('status')
-      const content = runs.filter((run) => !status || run.status === status).map(summary)
-      return jsonResponse(200, { page: Number(parsed.searchParams.get('page') ?? 0), size: 10, totalElements: content.length, content })
+      const matching = runs.filter((run) => run.knowledgeBaseId === knowledgeBaseId && (!status || run.status === status))
+      const page = Number(parsed.searchParams.get('page') ?? 0)
+      return jsonResponse(200, { page, size: 10, totalElements: matching.length, content: matching.slice(page * 10, (page + 1) * 10).map(summary) })
+    }
+    const cancelMatch = path.match(/advanced-search-runs\/(run-[^/]+)\/cancel$/)
+    if (cancelMatch && init?.method === 'POST') {
+      const run = runs.find((item) => item.id === cancelMatch[1] && item.knowledgeBaseId === knowledgeBaseId)
+      if (run) {
+        run.cancellationRequested = true
+        return jsonResponse(200, run)
+      }
     }
     const detailMatch = path.match(/advanced-search-runs\/(run-[^/]+)$/)
     if (detailMatch) {
-      const run = runs.find((item) => item.id === detailMatch[1])
+      const run = runs.find((item) => item.id === detailMatch[1] && item.knowledgeBaseId === knowledgeBaseId)
       return run ? jsonResponse(200, run) : jsonResponse(404, { title: 'Not found' })
     }
     return jsonResponse(200, {})
   })
   return { fetchMock, requests, runs }
+}
+
+function WorkspaceControls() {
+  const { setSelectedKnowledgeBaseId } = useSelectedKnowledgeBase()
+  const location = useLocation()
+  return (
+    <>
+      <button onClick={() => setSelectedKnowledgeBaseId('kb-2')}>Switch workspace</button>
+      <button onClick={() => setSelectedKnowledgeBaseId(null)}>Clear workspace</button>
+      <output aria-label='Current URL'>{location.pathname}{location.search}</output>
+    </>
+  )
 }
 
 function renderPage(selectedKnowledgeBaseId: string | null = 'kb-1') {
@@ -98,6 +123,77 @@ describe('AdvancedSearchPage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it.each(['Switch workspace', 'Clear workspace'])('resets focused run context on %s', async (action) => {
+    const oldRuns = Array.from({ length: 11 }, (_, index) => runDetail(`run-old-${index}`, `Old question ${index}`, 'RUNNING'))
+    const newRun = { ...runDetail('run-new', 'New workspace question'), knowledgeBaseId: 'kb-2' }
+    const { requests } = mockAdvancedSearchApi({ initialRuns: [...oldRuns, newRun] })
+    const user = userEvent.setup()
+    const { queryClient } = renderWithProviders(
+      <MemoryRouter initialEntries={['/advanced-search?runId=run-old-0&view=history']}>
+        <WorkspaceControls />
+        <AdvancedSearchPage />
+      </MemoryRouter>,
+      { selectedKnowledgeBaseId: 'kb-1' },
+    )
+
+    expect(await screen.findByRole('heading', { name: 'run-old-0' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('runId=run-old-0')
+    await user.selectOptions(screen.getByLabelText('Status'), 'RUNNING')
+    await user.click(await screen.findByRole('button', { name: 'Next' }))
+    expect(await screen.findByRole('button', { name: 'Old question 10' })).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByText('Cancellation state updated')).toBeInTheDocument()
+
+    // Include an inactive result entry to ensure the whole old workspace is evicted.
+    const oldResultKey = queryKeys.advancedSearchResult('kb-1', 'run-retained')
+    const otherResultKey = queryKeys.advancedSearchResult('kb-2', 'run-retained')
+    const retainedResult = { retained: true }
+    queryClient.setQueryData(oldResultKey, retainedResult)
+    queryClient.setQueryData(otherResultKey, retainedResult)
+    const oldKeys = [
+      queryKeys.advancedSearchReadiness('kb-1'),
+      queryKeys.advancedSearchHistory('kb-1', 'RUNNING', 1, 10),
+      queryKeys.advancedSearchRun('kb-1', 'run-old-0'),
+      oldResultKey,
+    ]
+    oldKeys.forEach((key) => expect(queryClient.getQueryData(key)).toBeDefined())
+    const cachedKnowledgeBases = queryClient.getQueryData(queryKeys.knowledgeBases())
+    expect(cachedKnowledgeBases).toEqual(knowledgeBases)
+
+    await user.click(screen.getByRole('button', { name: action }))
+
+    expect(await screen.findByText('Run selection cleared')).toBeInTheDocument()
+    expect(screen.getByText('The previous run selection was cleared because the knowledge base changed. History and readiness are now scoped to the new workspace.')).toBeInTheDocument()
+    expect(screen.queryByText('Cancellation state updated')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent(/^\/advanced-search\?view=history$/)
+    expect(screen.getByRole('heading', { name: 'No focused run' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'run-old-0' })).not.toBeInTheDocument()
+    expect(screen.getByText(/^Page 1 of /)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled()
+    expect(screen.getByLabelText('Status')).toHaveValue('RUNNING')
+    await waitFor(() => expect(queryClient.getQueriesData({ queryKey: queryKeys.advancedSearch('kb-1') })).toEqual([]))
+    expect(queryClient.getQueryData(otherResultKey)).toEqual(retainedResult)
+    expect(queryClient.getQueryData(queryKeys.knowledgeBases())).toEqual(cachedKnowledgeBases)
+
+    if (action === 'Switch workspace') {
+      await waitFor(() => expect(requests.some(({ url }) => {
+        const parsed = new URL(url, 'http://test')
+        return parsed.pathname === '/api/v1/knowledge-bases/kb-2/queries/advanced-search-runs'
+          && parsed.searchParams.get('page') === '0'
+          && parsed.searchParams.get('status') === 'RUNNING'
+      })).toBe(true))
+      expect(await screen.findByText('Ready for advanced search')).toBeInTheDocument()
+      await user.selectOptions(screen.getByLabelText('Status'), 'ALL')
+      expect(await screen.findByRole('button', { name: 'New workspace question' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Old question 10' })).not.toBeInTheDocument()
+    } else {
+      expect(screen.getByText('Workspace: None selected')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Submit search' })).toBeDisabled()
+      expect(screen.queryByText('Ready for advanced search')).not.toBeInTheDocument()
+    }
   })
 
   it('shows readiness blockers and informational degraded capabilities separately', async () => {
