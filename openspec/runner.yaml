@@ -1,0 +1,7 @@
+version: 1
+defaultModel: session
+maxParallel: 4
+worktrees: auto
+terminal: auto
+setup: []
+verifyIntegration: []
