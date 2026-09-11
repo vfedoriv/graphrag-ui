@@ -1,6 +1,6 @@
 ## 1. Document Source and Processing Coverage
 
-- [ ] 1.1 Add focused tests for document open-target selection across local paths, supported URIs, missing metadata, malformed URIs, and unsupported protocols; verify the targeted test file passes.
+- [x] 1.1 Add focused tests for document open-target selection across local paths, supported URIs, missing metadata, malformed URIs, and unsupported protocols; verify the targeted test file passes.
 - [ ] 1.2 Add tests for local-file open requests covering success, structured error detail, malformed error bodies, 404 fallback guidance, and generic failure guidance; verify fetch requests and visible/error results match the contract.
 - [ ] 1.3 Add tests for document error formatting across `ApiError` details, field errors, ordinary errors, and unknown failures; verify the focused helper suite passes.
 - [ ] 1.4 Extend document workflow tests for local opening, browser opening, blocked popups, clipboard copying, and pending/error cleanup; verify user-facing feedback and side effects through React Testing Library.
