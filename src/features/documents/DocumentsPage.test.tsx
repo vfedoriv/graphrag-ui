@@ -23,6 +23,11 @@ const localDocument = {
   contentUri: 'file:///var/graphrag/kb-a/a.txt',
 }
 
+const remoteDocument = {
+  ...documentFixture,
+  contentUri: 'https://example.test/documents/a.txt',
+}
+
 type OpenResponse = ReturnType<typeof jsonResponse> | ReturnType<typeof textResponse>
 
 function renderLocalDocumentPage(openResponse: OpenResponse) {
@@ -38,6 +43,7 @@ function renderLocalDocumentPage(openResponse: OpenResponse) {
 
 describe('documents page', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
     vi.useRealTimers()
   })
@@ -96,18 +102,68 @@ describe('documents page', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/chunks'))).toBe(false)
   })
 
-  it('shows the local-file open success and sends the expected request', async () => {
+  it('shows local opening progress, clears prior errors after a retry, and sends the expected request', async () => {
     const user = userEvent.setup()
-    const fetchMock = renderLocalDocumentPage(jsonResponse(202, { status: 'OPEN_REQUESTED' }))
+    let resolveOpen: ((value: Response) => void) | undefined
+    let openAttempts = 0
+    const fetchMock = stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/documents' && !init?.method) return jsonResponse(200, [localDocument])
+      if (url === '/__graphrag-ui/open-local-file' && init?.method === 'POST') {
+        openAttempts += 1
+        if (openAttempts === 1) return jsonResponse(500, { detail: 'The local file could not be opened.' })
+        return new Promise<Response>((resolve) => {
+          resolveOpen = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
 
     await user.click(await screen.findByRole('button', { name: 'Open' }))
+    expect(await screen.findByText('The local file could not be opened.')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'Open' }))
+    expect(screen.getByRole('button', { name: 'Opening...' })).toBeDisabled()
+    expect(screen.queryByText('The local file could not be opened.')).not.toBeInTheDocument()
+    resolveOpen?.(jsonResponse(202, { status: 'OPEN_REQUESTED' }) as Response)
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toBeEnabled())
     expect(await screen.findByText('Document opened in another window')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/__graphrag-ui/open-local-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: localDocument.localPath }),
     })
+  })
+
+  it('opens supported browser sources in a separate window', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({} as Window)
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/documents' && !init?.method) return jsonResponse(200, [remoteDocument])
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+    await user.click(await screen.findByRole('button', { name: 'Open' }))
+
+    expect(openSpy).toHaveBeenCalledWith(remoteDocument.contentUri, '_blank', 'noopener,noreferrer')
+    expect(screen.queryByText('Open failed')).not.toBeInTheDocument()
+  })
+
+  it('shows fallback guidance when the browser blocks a document popup', async () => {
+    vi.spyOn(window, 'open').mockReturnValue(null)
+    const user = userEvent.setup()
+    stubFetch((url, init) => {
+      if (url === '/api/v1/knowledge-bases/kb-a/documents' && !init?.method) return jsonResponse(200, [remoteDocument])
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    renderWithProviders(<DocumentsPage />, { selectedKnowledgeBaseId: 'kb-a' })
+    await user.click(await screen.findByRole('button', { name: 'Open' }))
+
+    expect(await screen.findByText('The browser blocked opening this document. Copy the source path and open it locally.')).toBeInTheDocument()
   })
 
   it.each([
