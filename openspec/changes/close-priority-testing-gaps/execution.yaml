@@ -1,0 +1,71 @@
+version: 1
+tasks:
+  '1.1':
+    model: gpt-5.6-luna
+    reasoningEffort: xhigh
+    parallel: true
+  '1.2':
+    model: gpt-5.6-luna
+    reasoningEffort: xhigh
+    dependsOn:
+      - '1.1'
+  '1.3':
+    model: gpt-5.6-luna
+    reasoningEffort: xhigh
+    parallel: true
+  '1.4':
+    model: gpt-5.6-terra
+    reasoningEffort: high
+    dependsOn:
+      - '1.2'
+      - '1.3'
+  '1.5':
+    model: gpt-5.6-terra
+    reasoningEffort: high
+    dependsOn:
+      - '1.4'
+  '2.1':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    parallel: true
+  '2.2':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    dependsOn:
+      - '2.1'
+  '2.3':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    dependsOn:
+      - '2.2'
+  '3.1':
+    model: gpt-5.6-terra
+    reasoningEffort: high
+    parallel: true
+  '3.2':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    parallel: true
+  '3.3':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    dependsOn:
+      - '3.2'
+  '4.1':
+    model: gpt-5.6-sol
+    reasoningEffort: medium
+    dependsOn:
+      - '1.5'
+      - '2.3'
+      - '3.1'
+      - '3.3'
+  '4.2':
+    model: gpt-6-astra
+    reasoningEffort: medium
+    dependsOn:
+      - '4.1'
+  '4.3':
+    model: gpt-5.6-sol
+    reasoningEffort: medium
+    dependsOn:
+      - '4.2'
