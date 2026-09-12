@@ -10,7 +10,7 @@
 
 - [x] 2.1 Add tests for changing or clearing the selected knowledge base while a run is focused; verify the run query parameter, history page, notices, and old workspace cache are reset as intended.
 - [x] 2.2 Add tests for mismatched, missing, and expired focused runs; verify stale run selection is cleared while question/options/history state and actionable feedback are preserved.
-- [ ] 2.3 Add tests for maximum-evidence boundaries, invalid values, queue conflicts, ordinary submission failures, cancellation failures, and terminal-state cancellation rules; verify requests, disabled actions, and visible notices.
+- [x] 2.3 Add tests for maximum-evidence boundaries, invalid values, queue conflicts, ordinary submission failures, cancellation failures, and terminal-state cancellation rules; verify requests, disabled actions, and visible notices.
 
 ## 3. Schema Workflow Coverage
 
