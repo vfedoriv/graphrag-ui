@@ -70,7 +70,7 @@ const denseRelationshipSchemaContent = JSON.stringify({
   ],
 })
 
-function renderBuilder(initialEntry = '/schema-builder', strict = false) {
+function renderBuilder(initialEntry = '/schema-builder', strict = false, selectedKnowledgeBaseId: string | null = 'kb-a') {
   const page = (
     <MemoryRouter initialEntries={[initialEntry]}>
       <SchemaBuilderPage />
@@ -79,7 +79,7 @@ function renderBuilder(initialEntry = '/schema-builder', strict = false) {
 
   return renderWithProviders(
     strict ? <StrictMode>{page}</StrictMode> : page,
-    { selectedKnowledgeBaseId: 'kb-a' },
+    { selectedKnowledgeBaseId },
   )
 }
 
@@ -458,6 +458,146 @@ describe('SchemaBuilderPage', () => {
 
     await waitFor(() => {
       expect(queryClient.getQueryCache().findAll().length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('failure feedback and guarded actions', () => {
+    function stubSchemaResponse(path: string, method: string, status: number, payload: unknown) {
+      const defaultFetch = vi.mocked(fetch).getMockImplementation()!
+      return stubFetch((url, init) =>
+        url.endsWith(path) && (init?.method ?? 'GET') === method
+          ? jsonResponse(status, payload)
+          : defaultFetch(url, init),
+      )
+    }
+
+    function schemaWrites(fetchMock: ReturnType<typeof stubFetch>) {
+      return fetchMock.mock.calls.filter(([url, init]) =>
+        String(url).includes('/api/v1/schemas') && ['POST', 'PUT', 'DELETE'].includes(init?.method ?? 'GET'),
+      )
+    }
+
+    it('shows schema load failure details and prevents updating an unloaded source', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubSchemaResponse('/schemas/schema-1', 'GET', 404, {
+        title: 'Not found', detail: 'The requested schema no longer exists.', status: 404,
+      })
+      renderBuilder('/schema-builder?schemaId=schema-1')
+
+      expect(await screen.findByText('Import failed')).toBeVisible()
+      expect(screen.getByText('The requested schema no longer exists.')).toBeVisible()
+      expect(screen.getByText('Source schema: Unsaved draft')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Contract' })).not.toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Import existing schema' })).toHaveValue('schema-1')
+      expect(screen.getByRole('button', { name: 'Update source' })).toBeDisabled()
+      await user.click(screen.getByRole('button', { name: 'Update source' }))
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/schemas/schema-1', expect.anything())
+      expect(schemaWrites(fetchMock)).toEqual([])
+    })
+
+    it.each([
+      ['Validate', '/schemas/validate', 'POST', 'Validate failed', 'Schema validation service is unavailable.'],
+      ['Create schema', '/schemas', 'POST', 'Create failed', 'A schema with this name and version already exists.'],
+      ['Update source', '/schemas/schema-1', 'PUT', 'Update failed', 'The source schema cannot be updated.'],
+    ])('shows %s request failure details and retains the draft for retry', async (action, path, method, title, detail) => {
+      const user = userEvent.setup()
+      const fetchMock = stubSchemaResponse(path, method, 400, { title: 'Request rejected', detail, status: 400 })
+      renderBuilder('/schema-builder?schemaId=schema-1')
+      await screen.findByRole('button', { name: 'Contract' })
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      const rawEditor = screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement
+      const content = rawEditor.value
+
+      await user.click(screen.getByRole('button', { name: action }))
+
+      expect(await screen.findByText(title)).toBeVisible()
+      expect(screen.getByText(detail)).toBeVisible()
+      expect(rawEditor).toHaveValue(content)
+      expect(screen.getByRole('button', { name: 'Contract' })).toBeVisible()
+      expect(screen.getByRole('button', { name: action })).toBeEnabled()
+      expect(screen.queryByText('Waiting for schema builder workflow response...')).not.toBeInTheDocument()
+      expect(screen.queryByText('Schema is valid.')).not.toBeInTheDocument()
+      expect(screen.queryByText(/Schema legal-contracts v1 (created|updated)\./)).not.toBeInTheDocument()
+      const writes = schemaWrites(fetchMock)
+      expect(writes).toHaveLength(1)
+      expect(writes[0]).toEqual([`/api/v1${path}`, expect.objectContaining({ method })])
+      expect(JSON.parse(String(writes[0][1]?.body))).toEqual({
+        content,
+        ...(action === 'Validate' ? {} : { sourceType: 'PREDEFINED' }),
+        ...(action === 'Create schema' ? { knowledgeBaseId: 'kb-a' } : {}),
+      })
+    })
+
+    it('shows all server validation errors without claiming success or saving the schema', async () => {
+      const user = userEvent.setup()
+      const fetchMock = stubSchemaResponse('/schemas/validate', 'POST', 200, {
+        valid: false, errors: ['Contract index is unsupported.', 'Relationship constraint is invalid.'],
+      })
+      renderBuilder('/schema-builder?schemaId=schema-1')
+      await screen.findByRole('button', { name: 'Contract' })
+      await user.click(screen.getByRole('button', { name: 'Validate' }))
+
+      expect(await screen.findByText('Schema validation errors')).toBeVisible()
+      expect(screen.getByText('Contract index is unsupported.; Relationship constraint is invalid.')).toBeVisible()
+      expect(screen.queryByText('Schema is valid.')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
+      expect(schemaWrites(fetchMock)).toEqual([
+        ['/api/v1/schemas/validate', expect.objectContaining({ method: 'POST' })],
+      ])
+    })
+
+    it('guards invalid drafts and missing source actions without a selected knowledge base', async () => {
+      const user = userEvent.setup()
+      const fetchMock = vi.mocked(fetch)
+      renderBuilder('/schema-builder', false, null)
+      expect(screen.getByText('Workspace: None selected')).toBeVisible()
+      expect(screen.getByRole('combobox', { name: 'Import existing schema' })).toBeDisabled()
+      expect(screen.getByText('Draft needs attention')).toBeVisible()
+      for (const action of ['Validate', 'Create schema', 'Update source']) {
+        expect(screen.getByRole('button', { name: action })).toBeDisabled()
+        await user.click(screen.getByRole('button', { name: action }))
+      }
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      const rawEditor = screen.getByLabelText('Schema builder JSON content')
+      fireEvent.change(rawEditor, { target: { value: importedSchemaContent } })
+      expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Create schema' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Update source' })).toBeDisabled()
+      await user.click(screen.getByRole('button', { name: 'Update source' }))
+
+      fireEvent.change(rawEditor, { target: { value: '{{' } })
+      expect(screen.getByText('JSON parse error')).toBeVisible()
+      expect(rawEditor).toHaveValue('{{')
+      for (const action of ['Validate', 'Create schema', 'Update source']) {
+        expect(screen.getByRole('button', { name: action })).toBeDisabled()
+        await user.click(screen.getByRole('button', { name: action }))
+      }
+      expect(schemaWrites(fetchMock)).toEqual([])
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/knowledge-bases/'))).toBe(false)
+    })
+
+    it('allows valid standalone validation and creation without sending a knowledge base id', async () => {
+      const user = userEvent.setup()
+      const fetchMock = vi.mocked(fetch)
+      sessionStorage.setItem('graphrag.schemaBuilderDraft', importedSchemaContent)
+      renderBuilder('/schema-builder?draft=session', false, null)
+      await screen.findByRole('button', { name: 'Contract' })
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      const content = (screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value
+      await user.click(screen.getByRole('button', { name: 'Validate' }))
+      expect(await screen.findByText('Schema is valid.')).toBeVisible()
+      await user.click(screen.getByRole('button', { name: 'Create schema' }))
+      expect(await screen.findByText('Schema legal-contracts v1 created.')).toBeVisible()
+      expect(screen.getByRole('button', { name: 'Update source' })).toBeDisabled()
+      const writes = schemaWrites(fetchMock)
+      expect(writes.map(([url, init]) => [url, init?.method])).toEqual([
+        ['/api/v1/schemas/validate', 'POST'], ['/api/v1/schemas', 'POST'],
+      ])
+      const validation = JSON.parse(String(writes[0][1]?.body))
+      const creation = JSON.parse(String(writes[1][1]?.body))
+      expect(validation).toEqual({ content })
+      expect(creation).toEqual({ content: validation.content, sourceType: 'PREDEFINED' })
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/knowledge-bases/'))).toBe(false)
     })
   })
 
