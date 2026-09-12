@@ -1,6 +1,9 @@
-import { StrictMode } from 'react'
+import { createElement, StrictMode } from 'react'
+import * as xyflow from '@xyflow/react'
+import type { Connection, ReactFlowProps } from '@xyflow/react'
+import type { SchemaFlowEdge, SchemaFlowNode } from './schemaBuilderFlow'
 import { MemoryRouter } from 'react-router-dom'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SchemaBuilderPage } from './SchemaBuilderPage'
 import { buildSchemaFlowEdges, buildSchemaFlowNodes, routeRelationshipPath } from './schemaBuilderFlow'
@@ -239,6 +242,170 @@ describe('SchemaBuilderPage', () => {
     await user.click(screen.getByRole('button', { name: 'Raw View' }))
 
     expect((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value).toContain('"Contract"')
+  })
+
+  describe('element interaction synchronization', () => {
+    let canvas: ReactFlowProps<SchemaFlowNode, SchemaFlowEdge>
+
+    beforeEach(() => {
+      // Keep the shared canvas double, capturing only its public controlled props.
+      // jsdom cannot perform React Flow's pointer/geometry-based reconnection gesture.
+      const renderFlow = xyflow.ReactFlow
+      vi.spyOn(xyflow, 'ReactFlow').mockImplementation((props) => {
+        canvas = props as ReactFlowProps<SchemaFlowNode, SchemaFlowEdge>
+        return createElement(renderFlow, props)
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    function readSchema() {
+      return JSON.parse((screen.getByLabelText('Schema builder JSON content') as HTMLTextAreaElement).value)
+    }
+
+    function expectNoSelection() {
+      expect(screen.getByText('Select a node or relationship on the canvas to edit its fields.')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Label')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('From node')).not.toBeInTheDocument()
+      expect(canvas.nodes?.some((node) => node.selected || node.data.isRelationshipEndpoint)).toBe(false)
+      expect(canvas.edges?.some((edge) => edge.selected)).toBe(false)
+    }
+
+    async function removeSelected(user: ReturnType<typeof userEvent.setup>) {
+      const heading = screen.getByRole('heading', { name: /^(Node|Relationship)$/ })
+      await user.click(within(heading.parentElement!).getByRole('button', { name: 'Remove' }))
+    }
+
+    it('adds and removes nodes and relationships with synchronized defaults and cleared inspectors', async () => {
+      const user = userEvent.setup()
+      renderBuilder()
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      expectNoSelection()
+      expect(screen.getByRole('button', { name: 'Add relationship' })).toBeDisabled()
+
+      await user.click(screen.getByRole('button', { name: 'Add node' }))
+      expect(screen.getByLabelText('Label')).toHaveValue('Node1')
+      expect(screen.getByLabelText('Key properties')).toHaveValue('node1Id')
+      expect(readSchema().nodes).toEqual([{
+        label: 'Node1', key: 'node1Id',
+        properties: [{ name: 'node1Id', type: 'string', required: true }],
+      }])
+      await user.click(screen.getByRole('button', { name: 'Add relationship' }))
+      expect(screen.getByLabelText('Type')).toHaveValue('RELATIONSHIP_1')
+      expect(screen.getByLabelText('From node')).toHaveDisplayValue('Node1')
+      expect(screen.getByLabelText('To node')).toHaveDisplayValue('Node1')
+      expect(readSchema().relationships).toEqual([{ type: 'RELATIONSHIP_1', from: 'Node1', to: 'Node1' }])
+      await removeSelected(user)
+      expectNoSelection()
+      expect(readSchema().relationships).toEqual([])
+      expect(screen.queryByRole('button', { name: 'Select relationship RELATIONSHIP_1' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Add node' }))
+      expect(screen.getByLabelText('Label')).toHaveValue('Node2')
+      await user.click(screen.getByRole('button', { name: 'Add relationship' }))
+      expect(screen.getByLabelText('From node')).toHaveDisplayValue('Node1')
+      expect(screen.getByLabelText('To node')).toHaveDisplayValue('Node2')
+      expect(readSchema().relationships).toEqual([{ type: 'RELATIONSHIP_1', from: 'Node1', to: 'Node2' }])
+      await user.click(screen.getByRole('button', { name: 'Node2' }))
+      expect(screen.queryByLabelText('Type')).not.toBeInTheDocument()
+      await removeSelected(user)
+      expectNoSelection()
+      expect(readSchema().nodes).toHaveLength(1)
+      expect(readSchema().relationships).toEqual([])
+      expect(screen.queryByRole('button', { name: 'Node2' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Node1' }))
+      await removeSelected(user)
+      expectNoSelection()
+      expect(readSchema().nodes).toEqual([])
+      expect(screen.getByRole('button', { name: 'Add relationship' })).toBeDisabled()
+    })
+
+    it('connects and reconnects while preserving relationship fields and selecting the updated endpoints', async () => {
+      const user = userEvent.setup()
+      renderBuilder('/schema-builder?schemaId=schema-1')
+      await screen.findByRole('button', { name: 'Contract' })
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      const imported = readSchema()
+      await user.click(screen.getByRole('button', { name: 'Add node' }))
+      const [contract, party, added] = canvas.nodes!
+      const connection: Connection = {
+        source: party.id, target: added.id,
+        sourceHandle: 'source-bottom-80', targetHandle: 'target-top-20',
+      }
+      expect(canvas.isValidConnection!(connection)).toBe(true)
+      act(() => canvas.onConnect!(connection))
+      expect(screen.getByLabelText('Type')).toHaveValue('RELATIONSHIP_2')
+      expect(screen.getByLabelText('From node')).toHaveDisplayValue('Party')
+      expect(screen.getByLabelText('To node')).toHaveDisplayValue('Node3')
+      expect(readSchema().relationships).toEqual([
+        imported.relationships[0], { type: 'RELATIONSHIP_2', from: 'Party', to: 'Node3' },
+      ])
+      expect(canvas.edges![1]).toMatchObject({ selected: true, ...connection })
+
+      // Reconnect the existing rich relationship, leaving the other edge untouched.
+      const oldEdge = canvas.edges![0]
+      const reconnect = { ...connection, source: added.id, target: contract.id }
+      expect(canvas.isValidConnection!(reconnect)).toBe(true)
+      act(() => canvas.onReconnect!(oldEdge, reconnect))
+      expect(screen.getByLabelText('Type')).toHaveValue('HAS_PARTY')
+      expect(screen.getByLabelText('From node')).toHaveDisplayValue('Node3')
+      expect(screen.getByLabelText('To node')).toHaveDisplayValue('Contract')
+      expect(screen.getAllByLabelText('Relationship properties name')).toHaveLength(5)
+      expect(readSchema().relationships).toEqual([
+        { ...imported.relationships[0], from: 'Node3', to: 'Contract' },
+        { type: 'RELATIONSHIP_2', from: 'Party', to: 'Node3' },
+      ])
+      expect(readSchema().indexes).toEqual(imported.indexes)
+      expect(canvas.edges![0]).toMatchObject({ id: oldEdge.id, selected: true, ...reconnect })
+      expect(canvas.edges![1].selected).toBe(false)
+      expect(canvas.nodes!.filter((node) => node.data.isRelationshipEndpoint).map((node) => node.data.label)).toEqual(['Contract', 'Node3'])
+
+      const afterReconnect = readSchema()
+      await user.click(screen.getByRole('button', { name: 'Party' }))
+      expect(screen.getByLabelText('Label')).toHaveValue('Party')
+      expect(screen.queryByLabelText('From node')).not.toBeInTheDocument()
+      expect(canvas.nodes!.filter((node) => node.selected).map((node) => node.id)).toEqual([party.id])
+      expect(canvas.nodes!.some((node) => node.data.isRelationshipEndpoint)).toBe(false)
+      expect(canvas.edges!.some((edge) => edge.selected)).toBe(false)
+      act(() => canvas.onEdgeClick!({} as Parameters<NonNullable<typeof canvas.onEdgeClick>>[0], canvas.edges![0]))
+      expect(screen.getByLabelText('Type')).toHaveValue('HAS_PARTY')
+      expect(screen.queryByLabelText('Label')).not.toBeInTheDocument()
+      expect(readSchema()).toEqual(afterReconnect)
+
+      await user.click(screen.getByRole('button', { name: 'Contract' }))
+      await removeSelected(user)
+      expectNoSelection()
+      expect(readSchema().relationships).toEqual([afterReconnect.relationships[1]])
+      expect(canvas.edges).toHaveLength(1)
+      expect(screen.queryByRole('button', { name: 'Select relationship HAS_PARTY' })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      ['missing source', '', 'node-party-2'],
+      ['missing target', 'node-contract-1', ''],
+      ['self connection', 'node-contract-1', 'node-contract-1'],
+    ])('rejects %s for both connection and reconnection without changing content or selection', async (_, source, target) => {
+      const user = userEvent.setup()
+      renderBuilder('/schema-builder?schemaId=schema-1')
+      await user.click(await screen.findByRole('button', { name: 'Contract' }))
+      await user.click(screen.getByRole('button', { name: 'Raw View' }))
+      const before = readSchema()
+      const connection: Connection = { source, target, sourceHandle: null, targetHandle: null }
+      expect(canvas.isValidConnection!(connection)).toBe(false)
+      // Invoke callbacks too: the controller guards must hold even if an invalid event arrives.
+      act(() => canvas.onConnect!(connection))
+      expect(readSchema()).toEqual(before)
+      expect(screen.getByLabelText('Label')).toHaveValue('Contract')
+      act(() => canvas.onReconnect!(canvas.edges![0], connection))
+      expect(readSchema()).toEqual(before)
+      expect(screen.getByLabelText('Label')).toHaveValue('Contract')
+      expect(screen.queryByLabelText('From node')).not.toBeInTheDocument()
+      expect(canvas.nodes!.filter((node) => node.selected).map((node) => node.data.label)).toEqual(['Contract'])
+      expect(canvas.edges).toHaveLength(1)
+      expect(canvas.edges![0].selected).toBe(false)
+    })
   })
 
   it('shows a drag preview while keeping the schema node in place until drop', async () => {
