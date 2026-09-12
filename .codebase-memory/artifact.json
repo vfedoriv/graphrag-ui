@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "94dfdca2d03e30c0169a1fb55e791c3c68728aec",
-    "indexed_at": "2026-09-12T08:56:21Z",
+    "commit": "1ad7170ccd49b25de1306473dcdcd6923e9b76c6",
+    "indexed_at": "2026-09-12T08:57:08Z",
     "project": "home-vitaliy-workspace-graphrag-ui",
     "nodes": 150,
     "edges": 158,
     "original_size": 2359296,
-    "compressed_size": 154873,
+    "compressed_size": 154872,
     "compression_level": 3
 }
