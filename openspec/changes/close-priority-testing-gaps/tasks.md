@@ -22,4 +22,4 @@
 
 - [x] 4.1 Run `npm run coverage` after the focused suites pass and update `docs/testing-gap-report.md` with the measurement date, exact metrics, configured gates, threshold headroom, closed items, remaining priorities, rationale, and closure criteria.
 - [x] 4.2 Reassess each Vitest threshold against the new stable baseline, raising only values that retain a documented safety margin; verify `npm run coverage` passes and the report records the decision for raised or retained gates.
-- [ ] 4.3 Run `openspec validate --all`, `npm run lint`, `npm run test:run`, `npm run test:e2e`, `npm run coverage`, and `npm run build`; record or resolve every actionable failure before marking the change complete.
+- [x] 4.3 Run `openspec validate --all`, `npm run lint`, `npm run test:run`, `npm run test:e2e`, `npm run coverage`, and `npm run build`; record or resolve every actionable failure before marking the change complete.
