@@ -15,7 +15,7 @@
 ## 3. Schema Workflow Coverage
 
 - [x] 3.1 Extend candidate-review tests for valid modify and pin decisions, malformed JSON, changed identity or kind, optional rationale, cancel, pending, and read-only states; verify emitted decision payloads and visible validation errors.
-- [ ] 3.2 Add selective Schema Builder interaction tests for node and relationship add/remove flows, connection and reconnection validation, and selected-element transitions; verify serialized schema content and inspector state remain synchronized.
+- [x] 3.2 Add selective Schema Builder interaction tests for node and relationship add/remove flows, connection and reconnection validation, and selected-element transitions; verify serialized schema content and inspector state remain synchronized.
 - [ ] 3.3 Add Schema Builder tests for schema load, validation, create, and update failure feedback plus guarded actions without a selected knowledge base; verify visible alerts and absence of invalid mutation calls.
 
 ## 4. Baseline, Documentation, and Gates
